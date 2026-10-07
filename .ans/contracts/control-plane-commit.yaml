@@ -1,0 +1,14 @@
+schema_version: 1
+id: control-plane-commit
+revision: proposal-v1
+status: SUPERSEDED
+primary_owner: control-plane
+callers: 'organization-engine,supervisor-engine'
+public_entry: 'src/services/public/control_plane.py'
+input_fields: 'execution_permit,expected_version,resource_changes,idempotency_key'
+output_fields: 'commit_id,organization_version,event_ids,resource_digests,status'
+errors: 'INVALID_PERMIT,STALE_VERSION,REPLAY,LOCK_CONFLICT,PATH_ESCAPE,RECOVERY_REQUIRED'
+guarantees: '可信许可核验与持锁重查；组织快照与重要事件事务提交；重试不得重复 mutation'
+canonical_design: ../../docs/design/2026-10-07_design_organization-proposal-v1.md
+verification: owner_contract_tests_and_independent_integration
+implementation_status: NOT_IMPLEMENTED

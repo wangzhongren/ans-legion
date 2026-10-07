@@ -1,0 +1,11 @@
+mission_id: legion-permission
+version: legion-v1
+steps:
+  - {id: core_models, owner: KernelEngineer, depends_on: []}
+  - {id: policy_decision, owner: KernelEngineer, depends_on: [core_models]}
+  - {id: mutation_gate, owner: KernelEngineer, depends_on: [policy_decision]}
+  - {id: event_log, owner: KernelEngineer, depends_on: [mutation_gate]}
+  - {id: permission_demo, owner: KernelEngineer, depends_on: [event_log]}
+  - {id: proposal_adapters, owner: AgentAdapterEngineer, depends_on: [permission_demo]}
+  - {id: review, owner: Reviewer, depends_on: [permission_demo,proposal_adapters]}
+  - {id: integration, owner: Tester, depends_on: [review]}

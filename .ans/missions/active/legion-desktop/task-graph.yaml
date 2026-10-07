@@ -1,0 +1,18 @@
+schema_version: 1
+status: COORDINATION_OVERVIEW_NOT_DISPATCH_AUTHORITY
+max_concurrent_workers: 2
+original_record: docs/scheduling/legion-desktop-workbench-v2.md
+successor_record: docs/scheduling/legion-desktop-workbench-v2-fixture-repair.md
+reason: five_owned_fixture_tests_require_caller_role_isolation_repair
+nodes:
+  - {id: kernel, role: KernelEngineer, needs: [], record: original}
+  - {id: adapter, role: AgentAdapterEngineer, needs: [kernel], record: original}
+  - {id: core-package-deps, role: ProjectManager, needs: [adapter], record: original}
+  - {id: cap-fixtures, role: DesktopEngineer, needs: [core-package-deps], record: successor, coverage: five_repaired_tests_and_25_unchanged_cap_outputs}
+  - {id: desktop-interface, role: DesktopEngineer, needs: [cap-fixtures], record: successor}
+  - {id: desktop-package, role: ProjectManager, needs: [desktop-interface], record: successor}
+  - {id: reviewer, role: Reviewer, needs: [desktop-package], record: successor}
+  - {id: tester, role: Tester, needs: [reviewer]}
+final_public_check: {record: docs/scheduling/legion-desktop-workbench-v2-desktop-public.md, role: ProjectManager, authored_write_set: [], verified_revision: 6, pass: 73}
+final_artifact_rechecks: {record: docs/scheduling/legion-desktop-workbench-v2-artifact-recheck.md, roles: [Reviewer,Tester], authored_write_set: [], verified_revision: 11, Reviewer_pass: 15, Tester_pass: 2}
+authority: Supervisor_task_ops_records_only_this_file_does_not_dispatch_or_verify

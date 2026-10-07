@@ -1,0 +1,19 @@
+schema_version: 1
+id: supervisor-engine
+name: '任务与交接开发'
+responsibility: '实现产品 Supervisor 的 Mission、Task 路由、依赖、Work Proposal 与显式 Handoff；不能授予权限'
+status: SUPERSEDED
+read_scope: ['project/**']
+write_scope: []
+deny_scope: [outside_accepted_boundary]
+authority_source: boundary.yaml
+tools: [read, propose]
+capabilities: ['Mission、Work Governance Loop、Handoff']
+allowed_actions: [investigate, propose_within_role]
+forbidden_actions: [self_expand_authority, self_approve, bypass_kernel, mutate_peer_resources]
+delegation_scope: []
+handoff_targets: ['project-manager']
+required_approvals: [human_acceptance, task_implementation_authorization]
+reporting_line: project-manager
+memory_scope: '.ans/roles/supervisor-engine/docs/'
+contracts: [policy-decision, control-plane-commit, organization-change, mission-handoff, agent-proposal]

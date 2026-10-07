@@ -1,0 +1,18 @@
+schema_version: 1
+status: ACCEPTED
+version: v004
+approval_source: direct_customer_workbench_v2_confirm_2026-10-07
+roles:
+  - {id: ProjectManager, status: ACCEPTED, reporting_line: Human, role: '../roles/ProjectManager/role.yaml', boundary: '../roles/ProjectManager/boundary.yaml'}
+  - {id: Supervisor, status: ACCEPTED, reporting_line: ProjectManager, role: '../roles/Supervisor/role.yaml', boundary: '../roles/Supervisor/boundary.yaml'}
+  - {id: KernelEngineer, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/KernelEngineer/role.yaml', boundary: '../roles/KernelEngineer/boundary.yaml'}
+  - {id: AgentAdapterEngineer, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/AgentAdapterEngineer/role.yaml', boundary: '../roles/AgentAdapterEngineer/boundary.yaml'}
+  - {id: DesktopEngineer, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/DesktopEngineer/role.yaml', boundary: '../roles/DesktopEngineer/boundary.yaml'}
+  - {id: Reviewer, status: ACCEPTED, reporting_line: Human, role: '../roles/Reviewer/role.yaml', boundary: '../roles/Reviewer/boundary.yaml'}
+  - {id: Tester, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/Tester/role.yaml', boundary: '../roles/Tester/boundary.yaml'}
+delegations: []
+handoff_topology: graph.yaml
+canonical_design: docs/design/2026-10-07_design_desktop-workbench-v2.md
+design_sha256: 715639b5dd278437059f29bde1e7c02ac90d94af18f9bf5a6b5367d16e9ab5d3
+policy_sha256: 2546ebd0b8756eccb83bced6808c10d1c25c3bc175ca8f676a9f1d5172cb706b
+path_base: project_root_for_canonical_design; organization_directory_for_role_refs

@@ -1,0 +1,16 @@
+schema_version: 1
+canonical_design: docs/design/2026-10-07_design_node-pi-v3.md
+execution_config: .ans/project.json
+organization: .ans/organization/versions/v002.yaml
+mission: .ans/missions/active/legion-pi/
+policy_sha256: 25e46e9b7811685847116393d9c9982062e975f66e151ce3d094ef2be020cccb
+design_sha256: 342fd522343126c31c7a7f1ee3c8befab9f363d5372297847ebc8f42b5f30bae
+validation: .ans/decisions/legion-node-pi-v3-validation.md
+delivery: docs/roles/Supervisor/docs/delivery-node-pi-v3.md
+delivery_sha256: 84cd12d8fd2568c1a50586cdad672d25604fea19d93d64dc095a3c29dcc6a7c7
+full_test_evidence: .ans/runtime/legion-pi-node-v3/packaging/final-public-npm-test.json
+full_test_evidence_sha256: 0f35d694c56a9d6ca8d49a2e77d3af0f2f8b10ef9f7826fd63fd4752cfe369c2
+tarball: .ans/runtime/legion-pi-node-v3/packaging/legion-runtime-0.3.0.tgz
+tarball_sha256: a83a86499c4aaa7c997d94cabbb697efdc82f81475b622b85307ac682de4d8f0
+product_mjs_count: 25
+product_source_sha256: 75ab247b8aafc224d39c926119e170bc56bbda966073a73eeab3bfa4a4bb8327

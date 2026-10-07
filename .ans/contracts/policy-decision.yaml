@@ -1,0 +1,14 @@
+schema_version: 1
+id: policy-decision
+revision: proposal-v1
+status: SUPERSEDED
+primary_owner: kernel
+callers: 'organization-engine,supervisor-engine'
+public_entry: 'src/services/public/policy.py'
+input_fields: 'proposal_id,actor_id,active_role,target,action,tool,capability,task,delegation,organization_version,payload_digest'
+output_fields: 'decision_id,outcome,reason_codes,organization_version,proposal_digest,next_step,execution_permit'
+errors: 'DENY_INVALID_IDENTITY,DENY_SCOPE,DENY_TOOL,DENY_STALE_VERSION,DENY_INVALID_STATE'
+guarantees: 'deny 优先；只有 ALLOW 可发绑定目标与参数的一次性许可；其余四种结果不执行'
+canonical_design: ../../docs/design/2026-10-07_design_organization-proposal-v1.md
+verification: owner_contract_tests_and_independent_integration
+implementation_status: NOT_IMPLEMENTED

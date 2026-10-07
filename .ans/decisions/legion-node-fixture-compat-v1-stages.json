@@ -1,0 +1,12 @@
+{
+  "package-fixtures": [
+    "tests/package/test_package.mjs"
+  ],
+  "ownership-regression": [
+    "tests/reviewer/test_structure.mjs"
+  ],
+  "integration-fixtures": [
+    "tests/integration/test_permission_flow.mjs",
+    "tests/integration/test_generic_agents.mjs"
+  ]
+}

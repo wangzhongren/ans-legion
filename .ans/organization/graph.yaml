@@ -1,0 +1,23 @@
+schema_version: 1
+organization_version: v004
+reporting_edges:
+  - {from: ProjectManager, to: Human}
+  - {from: Supervisor, to: ProjectManager}
+  - {from: KernelEngineer, to: Supervisor}
+  - {from: AgentAdapterEngineer, to: Supervisor}
+  - {from: DesktopEngineer, to: Supervisor}
+  - {from: Tester, to: Supervisor}
+  - {from: Reviewer, to: Human, independent: true}
+handoff_edges:
+  - {from: KernelEngineer, to: Supervisor}
+  - {from: Supervisor, to: KernelEngineer}
+  - {from: AgentAdapterEngineer, to: Supervisor}
+  - {from: Supervisor, to: AgentAdapterEngineer}
+  - {from: DesktopEngineer, to: Supervisor}
+  - {from: Supervisor, to: DesktopEngineer}
+  - {from: Tester, to: Supervisor}
+  - {from: Supervisor, to: Tester}
+  - {from: Reviewer, to: Supervisor}
+  - {from: Supervisor, to: Reviewer}
+  - {from: Reviewer, to: ProjectManager}
+delegation_edges: []

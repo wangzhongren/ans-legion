@@ -1,0 +1,15 @@
+schema_version: 1
+status: ACCEPTED
+version: v001
+approval_source: direct_customer_message_2026-10-07
+roles:
+  - {id: ProjectManager, status: ACCEPTED, reporting_line: Human, role: '../roles/ProjectManager/role.yaml', boundary: '../roles/ProjectManager/boundary.yaml'}
+  - {id: Supervisor, status: ACCEPTED, reporting_line: ProjectManager, role: '../roles/Supervisor/role.yaml', boundary: '../roles/Supervisor/boundary.yaml'}
+  - {id: KernelEngineer, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/KernelEngineer/role.yaml', boundary: '../roles/KernelEngineer/boundary.yaml'}
+  - {id: AgentAdapterEngineer, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/AgentAdapterEngineer/role.yaml', boundary: '../roles/AgentAdapterEngineer/boundary.yaml'}
+  - {id: Tester, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/Tester/role.yaml', boundary: '../roles/Tester/boundary.yaml'}
+  - {id: Reviewer, status: ACCEPTED, reporting_line: Human, role: '../roles/Reviewer/role.yaml', boundary: '../roles/Reviewer/boundary.yaml'}
+delegations: []
+handoff_topology: graph.yaml
+committed_date: '2026-10-07'
+reason: Customer_supplied_six_role_organization_and_authorized_development

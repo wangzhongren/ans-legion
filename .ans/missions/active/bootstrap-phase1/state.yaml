@@ -1,0 +1,7 @@
+schema_version: 1
+mission_id: bootstrap-phase1
+status: SUPERSEDED
+active_workers: []
+verified_nodes: []
+blocked_reason: Awaiting_customer_acceptance_and_implementation_authorization
+last_event_id: null

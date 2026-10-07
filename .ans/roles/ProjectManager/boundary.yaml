@@ -1,0 +1,9 @@
+schema_version: 1
+role_id: ProjectManager
+status: ACCEPTED
+version: legion-desktop-workbench-v2
+read_scope: ['project/**']
+write_scope: ["package.json","package-lock.json","workbench.mjs","README.md","apps/desktop/package.json","apps/desktop/package-lock.json","apps/desktop/forge.config.mjs","apps/desktop/main.mjs","apps/desktop/README.md","apps/desktop/scripts/install-electron.mjs","apps/desktop/scripts/verify-dependencies.mjs","tests/package/test_package.mjs","apps/desktop/tests/package/desktop-package.test.mjs","docs/roles/ProjectManager/feature-map.md","docs/roles/ProjectManager/functional-description.md","docs/roles/ProjectManager/api-spec.md","docs/roles/ProjectManager/changelog.md","docs/roles/ProjectManager/docs/design/2026-10-07_design_desktop-workbench-v2.md","docs/roles/ProjectManager/docs/feature/distribution.md","docs/roles/ProjectManager/docs/feature/desktop-distribution.md","docs/roles/ProjectManager/docs/architecture.md"]
+generated_effect_scope: [".ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/",".ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/npm-cache/",".ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/tmp/",".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/packaging/",".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/npm-cache/",".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/electron-cache/",".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/user-data/",".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/fixtures/",".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/tmp/","node_modules/","apps/desktop/node_modules/","apps/desktop/out/"]
+deny_scope: ['outside_boundary', '.ans/organization/**', '.ans/roles/**', '.ans/project.json', 'historical_runtime_artifacts']
+approval_source: direct_customer_workbench_v2_confirm_2026-10-07

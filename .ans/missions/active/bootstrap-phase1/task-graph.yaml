@@ -1,0 +1,188 @@
+schema_version: 1
+mission_id: bootstrap-phase1
+status: SUPERSEDED
+execution_authorized: false
+contract_revision: proposal-v1
+write_sets_status: must_be_narrowed_before_dispatch
+release_rule: predecessor_verified_against_current_candidate_and_accepted_contract
+nodes:
+  - id: design
+    owner: project-manager
+    stage: design
+    status: pending
+    role_card: ../../../roles/project-manager/role-card.md
+    boundary: ../../../roles/project-manager/boundary.md
+    depends_on: []
+    output: '已确认集成契约和实施方案'
+    checks: ['human_confirmed_version', 'unique_ownership', 'acyclic_dependencies']
+    authorization: null
+  - id: build
+    owner: assembly
+    stage: configuration
+    status: pending
+    role_card: ../../../roles/assembly/role-card.md
+    boundary: ../../../roles/assembly/boundary.md
+    depends_on: ['design']
+    output: '构建与测试环境'
+    checks: ['test_runner_available', 'configuration_check']
+    authorization: null
+  - id: org-model
+    owner: organization-engine
+    stage: model
+    status: pending
+    role_card: ../../../roles/organization-engine/role-card.md
+    boundary: ../../../roles/organization-engine/boundary.md
+    depends_on: ['build']
+    output: 'Organization/Role/Request/Approval/Contract Model'
+    checks: ['model_unit_tests', 'schema_contract_tests']
+    authorization: null
+  - id: mission-model
+    owner: supervisor-engine
+    stage: model
+    status: pending
+    role_card: ../../../roles/supervisor-engine/role-card.md
+    boundary: ../../../roles/supervisor-engine/boundary.md
+    depends_on: ['build']
+    output: 'Mission/Task/Handoff/CapabilityGap Model'
+    checks: ['model_unit_tests', 'state_transition_tests']
+    authorization: null
+  - id: policy-model
+    owner: kernel
+    stage: model
+    status: pending
+    role_card: ../../../roles/kernel/role-card.md
+    boundary: ../../../roles/kernel/boundary.md
+    depends_on: ['build']
+    output: 'ActionProposal/Boundary/Decision/Permit Model'
+    checks: ['model_unit_tests', 'deny_invariant_tests']
+    authorization: null
+  - id: agent-model
+    owner: agent-adapter
+    stage: model
+    status: pending
+    role_card: ../../../roles/agent-adapter/role-card.md
+    boundary: ../../../roles/agent-adapter/boundary.md
+    depends_on: ['build']
+    output: 'AgentSession 固定角色数据'
+    checks: ['binding_schema_tests']
+    authorization: null
+  - id: storage-model
+    owner: control-plane
+    stage: model
+    status: pending
+    role_card: ../../../roles/control-plane/role-card.md
+    boundary: ../../../roles/control-plane/boundary.md
+    depends_on: ['build']
+    output: 'Event/CommitReceipt/Checkpoint Model'
+    checks: ['model_unit_tests', 'replay_schema_tests']
+    authorization: null
+  - id: storage
+    owner: control-plane
+    stage: provider-service
+    status: pending
+    role_card: ../../../roles/control-plane/role-card.md
+    boundary: ../../../roles/control-plane/boundary.md
+    depends_on: ['storage-model', 'org-model', 'policy-model']
+    output: '受控执行、文件事务、版本与日志'
+    checks: ['permit_replay_and_path_escape_tests', 'failure_recovery_tests', 'commit_contract_tests']
+    authorization: null
+  - id: adapter
+    owner: agent-adapter
+    stage: provider-service
+    status: pending
+    role_card: ../../../roles/agent-adapter/role-card.md
+    boundary: ../../../roles/agent-adapter/boundary.md
+    depends_on: ['agent-model', 'policy-model', 'mission-model']
+    output: '可复现的隔离 Agent 提案通道'
+    checks: ['no_raw_mutation_tools', 'binding_and_proposal_contract_tests']
+    authorization: null
+  - id: policy
+    owner: kernel
+    stage: service
+    status: pending
+    role_card: ../../../roles/kernel/role-card.md
+    boundary: ../../../roles/kernel/boundary.md
+    depends_on: ['policy-model', 'org-model', 'mission-model']
+    output: '确定性五类 PolicyDecision'
+    checks: ['deny_precedence', 'delegation_intersection', 'stale_version_and_self_approval_tests']
+    authorization: null
+  - id: org-service
+    owner: organization-engine
+    stage: service
+    status: pending
+    role_card: ../../../roles/organization-engine/role-card.md
+    boundary: ../../../roles/organization-engine/boundary.md
+    depends_on: ['org-model']
+    output: '组织候选、重叠和审批模型'
+    checks: ['organization_contract_tests', 'overlap_and_approval_tests']
+    authorization: null
+  - id: mission-service
+    owner: supervisor-engine
+    stage: service
+    status: pending
+    role_card: ../../../roles/supervisor-engine/role-card.md
+    boundary: ../../../roles/supervisor-engine/boundary.md
+    depends_on: ['mission-model', 'org-model']
+    output: 'Mission 状态和显式交接模型'
+    checks: ['mission_transition_tests', 'explicit_acceptance_tests']
+    authorization: null
+  - id: org-pipeline
+    owner: organization-engine
+    stage: pipeline
+    status: pending
+    role_card: ../../../roles/organization-engine/role-card.md
+    boundary: ../../../roles/organization-engine/boundary.md
+    depends_on: ['storage', 'policy', 'org-service']
+    output: '组织、角色创建、approval、scope 闭环'
+    checks: ['organization_pipeline_contract_tests', 'approval_version_invalidation_tests']
+    authorization: null
+  - id: work-pipeline
+    owner: supervisor-engine
+    stage: pipeline
+    status: pending
+    role_card: ../../../roles/supervisor-engine/role-card.md
+    boundary: ../../../roles/supervisor-engine/boundary.md
+    depends_on: ['storage', 'adapter', 'policy', 'mission-service']
+    output: 'Mission/Work/Handoff 闭环'
+    checks: ['work_pipeline_contract_tests', 'handoff_no_authority_transfer_tests']
+    authorization: null
+  - id: cli
+    owner: assembly
+    stage: interface
+    status: pending
+    role_card: ../../../roles/assembly/role-card.md
+    boundary: ../../../roles/assembly/boundary.md
+    depends_on: ['org-pipeline', 'work-pipeline']
+    output: '可启动的命令入口'
+    checks: ['layer_wiring_checks', 'startup_smoke_tests']
+    authorization: null
+  - id: review
+    owner: reviewer
+    stage: independent-review
+    status: pending
+    role_card: ../../../roles/reviewer/role-card.md
+    boundary: ../../../roles/reviewer/boundary.md
+    depends_on: ['cli']
+    output: '当前组合版本审查报告'
+    checks: ['adjacent_layer_check', 'authority_bypass_review', 'write_scope_check']
+    authorization: null
+  - id: e2e
+    owner: tester
+    stage: integration
+    status: pending
+    role_card: ../../../roles/tester/role-card.md
+    boundary: ../../../roles/tester/boundary.md
+    depends_on: ['review']
+    output: 'Demo A/B/C 与受影响回归证据'
+    checks: ['demo_a_no_file_change', 'demo_b_atomic_role_creation', 'demo_c_explicit_acceptance', 'crash_recovery_and_replay']
+    authorization: null
+  - id: acceptance
+    owner: project-manager
+    stage: delivery
+    status: pending
+    role_card: ../../../roles/project-manager/role-card.md
+    boundary: ../../../roles/project-manager/boundary.md
+    depends_on: ['e2e']
+    output: '版本化完整证据与 Human 验收请求'
+    checks: ['all_required_nodes_current', 'feature_docs_current', 'human_acceptance']
+    authorization: null

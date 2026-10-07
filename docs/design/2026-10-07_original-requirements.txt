@@ -1,0 +1,1436 @@
+$ans-governed-construction
+
+这是一个全新的软件项目。
+
+我要开发一个面向多 Agent 软件开发的 Agent Organization Runtime / Command Center。
+
+这个软件的目标不是简单“同时运行多个 Agent”，而是建立一套：
+
+**让一个人通过组织、角色、权限、任务关系、交接协议和自动治理流程，可靠管理大量自治 Agent 的系统。**
+
+系统核心理念：
+
+> Knowledge may be global; mutation authority must be local.
+
+同时：
+
+> Organizational authority must itself be bounded.
+
+以及：
+
+> Maximum autonomy within bounded authority.
+
+概率模型负责规划，确定性系统负责授权。
+
+---
+
+# 1. 核心原则
+
+1. 每个 Agent 必须绑定明确的 Role。
+2. Role 定义职责，但 Role 描述本身不能授予实际权限。
+3. 实际 Mutation Authority 必须由确定性的 Policy Kernel 强制执行。
+4. Agent 只能提出 ActionProposal，不能直接绕过 Kernel 修改受保护资源。
+5. Agent 在自己的合法权限范围内拥有尽可能大的自主性。
+6. 权限不足不能因为“完成任务需要”而自动扩大。
+7. 跨角色操作必须通过 Handoff、Delegate、Scope Expansion 或 Escalation。
+8. 所有重要 Mutation 必须记录 Event。
+9. 所有组织变化必须产生 OrganizationVersion。
+10. 所有治理信息必须具有稳定、人类可读、机器可解析的位置。
+11. 不允许把重要组织状态散落在 Prompt、聊天记录或 Agent 私有记忆中。
+12. 文件系统本身必须构成系统的一个稳定 Control Plane Interface。
+
+---
+
+# 2. Client / Human / Project Owner
+
+Client 是合法的 Mission 和 Organization Intent 来源。
+
+Client 可以提出：
+
+- 新 Mission；
+- 创建角色；
+- 删除角色；
+- 修改角色职责；
+- 修改角色边界；
+- 拆分角色；
+- 合并角色；
+- 增加专业团队；
+- 修改 Delegation；
+- 修改 Handoff 关系；
+- 调整组织结构。
+
+例如：
+
+- “增加一个安全审查角色。”
+- “增加一个专门负责数据库的 Agent。”
+- “Backend 职责太大，把数据库职责拆出去。”
+- “Tester 不允许修改生产代码。”
+- “给这个项目增加一个发布管理员。”
+
+Client 的自然语言请求首先转换成：
+
+`OrganizationRequest`
+
+Client 提出的是：
+
+**Organization Intent**
+
+而不是直接改变 Organization State。
+
+---
+
+# 3. Project Manager
+
+每创建一个 Project，系统必须自动创建：
+
+`ProjectManager`
+
+Project Manager 是项目组织生命周期的治理角色。
+
+它不是万能 Agent，也不是 Root。
+
+Project Manager 主要负责：
+
+**Organization Lifecycle Pipeline**
+
+包括：
+
+- Role 创建；
+- Role 删除；
+- Role 修改；
+- Role Split；
+- Role Merge；
+- Boundary 设计；
+- Capability 管理；
+- Reporting Line；
+- Delegation；
+- Handoff topology；
+- Contract 管理；
+- Organization Version；
+- Organization Health Monitoring。
+
+Project Manager 不一定是组织请求发起者。
+
+请求可以来自：
+
+- Client；
+- Supervisor；
+- Existing Role；
+- Runtime Metrics；
+- Project Manager 本身。
+
+Project Manager 的职责是：
+
+**接收 → 分析 → 设计 → 风险检查 → 推进审批 → 落地 → 接入 → 观察 → 演化。**
+
+---
+
+# 4. Project Manager 权限边界
+
+Project Manager 拥有：
+
+`Organization Proposal Authority`
+
+但不天然拥有：
+
+`Organization Approval Authority`
+
+更不天然拥有：
+
+`Business Mutation Authority`
+
+因此 Project Manager 不能：
+
+- 自己提出角色并直接使其生效；
+- 自己批准自己的 Boundary Expansion；
+- 给自己扩权；
+- 修改任意业务代码；
+- 因为缺少某角色就自己代替该角色执行；
+- 绕过 Governance Gate；
+- 修改 Policy Kernel 规则；
+- 成为隐式 Root。
+
+高风险 Organization Mutation 默认需要：
+
+`Human / Project Owner Approval`
+
+---
+
+# 5. Supervisor
+
+Supervisor 负责：
+
+**Mission Lifecycle / Work Coordination**
+
+包括：
+
+- Mission 理解；
+- Task 拆解；
+- Task Routing；
+- Dependency Planning；
+- Handoff；
+- Delegation；
+- Replanning；
+- 工作状态汇总；
+- Capability Gap Detection；
+- 任务终止判断。
+
+但是：
+
+**Supervisor 不是 Root。**
+
+Supervisor 不天然拥有其他 Role 的权限。
+
+Supervisor 可以：
+
+`request role`
+
+但不能：
+
+`create role`
+
+Supervisor 可以：
+
+`request boundary change`
+
+但不能：
+
+`grant boundary change`
+
+Supervisor 可以协调 Backend。
+
+但不能因此直接修改 Backend 的资源。
+
+---
+
+# 6. Project Manager 与 Supervisor 的职责分离
+
+必须明确：
+
+```text
+Project Manager
+负责 Organization Lifecycle
+
+Supervisor
+负责 Mission Lifecycle
+```
+
+Project Manager 回答：
+
+```text
+谁应该存在？
+谁负责什么？
+谁拥有什么权限？
+角色之间是什么关系？
+组织结构是否合理？
+```
+
+Supervisor 回答：
+
+```text
+当前 Mission 怎么完成？
+任务应该交给谁？
+任务之间是什么依赖？
+什么时候执行？
+失败后怎么重新规划？
+```
+
+禁止把两者融合成一个拥有无限权限的超级 Agent。
+
+---
+
+# 7. Organization Request 来源
+
+以下主体都可以提出 OrganizationRequest：
+
+## Client
+
+直接提出组织需求。
+
+## Supervisor
+
+发现 Capability Gap。
+
+## Existing Role
+
+发现当前职责无法覆盖任务，并且不存在合法 Handoff Target。
+
+## Project Manager
+
+根据组织运行情况主动提出优化建议。
+
+## Runtime Metrics
+
+根据运行数据生成 OrganizationSignal。
+
+例如：
+
+- ScopeExpansionRequest 过多；
+- Handoff 过多；
+- 某 Role 长期成为瓶颈；
+- 某 Role 长期空闲；
+- Write Scope 冲突频繁；
+- 某类任务没有责任主体；
+- 某角色重复返工。
+
+Runtime 只能产生 Signal。
+
+不能直接改变 Organization。
+
+---
+
+# 8. Role Lifecycle Pipeline
+
+所有角色创建和修改必须进入统一流程：
+
+```text
+REQUEST
+  ↓
+INTAKE
+  ↓
+NEED ANALYSIS
+  ↓
+OVERLAP ANALYSIS
+  ↓
+ROLE DESIGN
+  ↓
+BOUNDARY DESIGN
+  ↓
+CAPABILITY DESIGN
+  ↓
+CONTRACT ANALYSIS
+  ↓
+RISK ANALYSIS
+  ↓
+APPROVAL
+  ↓
+COMMIT
+  ↓
+REGISTER
+  ↓
+INTEGRATE
+  ↓
+ASSIGN
+  ↓
+MONITOR
+  ↓
+EVOLVE / RETIRE
+```
+
+Project Manager 自动推动流程。
+
+---
+
+# 9. Role Creation 原则
+
+不能因为用户说：
+
+“创建一个 Database Agent”
+
+就立即启动一个数据库 Agent。
+
+首先产生：
+
+`RoleCreationRequest`
+
+然后分析：
+
+- 是否真的需要长期 Role；
+- 当前是否已有类似 Role；
+- 是否应该修改已有 Role；
+- 是否只是一次临时 Task；
+- 是否存在职责重叠；
+- 是否存在 Write Scope 冲突；
+- 是否需要修改已有角色 Boundary；
+- 是否需要新增 Contract。
+
+然后形成：
+
+`CandidateRoleDefinition`
+
+Candidate Role 不具有实际权限。
+
+---
+
+# 10. Role 必须包含的定义
+
+每个正式 Role 至少包含：
+
+```text
+id
+name
+responsibility
+read_scope
+write_scope
+deny_scope
+tools
+capabilities
+allowed_actions
+forbidden_actions
+delegation_scope
+handoff_targets
+required_approvals
+reporting_line
+memory_scope
+contracts
+status
+```
+
+但是：
+
+Role Definition 和 Authority Boundary 必须逻辑分离。
+
+`role.yaml` 表示：
+
+**你是谁，你负责什么。**
+
+`boundary.yaml` 表示：
+
+**你真正被允许做什么。**
+
+Role 描述不能覆盖 Boundary。
+
+---
+
+# 11. Work Mutation 与 Organization Mutation
+
+系统必须明确区分两种变化。
+
+## Work Mutation
+
+例如：
+
+- 修改代码；
+- 修改测试；
+- 修改文档；
+- 修改配置；
+- 数据库 schema；
+- shell command；
+- Git commit；
+- 业务状态变化。
+
+由：
+
+`Role Policy`
+
+控制。
+
+---
+
+## Organization Mutation
+
+例如：
+
+- CreateRole；
+- DeleteRole；
+- ModifyRole；
+- SplitRole；
+- MergeRole；
+- ChangeBoundary；
+- GrantCapability；
+- RevokeCapability；
+- ChangeDelegation；
+- ChangeReportingLine；
+- ChangeContract；
+- ChangeOrganizationTopology。
+
+由：
+
+`Organization Governance`
+
+控制。
+
+二者必须使用不同 Proposal 和 Commit Pipeline。
+
+---
+
+# 12. ActionProposal
+
+Agent 不直接执行受保护 Mutation。
+
+Agent 首先提交：
+
+`ActionProposal`
+
+Kernel 必须检查：
+
+- Active Role；
+- Target Resource；
+- read/write scope；
+- deny scope；
+- capability；
+- tool permission；
+- current state；
+- required approval；
+- delegation context；
+- task ownership；
+- organization version。
+
+返回：
+
+```text
+ALLOW
+DENY
+REQUIRE_APPROVAL
+REQUIRE_HANDOFF
+REQUIRE_SCOPE_EXPANSION
+```
+
+只有 ALLOW 后才允许执行真正 Mutation。
+
+---
+
+# 13. 关键安全规则
+
+必须禁止：
+
+1. Agent 自己扩大自己的权限；
+2. Supervisor 给自己增加业务权限；
+3. Project Manager 给自己扩权；
+4. Project Manager 自批组织变化；
+5. 角色缺失时其他 Agent 自动顶替；
+6. Agent 因任务需要自动获得权限；
+7. LLM 自己决定权限结果；
+8. Tool 间接绕过 Policy；
+9. Delegation 洗权限；
+10. Handoff 洗权限；
+11. Role Creation 自动继承创建者权限；
+12. 新角色默认拥有全局 Write；
+13. 高权限角色成为隐式 Root。
+
+原则：
+
+> Responsibility gap must not become an authorization bypass.
+
+---
+
+# 14. 项目文件系统 Control Plane
+
+整个项目必须存在统一控制目录：
+
+```text
+.ans/
+```
+
+所有组织治理信息必须放在这里。
+
+禁止把 Role、Mission、Handoff、Contract、Approval 等核心治理数据随意散落。
+
+推荐并要求使用以下结构：
+
+```text
+project/
+├── src/
+├── tests/
+├── docs/
+│
+└── .ans/
+    ├── README.md
+    ├── project.yaml
+    │
+    ├── organization/
+    │   ├── current.yaml
+    │   ├── graph.yaml
+    │   └── versions/
+    │       ├── v001.yaml
+    │       ├── v002.yaml
+    │       └── ...
+    │
+    ├── roles/
+    │   ├── project-manager/
+    │   │   ├── README.md
+    │   │   ├── role.yaml
+    │   │   ├── boundary.yaml
+    │   │   └── state.yaml
+    │   │
+    │   ├── supervisor/
+    │   │   ├── README.md
+    │   │   ├── role.yaml
+    │   │   ├── boundary.yaml
+    │   │   └── state.yaml
+    │   │
+    │   └── {role-id}/
+    │       ├── README.md
+    │       ├── role.yaml
+    │       ├── boundary.yaml
+    │       └── state.yaml
+    │
+    ├── missions/
+    │   ├── active/
+    │   │   └── {mission-id}/
+    │   │       ├── README.md
+    │   │       ├── mission.yaml
+    │   │       ├── task-graph.yaml
+    │   │       └── state.yaml
+    │   └── archive/
+    │
+    ├── handoffs/
+    │   ├── active/
+    │   │   └── {handoff-id}/
+    │   │       ├── handoff.yaml
+    │   │       ├── context.md
+    │   │       ├── artifacts.yaml
+    │   │       └── acceptance.md
+    │   └── archive/
+    │
+    ├── contracts/
+    │   └── {contract-id}.yaml
+    │
+    ├── requests/
+    │   ├── role/
+    │   ├── boundary/
+    │   ├── capability/
+    │   ├── organization/
+    │   └── scope/
+    │
+    ├── approvals/
+    │   ├── pending/
+    │   ├── approved/
+    │   └── rejected/
+    │
+    ├── decisions/
+    │   └── ADR-{id}.md
+    │
+    ├── runtime/
+    │   ├── agents/
+    │   ├── locks/
+    │   ├── queues/
+    │   └── checkpoints/
+    │
+    └── events/
+        ├── index.jsonl
+        └── YYYY-MM-DD.jsonl
+```
+
+该目录结构属于系统协议的一部分。
+
+不能由 Agent 随意重新组织。
+
+---
+
+# 15. `.ans/README.md` 是唯一人类入口
+
+如果一个人第一次打开项目，不应该猜应该看哪里。
+
+固定规则：
+
+> 不知道从哪里开始，就读取 `.ans/README.md`
+
+该文件必须至少展示：
+
+```text
+Project
+Current Organization Version
+Current Mission
+Project Manager
+Supervisor
+Active Roles
+Pending Requests
+Pending Approvals
+Active Handoffs
+Blocked Tasks
+Recent Important Events
+```
+
+并提供下一步阅读路径：
+
+```text
+Organization → .ans/organization/current.yaml
+Roles → .ans/roles/
+Mission → .ans/missions/active/
+Handoffs → .ans/handoffs/active/
+Pending Requests → .ans/requests/
+Approvals → .ans/approvals/
+```
+
+README 必须面向 Human，不只是机器。
+
+---
+
+# 16. Role 目录规范
+
+每个 Role 必须拥有自己的独立目录：
+
+```text
+.ans/roles/{role-id}/
+```
+
+固定包含：
+
+```text
+README.md
+role.yaml
+boundary.yaml
+state.yaml
+```
+
+禁止将多个 Role 的数据混合在一个大型文件中。
+
+---
+
+# 17. Role README
+
+每个角色的 README.md 面向 Human。
+
+至少说明：
+
+```text
+角色是谁
+负责什么
+不负责什么
+可以修改什么
+禁止修改什么
+上级是谁
+可以 Handoff 给谁
+依赖哪些 Contract
+当前状态
+```
+
+让人不读取 YAML 也能快速理解角色。
+
+---
+
+# 18. Handoff 必须独立存在
+
+Handoff 是一次工作交接事务。
+
+不能存放为：
+
+```text
+roles/backend/handoff.md
+```
+
+必须：
+
+```text
+.ans/handoffs/active/{handoff-id}/
+```
+
+每个 Handoff 至少包含：
+
+```text
+handoff.yaml
+context.md
+artifacts.yaml
+acceptance.md
+```
+
+---
+
+# 19. Handoff 生命周期
+
+Handoff 必须具有明确状态：
+
+```text
+CREATED
+↓
+SENT
+↓
+ACCEPTED
+↓
+IN_PROGRESS
+↓
+COMPLETED
+↓
+CLOSED
+↓
+ARCHIVED
+```
+
+禁止用聊天中的一句：
+
+“已经交给 Frontend”
+
+代替正式 Handoff。
+
+---
+
+# 20. Handoff 内容要求
+
+`handoff.yaml`：
+
+记录结构化元数据：
+
+```text
+from
+to
+mission
+task
+reason
+status
+created_at
+accepted_at
+```
+
+`context.md`：
+
+面向接收角色解释：
+
+```text
+发生了什么
+为什么交接
+当前已经完成什么
+下一步需要完成什么
+哪些决定已经固定
+哪些问题仍未解决
+```
+
+`artifacts.yaml`：
+
+记录：
+
+```text
+changed files
+relevant files
+contracts
+tests
+outputs
+references
+```
+
+`acceptance.md`：
+
+由接收 Role 写明：
+
+```text
+是否接受
+接受时间
+理解的任务
+仍存在的问题
+```
+
+---
+
+# 21. Contract 与 Handoff 必须分开
+
+Contract 表示长期稳定接口。
+
+Handoff 表示一次具体任务交接。
+
+例如：
+
+```text
+Contract:
+Backend 与 Frontend 的长期 API 协议
+
+Handoff:
+这一次登录接口修改之后 Frontend 需要做什么
+```
+
+Contract 存：
+
+```text
+.ans/contracts/
+```
+
+Handoff 存：
+
+```text
+.ans/handoffs/
+```
+
+禁止混淆。
+
+---
+
+# 22. Organization State
+
+当前组织结构必须存：
+
+```text
+.ans/organization/current.yaml
+```
+
+必须能够直接看到：
+
+- 当前 Role；
+- Reporting Relationship；
+- Delegation；
+- Handoff Relationships；
+- Role Status；
+- Organization Version。
+
+图结构另存：
+
+```text
+.ans/organization/graph.yaml
+```
+
+---
+
+# 23. Organization Version
+
+任何正式组织变化必须生成新版本。
+
+例如：
+
+```text
+v12 → v13
+
++ DatabaseEngineer
+
+Backend:
+  write scope reduced
+
+DatabaseEngineer:
+  write scope added
+
+new contract:
+  backend-database
+```
+
+旧版本禁止覆盖。
+
+必须归档：
+
+```text
+.ans/organization/versions/
+```
+
+以支持：
+
+- Audit；
+- Rollback；
+- Diff；
+- Research；
+- Organization Evolution Analysis。
+
+---
+
+# 24. Governance State 与 Runtime State 分离
+
+必须明确两类状态。
+
+## Persistent Governance State
+
+例如：
+
+```text
+roles/
+organization/
+contracts/
+decisions/
+approved organization changes
+```
+
+这部分应进入版本控制。
+
+---
+
+## Ephemeral Runtime State
+
+例如：
+
+```text
+agent process
+locks
+queues
+temporary checkpoint
+temporary execution state
+```
+
+统一放：
+
+```text
+.ans/runtime/
+```
+
+Runtime 数据可以不全部进入 Git。
+
+禁止把临时运行状态和长期治理状态混在一起。
+
+---
+
+# 25. Directory Is API
+
+目录位置属于正式协议。
+
+Agent 不应该通过搜索猜测：
+
+“Role 文件在哪里？”
+
+这些路径必须确定。
+
+例如：
+
+```text
+/.ans/roles/{role_id}/role.yaml
+/.ans/roles/{role_id}/boundary.yaml
+/.ans/roles/{role_id}/state.yaml
+
+/.ans/missions/active/{mission_id}/
+
+/.ans/handoffs/active/{handoff_id}/
+
+/.ans/contracts/{contract_id}.yaml
+
+/.ans/requests/{request_type}/{request_id}.yaml
+```
+
+未来即使底层迁移到数据库，这些逻辑路径仍然应保持稳定映射。
+
+---
+
+# 26. Mission
+
+Mission 必须独立存在。
+
+每个 Active Mission：
+
+```text
+.ans/missions/active/{mission-id}/
+```
+
+至少包含：
+
+```text
+README.md
+mission.yaml
+task-graph.yaml
+state.yaml
+```
+
+Mission README 面向 Human。
+
+应该能够快速回答：
+
+```text
+我们现在要完成什么？
+进行到哪里？
+谁在工作？
+谁被阻塞？
+下一步是什么？
+```
+
+---
+
+# 27. Task Graph
+
+Graph 的定位不是取代 Agent Planner。
+
+Graph 表示：
+
+**合法任务依赖与状态转换空间。**
+
+LLM：
+
+```text
+Soft Planner
+```
+
+Graph：
+
+```text
+Legal Transition Space
+```
+
+Role Policy：
+
+```text
+Authority Boundary
+```
+
+三者必须分离。
+
+Graph 不能把所有 Agent 行为硬编码死。
+
+LLM 也不能随意绕过 Graph 状态约束。
+
+---
+
+# 28. Role Creation 后的文件操作
+
+角色批准之后，必须原子化完成：
+
+```text
+CREATE .ans/roles/{role-id}/
+
+CREATE role.yaml
+
+CREATE boundary.yaml
+
+CREATE state.yaml
+
+CREATE README.md
+
+UPDATE organization/current.yaml
+
+UPDATE organization/graph.yaml
+
+CREATE organization version
+
+CREATE event log
+```
+
+禁止只创建一个 Prompt 文件就算角色创建完成。
+
+---
+
+# 29. Scope Expansion
+
+如果 Role 请求扩大权限：
+
+产生：
+
+`ScopeExpansionRequest`
+
+存放：
+
+```text
+.ans/requests/scope/
+```
+
+内容必须包括：
+
+```text
+requester
+requested resource
+requested action
+current boundary
+reason
+mission
+task
+risk
+suggested duration
+```
+
+Scope Expansion 默认不能自行批准。
+
+---
+
+# 30. Approval
+
+Approval 必须具有正式状态：
+
+```text
+PENDING
+APPROVED
+REJECTED
+EXPIRED
+REVOKED
+```
+
+文件分别进入：
+
+```text
+.ans/approvals/pending/
+.ans/approvals/approved/
+.ans/approvals/rejected/
+```
+
+重要 Approval 必须产生 Event。
+
+---
+
+# 31. Event Log
+
+所有重要操作必须进入 EventLog。
+
+至少包括：
+
+```text
+ActionProposal
+ALLOW
+DENY
+Handoff
+ScopeExpansionRequest
+RoleCreationRequest
+Approval
+OrganizationChange
+RoleCreated
+RoleRetired
+BoundaryChanged
+ContractChanged
+MissionStarted
+MissionCompleted
+```
+
+Event 必须可按时间回放。
+
+---
+
+# 32. 第一阶段 Runtime 核心对象
+
+第一阶段至少实现：
+
+```text
+Project
+ProjectManager
+
+RoleDefinition
+AuthorityBoundary
+RoleState
+
+Organization
+OrganizationVersion
+
+Mission
+Task
+
+ActionProposal
+PolicyDecision
+
+OrganizationRequest
+RoleCreationRequest
+BoundaryChangeRequest
+ScopeExpansionRequest
+OrganizationChangeProposal
+
+Handoff
+
+Contract
+
+ApprovalRequest
+
+CapabilityGap
+
+Event
+```
+
+---
+
+# 33. 第一阶段只实现两个闭环
+
+不要一开始开发完整平台。
+
+## Work Governance Loop
+
+```text
+Agent
+↓
+ActionProposal
+↓
+Policy Kernel
+↓
+ALLOW / DENY
+↓
+Mutation
+↓
+Event
+```
+
+---
+
+## Organization Governance Loop
+
+```text
+Client / Supervisor / Role / Runtime
+↓
+OrganizationRequest
+↓
+Project Manager
+↓
+Role Lifecycle Pipeline
+↓
+Candidate Organization Change
+↓
+Approval
+↓
+Governance Kernel
+↓
+OrganizationVersion
+```
+
+---
+
+# 34. 第一阶段 Demo A：权限
+
+Workspace：
+
+```text
+demo/
+├── backend/
+├── frontend/
+└── shared/
+```
+
+BackendRole：
+
+```text
+read:
+/**
+
+write:
+/backend/**
+
+deny:
+/frontend/**
+/shared/**
+```
+
+任务：
+
+“修复登录问题，如果需要可以修改任何文件。”
+
+如果 Agent 提出：
+
+```text
+WRITE /frontend/login.vue
+```
+
+必须：
+
+```text
+DENY
+```
+
+然后只能：
+
+```text
+Handoff
+或
+ScopeExpansionRequest
+```
+
+不能直接修改。
+
+---
+
+# 35. 第一阶段 Demo B：创建角色
+
+Client：
+
+> 给项目增加一个 Database Engineer。
+
+系统不得立即生成 Agent。
+
+必须：
+
+```text
+RoleCreationRequest
+↓
+ProjectManager
+↓
+NeedAnalysis
+↓
+OverlapAnalysis
+↓
+CandidateRoleDefinition
+↓
+BoundaryDesign
+↓
+ContractAnalysis
+↓
+RiskAnalysis
+↓
+Approval
+↓
+Create Role
+↓
+Update Organization
+↓
+Organization Version +1
+```
+
+并在：
+
+```text
+.ans/roles/database-engineer/
+```
+
+生成完整角色控制面。
+
+---
+
+# 36. 第一阶段 Demo C：Handoff
+
+Backend 完成 API 修改后发现 Frontend 需要适配。
+
+必须产生：
+
+```text
+.ans/handoffs/active/{handoff-id}/
+```
+
+由 Frontend 明确 ACCEPT。
+
+禁止仅通过共享聊天上下文默认 Frontend 已经知道发生了什么。
+
+---
+
+# 37. ANS Bootstrap 要求
+
+现在请使用 ANS 对这个新项目执行 bootstrap。
+
+当前阶段：
+
+**禁止直接编写业务实现。**
+
+先完成治理设计。
+
+请依次执行：
+
+1. 分析项目目标；
+2. 分析核心能力域；
+3. 规划源码目录；
+4. 创建 `.ans/` 控制面目录设计；
+5. 设计开发本项目所需 Roles；
+6. 设计 Project Manager；
+7. 设计 Supervisor；
+8. 设计 Kernel Role；
+9. 设计 Agent Adapter Role；
+10. 设计 Reviewer；
+11. 设计 Tester；
+12. 设计各 Role responsibility；
+13. 设计各 Role mutation scope；
+14. 设计 Role Boundary；
+15. 设计 Role Contracts；
+16. 设计 Role Handoff topology；
+17. 设计 Organization Lifecycle Pipeline；
+18. 设计 Mission Lifecycle Pipeline；
+19. 设计 Role Creation Pipeline；
+20. 设计 Handoff Pipeline；
+21. 设计 Approval Pipeline；
+22. 设计 Scope Expansion Pipeline；
+23. 分析 privilege escalation path；
+24. 分析 Write Scope 冲突；
+25. 设计 Event Model；
+26. 设计 Organization Version Model；
+27. 创建候选 role cards；
+28. 创建候选 boundary；
+29. 创建候选 `.ans/` 目录；
+30. 创建第一阶段 Task Graph。
+
+---
+
+# 38. 当前阶段输出要求
+
+当前阶段不要开始业务代码实现。
+
+首先向我提交：
+
+## Organization Proposal v1
+
+必须包含：
+
+```text
+1. Project Architecture
+2. Source Directory
+3. .ans Control Plane Directory
+4. Initial Roles
+5. Role Responsibilities
+6. Role Boundaries
+7. Organization Graph
+8. Handoff Graph
+9. Contracts
+10. Organization Lifecycle
+11. Mission Lifecycle
+12. Approval Model
+13. Privilege Escalation Analysis
+14. First Development Task Graph
+15. Bootstrap Files To Be Created
+```
+
+并明确告诉我：
+
+```text
+Human should start reading from:
+
+.ans/README.md
+```
+
+等待我接受或修改：
+
+`Organization Proposal v1`
+
+之后才能正式进入实现阶段。

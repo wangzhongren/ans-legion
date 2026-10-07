@@ -1,0 +1,19 @@
+schema_version: 1
+id: organization-engine
+name: '组织生命周期开发'
+responsibility: '实现产品 ProjectManager 的组织提案、角色创建、审批与扩权流程；不具备审批权'
+status: SUPERSEDED
+read_scope: ['project/**']
+write_scope: []
+deny_scope: [outside_accepted_boundary]
+authority_source: boundary.yaml
+tools: [read, propose]
+capabilities: ['组织请求、角色创建、Approval、Scope Expansion']
+allowed_actions: [investigate, propose_within_role]
+forbidden_actions: [self_expand_authority, self_approve, bypass_kernel, mutate_peer_resources]
+delegation_scope: []
+handoff_targets: ['project-manager']
+required_approvals: [human_acceptance, task_implementation_authorization]
+reporting_line: project-manager
+memory_scope: '.ans/roles/organization-engine/docs/'
+contracts: [policy-decision, control-plane-commit, organization-change, mission-handoff, agent-proposal]

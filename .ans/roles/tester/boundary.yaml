@@ -1,0 +1,9 @@
+schema_version: 1
+role_id: Tester
+status: ACCEPTED
+version: legion-desktop-workbench-v2
+read_scope: ['project/**']
+write_scope: ["tests/integration/test_permission_flow.mjs","tests/integration/test_generic_agents.mjs","apps/desktop/tests/integration/workbench-flow.test.mjs","apps/desktop/tests/e2e/workbench-ui.test.mjs","docs/roles/Tester/feature-map.md","docs/roles/Tester/functional-description.md","docs/roles/Tester/api-spec.md","docs/roles/Tester/changelog.md","docs/roles/Tester/docs/design/2026-10-07_design_desktop-workbench-v2.md","docs/roles/Tester/docs/verification-desktop-workbench-v2.md"]
+generated_effect_scope: [".ans/runtime/legion-desktop-workbench-v2/Tester/node/packaging/",".ans/runtime/legion-desktop-workbench-v2/Tester/node/npm-cache/",".ans/runtime/legion-desktop-workbench-v2/Tester/node/tmp/",".ans/runtime/legion-desktop-workbench-v2/Tester/desktop/fixtures/",".ans/runtime/legion-desktop-workbench-v2/Tester/desktop/user-data/",".ans/runtime/legion-desktop-workbench-v2/Tester/desktop/tmp/"]
+deny_scope: ['outside_boundary', '.ans/organization/**', '.ans/roles/**', '.ans/project.json', 'historical_runtime_artifacts']
+approval_source: direct_customer_workbench_v2_confirm_2026-10-07

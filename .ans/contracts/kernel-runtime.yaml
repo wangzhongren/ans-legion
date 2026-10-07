@@ -1,0 +1,11 @@
+schema_version: 1
+id: kernel-runtime
+version: legion-node-pi-v3
+status: ACCEPTED
+primary_owner: KernelEngineer
+input: trusted_workspace_boundaries_version_TaskDispatchContext_AgentConfig
+output: PolicyDecision_MutationResult_Events_AgentInstance_PiRunResult
+guarantee: exact_task_intersection_deny_precedence_opaque_single_use_rechecked_permit
+public_permission_methods: [prepare,execute,submit,updateVersion,updateBoundary,setTaskStatus,events,readFile,close]
+public_agent_methods: [run,cancel,close]
+canonical_design: ../../docs/design/2026-10-07_design_node-pi-v3.md

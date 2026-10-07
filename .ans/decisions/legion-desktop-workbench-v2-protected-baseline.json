@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Pre-mutation historical protection and actual source baseline; authorized exact v2 source may change",
+  "protected": {
+    "docs/design/2026-10-07_design_desktop-gui-v1.md": {
+      "bytes": 11519,
+      "sha256": "58c79cae70bc45dcdda038e0e7944883dbee3ecfb2e277664a5954c3ec6a398d"
+    },
+    "docs/design/2026-10-07_design_desktop-workbench-v2.md": {
+      "bytes": 14578,
+      "sha256": "715639b5dd278437059f29bde1e7c02ac90d94af18f9bf5a6b5367d16e9ab5d3"
+    },
+    ".ans/organization/versions/v001.yaml": {
+      "bytes": 1205,
+      "sha256": "82b219124b742095fe5a779d27c41a295ebba4c7bf290d9a336d86159d67fd95"
+    },
+    ".ans/organization/versions/v002.yaml": {
+      "bytes": 1438,
+      "sha256": "ec7fa45506db198566b09772730fd460825937e46cd7074b30ab5513c2332c40"
+    },
+    ".ans/organization/versions/v003.yaml": {
+      "bytes": 1585,
+      "sha256": "2cad339fef575c2479de52254f0e502864f7b04ead5f6d4e0ad3a50f9b5f4916"
+    },
+    ".ans/runtime/legion-pi-node-v3/packaging/legion-runtime-0.3.0.tgz": {
+      "bytes": 23442,
+      "sha256": "a83a86499c4aaa7c997d94cabbb697efdc82f81475b622b85307ac682de4d8f0"
+    },
+    ".ans/runtime/legion-desktop-gui-v1/packaging/LegionDesktop-0.1.0-win32-x64.zip": {
+      "bytes": 175656986,
+      "sha256": "728a7da8fb0c94f5dade821a2edf9b6fa369410d8e2812c4f6417dc7383cf2a8"
+    }
+  },
+  "currentSources": {
+    "src/adapters/providers/abstract/pi_session.mjs": "3e531766baf7469978a9396f3f4a4174cf3e81ab3968df94a28c8b5d3d161562",
+    "src/adapters/providers/impl/pi_session.mjs": "73583a83a907c6bcf50ee61665b6384de41d7ad73e85c30caf8cb8d7173f6df6",
+    "src/adapters/providers/public/pi_session.mjs": "3b89c0951f8fbda93098578292eab91703ac5a13e8a685cfd5bd7297363b6e74",
+    "src/adapters/services/abstract/pi_agent.mjs": "a13c5d55013edad2418b04492a867f120017e34646958157fe7822b8e95cc1a0",
+    "src/adapters/services/abstract/proposal.mjs": "ae1484967e18d481971b4a76deb084282c22233c85ec4f0c05c99adbeeb19fd1",
+    "src/adapters/services/impl/pi_agent.mjs": "f605e8c7a4fd92935eb21dfefe2ae354239ee2e8995d1c3679c022ce309149cc",
+    "src/adapters/services/impl/proposal.mjs": "4d88952e696214aea5184eb7496964781ae3407c2ff599d9d89d8efc08676344",
+    "src/adapters/services/public/pi_agent.mjs": "c14040bd22ad87512ddb3d9d08ee681b3e06ce8d625f526bcf9b46a1de9f054e",
+    "src/adapters/services/public/proposal.mjs": "09f170b5c4b0d5f7be371d12896862047d1a63b46622f3b8554337ec42bb9ef3",
+    "src/kernel/interface/demo.mjs": "04671bb9196932cf5b53e74772a0d79bc10c5f01df6c60ca6db7fb1a83e51e52",
+    "src/kernel/interface/runtime.mjs": "ba5349438e5620a2e2860205ff44f22a7c302902b2241443f2769b9893dc35ba",
+    "src/kernel/models/agent.mjs": "23c9ed318741f31dddfacc9aaa1bc45ddf4d80b9eb05543b9dd72421649a51c2",
+    "src/kernel/models/core.mjs": "f62168160c1863bfeca4a80f3a1204b945d9dac4913520c77b1eed257ebe7ecc",
+    "src/kernel/pipelines/permission.mjs": "87d2403805099e3579592aabc32adeb65a713fc03004160d4458717e1979844e",
+    "src/kernel/providers/abstract/storage.mjs": "009b1ddfdd13cf5c39e5cb1d75721a3904cccc01dbb2422d82841563a88f9518",
+    "src/kernel/providers/impl/storage.mjs": "d52d5aad10ff8b0fe93d0d8d53279d6f41131eb2efd0c32d3472fb480a0138e2",
+    "src/kernel/providers/public/storage.mjs": "5f39b1be79a869be9c5ae68698a3b4210659c6bd1cdac415bca89ce58d234cbd",
+    "src/kernel/services/abstract/mutation.mjs": "07ac9aa7b51ca4593b6d17d64b86c48f2c236cfd85ad74747e2535b28c499ff2",
+    "src/kernel/services/abstract/policy.mjs": "85e0697e6098746f956276f4556414e79e9cb10d25d174974e3dcd59c4f71b12",
+    "src/kernel/services/impl/mutation.mjs": "9cec7b4acbfbe7369a5ee49f5d1b3a58d141ebaafe3cc81e2f6c657680f2a240",
+    "src/kernel/services/impl/policy.mjs": "8f809a821abf02f1a263de0835b9fc145dc6af4054b88db5ee98bbf279f53753",
+    "src/kernel/services/public/mutation.mjs": "3ab3ada7e41c39dfaee961c69591c6a1b4a56a073a0ff9abfe9b1024479889af",
+    "src/kernel/services/public/policy.mjs": "7addc2cad7c14e6aa0f4c34567d9e24b29e6c5a0c11be6268d5a63f372754642",
+    "package.json": "09c91316f22a7b3f3c1097b71e1a6e0388736ff4d7540ea9e0583c9f0ddd6e0b",
+    "package-lock.json": "f4649c6a7b8c2aa623c07097f01de2f340b561228d3cfa75a0a48cc7acdfb34b",
+    "runtime.mjs": "60bf11c3b9da04c155988e99e5ae7cb8f8be672d0589ecab9237ecfb95ccd3b3",
+    "bin/legion.mjs": "0ff9d0bd3e5dd7646fbd3cfa38ba037b75679e83202b7d5b50589c0151746a56",
+    "README.md": "8ae390ca2c059a1fb04d01d54912caece60ec68934d1181087aab990a90d2894",
+    "apps/desktop/package.json": "270ca9d35828253d233e2d47b0d517e1bf1ada95d3d4ada6a543693ad7259e43",
+    "apps/desktop/package-lock.json": "1a5eb579b6ff118f97b7aeebb3fc35f54b3aec0bee2efdd24d14dc49f6264d98"
+  }
+}

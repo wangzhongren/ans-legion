@@ -1,0 +1,340 @@
+{
+  "producer": "ANS Governance",
+  "candidate": "proposal-v1",
+  "environment": "Windows / Python 3.14.0 / PyYAML 6.0.3",
+  "date": "2026-10-07",
+  "timezone": "Asia/Shanghai",
+  "results": {
+    "yaml_parse": 38,
+    "roles_complete": 9,
+    "boundary_md_yaml_consistency": "PASS",
+    "markdown_links": "PASS",
+    "source_absent": "PASS",
+    "formal_approvals_versions_events_absent": "PASS",
+    "original_copy_identical": "PASS",
+    "ownership_overlap": "PASS (129 grants, PowerShell pairwise check)",
+    "task_graph_acyclic": "PASS (18 nodes, PowerShell topological check)"
+  },
+  "files": [
+    {
+      "path": ".ans/contracts/agent-proposal.yaml",
+      "sha256": "d957eafd6ef623a3e28f2f92e12c6ec874457e4671bc98cc34288a2b49d9257d"
+    },
+    {
+      "path": ".ans/contracts/control-plane-commit.yaml",
+      "sha256": "8330ed90c67e20734e990602cc4d91d763168ffb52f4fd9c4fc65abedf3bfbbb"
+    },
+    {
+      "path": ".ans/contracts/mission-handoff.yaml",
+      "sha256": "7808340fd1ffb72655fffd8ec33fa37e9de1d2eaeefc6c4b6e325082181ccf6f"
+    },
+    {
+      "path": ".ans/contracts/organization-change.yaml",
+      "sha256": "cf51e1776905cb8e121bf2989860e09fb52559f6f649692f788021fd9aca9d78"
+    },
+    {
+      "path": ".ans/contracts/policy-decision.yaml",
+      "sha256": "774bceb610293f594f9e6222d55caa1e5aed18da14c3007836d662dcf1a71920"
+    },
+    {
+      "path": ".ans/decisions/bootstrap-governance-boundary.md",
+      "sha256": "3734a11d9b01382861dfd95e92ff4d8289c4dfdcf9b9ca079b5b8db4d2473122"
+    },
+    {
+      "path": ".ans/decisions/bootstrap-validation.md",
+      "sha256": "f143382c00fba52b918fab429a8acfae6be7441470e21bc6e989f6b10fd88ad3"
+    },
+    {
+      "path": ".ans/missions/active/bootstrap-phase1/mission.yaml",
+      "sha256": "7b79afc9d998781e7241adeca4503237971d1547e4bc3894f2a21cd8e5e15926"
+    },
+    {
+      "path": ".ans/missions/active/bootstrap-phase1/README.md",
+      "sha256": "de1b1cee84cecf13de6d422e49a6b0dfdbb3953eb3e2e926daf5c1d986ccfa66"
+    },
+    {
+      "path": ".ans/missions/active/bootstrap-phase1/state.yaml",
+      "sha256": "ad9e5bbd3f67a5dace21d1a8f9139c4bf68794562d7b621301b718b98d4bc07a"
+    },
+    {
+      "path": ".ans/missions/active/bootstrap-phase1/task-graph.yaml",
+      "sha256": "a91d56e2aa270a6910ae1a2ca63abf201e55d39c690c16bb4671298858a56f0d"
+    },
+    {
+      "path": ".ans/organization/current.yaml",
+      "sha256": "eaa87d1f5728e35013aab246416ac2d9c0e6edb2b2d5f6d3635be1c18bb12084"
+    },
+    {
+      "path": ".ans/organization/graph.yaml",
+      "sha256": "8c3d75d38900bf33498671fde55df7612a12942b4d6311f65552f709a649189a"
+    },
+    {
+      "path": ".ans/project.yaml",
+      "sha256": "b2b17e246c27a2f2679cb939f7fd897842f6fa80fc6d4aa983a6b46c5e083802"
+    },
+    {
+      "path": ".ans/README.md",
+      "sha256": "b0713e0fb734416353612be92c0f68b5e551019f6063397eb8a0c86281b66a2c"
+    },
+    {
+      "path": ".ans/roles/agent-adapter/boundary.md",
+      "sha256": "df396ebfe0dcbddb16ea5f3c6fc312ad8c7476e036385eb586fb5dcf45a89b7e"
+    },
+    {
+      "path": ".ans/roles/agent-adapter/boundary.yaml",
+      "sha256": "a4aecc9b0117a8c1d9809a5fc5ec7881fb3e275d0524ffc39df4ce5323cf94b0"
+    },
+    {
+      "path": ".ans/roles/agent-adapter/changelog.md",
+      "sha256": "2118f83d8eef16ddef3efe1ff4fe6ada4b89dc85971a891062b047179dfe85e5"
+    },
+    {
+      "path": ".ans/roles/agent-adapter/README.md",
+      "sha256": "575a621a6cdf188a1120dfae950260b0c865c1468be67b57aab4dbc427c0b7ff"
+    },
+    {
+      "path": ".ans/roles/agent-adapter/role-card.md",
+      "sha256": "4e9659e4cb91eecfe707be84ebcf43fb19a1db05e2bdf68ba136805ae4ca39a5"
+    },
+    {
+      "path": ".ans/roles/agent-adapter/role.yaml",
+      "sha256": "c443b6f8a71282328853655ca646ecf0d6808328dff50a661b93ea7e2d45d598"
+    },
+    {
+      "path": ".ans/roles/agent-adapter/state.yaml",
+      "sha256": "54e15f09171750b0fd9412c13277a19e3aaf529dd11efbec2dd192b1bda6f631"
+    },
+    {
+      "path": ".ans/roles/assembly/boundary.md",
+      "sha256": "0109614e6ba2fb2256d0370fe603020d40fa63c14e6e3f69408875d8b450982c"
+    },
+    {
+      "path": ".ans/roles/assembly/boundary.yaml",
+      "sha256": "da05ee887ff85866e1e891693e0c508344a6ba5c4f3cbed8a565d52752a223bc"
+    },
+    {
+      "path": ".ans/roles/assembly/changelog.md",
+      "sha256": "2118f83d8eef16ddef3efe1ff4fe6ada4b89dc85971a891062b047179dfe85e5"
+    },
+    {
+      "path": ".ans/roles/assembly/README.md",
+      "sha256": "ac609f578a727063641808e876ecf38402e931716616b5d90a4c04dbc9a876d0"
+    },
+    {
+      "path": ".ans/roles/assembly/role-card.md",
+      "sha256": "9e83d2136f4c0821d502c9d169df1069462704b3f235b3c7d87aa2d0aa6f660e"
+    },
+    {
+      "path": ".ans/roles/assembly/role.yaml",
+      "sha256": "16fc19b4782a2765ea4eba5782b26fc6f96e6d072e90aa086554cdc1ff0d2e54"
+    },
+    {
+      "path": ".ans/roles/assembly/state.yaml",
+      "sha256": "e3cf8273f51072a0ab10b5ba12cf93ebed11a2d464d4cbc1f1d358c14786f03d"
+    },
+    {
+      "path": ".ans/roles/control-plane/boundary.md",
+      "sha256": "a31fc0d24429fc46e686864ee791881a0470969177a034b91011c1afbbb7d9fb"
+    },
+    {
+      "path": ".ans/roles/control-plane/boundary.yaml",
+      "sha256": "c14a3cf34eb20ceed9d965e0171063a030140de20abf60997cfa4662f2860269"
+    },
+    {
+      "path": ".ans/roles/control-plane/changelog.md",
+      "sha256": "2118f83d8eef16ddef3efe1ff4fe6ada4b89dc85971a891062b047179dfe85e5"
+    },
+    {
+      "path": ".ans/roles/control-plane/README.md",
+      "sha256": "15ffeca1b70bede3aeee1d1251a0670c0be65e3fed13d76edf45cd59fe11bbd2"
+    },
+    {
+      "path": ".ans/roles/control-plane/role-card.md",
+      "sha256": "9782fbedfe1d98bf5e9d1e800d402aecfdf1cd28c19cdb1f714feff71042180f"
+    },
+    {
+      "path": ".ans/roles/control-plane/role.yaml",
+      "sha256": "eb055cf100c69a604abafaa394b64bfd2c9cd0e3a52d09ac49ec4deea2f966c5"
+    },
+    {
+      "path": ".ans/roles/control-plane/state.yaml",
+      "sha256": "2f98bbd34c1234feba33fcf45fd4c87b02d05bfbb2b9bf7d36bc3fac19499b70"
+    },
+    {
+      "path": ".ans/roles/kernel/boundary.md",
+      "sha256": "d2b332137f93954573b4a17882bc615179bff74a18d289ffd6cfc3cfdb82ac74"
+    },
+    {
+      "path": ".ans/roles/kernel/boundary.yaml",
+      "sha256": "edfbadb503b5cf77726129efa805319ae3e7847a1e0c90fe7cea9960ac276c66"
+    },
+    {
+      "path": ".ans/roles/kernel/changelog.md",
+      "sha256": "2118f83d8eef16ddef3efe1ff4fe6ada4b89dc85971a891062b047179dfe85e5"
+    },
+    {
+      "path": ".ans/roles/kernel/README.md",
+      "sha256": "43487eecd9a279c594f734f55d36e0004db34a57ad39e38917b0313aed40b60c"
+    },
+    {
+      "path": ".ans/roles/kernel/role-card.md",
+      "sha256": "e59e49106ac9dc3a651df881bc982883332c91e4c69afc0ee668dfc829e73255"
+    },
+    {
+      "path": ".ans/roles/kernel/role.yaml",
+      "sha256": "1703905dc76113562ed4227edd17183f18201bd5e79c83774dac7b12f47cb099"
+    },
+    {
+      "path": ".ans/roles/kernel/state.yaml",
+      "sha256": "f0558fb45bd44b631c7b92eb21a3e805a67decac92b373e62aff5346acdf8723"
+    },
+    {
+      "path": ".ans/roles/organization-engine/boundary.md",
+      "sha256": "060da862a8c59d00be8c24daf9bf30e398741d7c1b2b3240e06c3fddb3b50150"
+    },
+    {
+      "path": ".ans/roles/organization-engine/boundary.yaml",
+      "sha256": "8dc4991f16b865c33c1fb2b641e2099ac2ff700c737c0817a2a6f541ec6d4b2b"
+    },
+    {
+      "path": ".ans/roles/organization-engine/changelog.md",
+      "sha256": "2118f83d8eef16ddef3efe1ff4fe6ada4b89dc85971a891062b047179dfe85e5"
+    },
+    {
+      "path": ".ans/roles/organization-engine/README.md",
+      "sha256": "2f67666989e6d75369d96380632dceda12467acfc4245e30ec63f551783a4ab8"
+    },
+    {
+      "path": ".ans/roles/organization-engine/role-card.md",
+      "sha256": "ab9fbe1ddb9e63cb129d8d686a67aa30f862000d08347aec5b566d543f83b67e"
+    },
+    {
+      "path": ".ans/roles/organization-engine/role.yaml",
+      "sha256": "f31ec3b7afd6ca53e4aee1e7a426325d825d67c361969e816d25fcb6999e20a4"
+    },
+    {
+      "path": ".ans/roles/organization-engine/state.yaml",
+      "sha256": "b3d4991777efd83eeeca61bea4bce23c98b3f7e9b1b654ad56fdeb268f25a937"
+    },
+    {
+      "path": ".ans/roles/project-manager/boundary.md",
+      "sha256": "12d340b63b4ff0c271116375990b617610e120f155836a28113961d60f55fdaf"
+    },
+    {
+      "path": ".ans/roles/project-manager/boundary.yaml",
+      "sha256": "bd6755167e1f26a1be78065cff2eaf56450b9a543970660b172ff29abbd1e3b7"
+    },
+    {
+      "path": ".ans/roles/project-manager/changelog.md",
+      "sha256": "2118f83d8eef16ddef3efe1ff4fe6ada4b89dc85971a891062b047179dfe85e5"
+    },
+    {
+      "path": ".ans/roles/project-manager/README.md",
+      "sha256": "3c835a2c0cef0ed97bffe8564cda1d43ba8299d5e3589858716c6f334648badd"
+    },
+    {
+      "path": ".ans/roles/project-manager/role-card.md",
+      "sha256": "eac73b85f63128a2654e3b29f38356bc851102ce2773b44afb6e28d8e61b80ae"
+    },
+    {
+      "path": ".ans/roles/project-manager/role.yaml",
+      "sha256": "c7d40cc891d9324170aa3a52ab458e913b20329d598e41b4e50c88f7064342f2"
+    },
+    {
+      "path": ".ans/roles/project-manager/state.yaml",
+      "sha256": "2afae8e737f17457033b4f1d4ddc7b75dd74e5e39384670e806c7147c8ea22d4"
+    },
+    {
+      "path": ".ans/roles/reviewer/boundary.md",
+      "sha256": "3764fab8d18e3265f9dd1f48120b800b142fc3288966f1f21dd14193025a784e"
+    },
+    {
+      "path": ".ans/roles/reviewer/boundary.yaml",
+      "sha256": "e243c826b41936fb351766e0649dc8389ee9678136008d3298e09745c927980b"
+    },
+    {
+      "path": ".ans/roles/reviewer/changelog.md",
+      "sha256": "2118f83d8eef16ddef3efe1ff4fe6ada4b89dc85971a891062b047179dfe85e5"
+    },
+    {
+      "path": ".ans/roles/reviewer/README.md",
+      "sha256": "bc5c9dec833618d25d5bd8fc4b96dbdabc168f8a3ad7a58596c76f726e54af75"
+    },
+    {
+      "path": ".ans/roles/reviewer/role-card.md",
+      "sha256": "16f1e3991c452e2ed95468224d4c9964b11016acfe6781ac5e2353b528040005"
+    },
+    {
+      "path": ".ans/roles/reviewer/role.yaml",
+      "sha256": "d83562588f5e7fd32d0c9f2ddcaafd571231cd3d82ba8bdccf3834700482a356"
+    },
+    {
+      "path": ".ans/roles/reviewer/state.yaml",
+      "sha256": "6137687186d2012643b01a923915ff715f8f62f7ee2459a37923ddd2919f6976"
+    },
+    {
+      "path": ".ans/roles/supervisor-engine/boundary.md",
+      "sha256": "412fbe0bcbf454fc351c42191a41728076cb16c2c6fc32334599a258a7d2dcaf"
+    },
+    {
+      "path": ".ans/roles/supervisor-engine/boundary.yaml",
+      "sha256": "77988728aad6218cdb04a7ee3a7a00b89b7fd43f450a1356e266b74a08f8c094"
+    },
+    {
+      "path": ".ans/roles/supervisor-engine/changelog.md",
+      "sha256": "2118f83d8eef16ddef3efe1ff4fe6ada4b89dc85971a891062b047179dfe85e5"
+    },
+    {
+      "path": ".ans/roles/supervisor-engine/README.md",
+      "sha256": "28b85ea53611c64b1a9b3376e365e3ad292a15960275575d2c0c107a25cce6ac"
+    },
+    {
+      "path": ".ans/roles/supervisor-engine/role-card.md",
+      "sha256": "448a770c6502cd8c5e94edd7bcc403ab3c41f2c689e2408331f1829adf2fe0f1"
+    },
+    {
+      "path": ".ans/roles/supervisor-engine/role.yaml",
+      "sha256": "902fbb770a0667b782708aaaf8c31d3e22fe69a7ee72bcc6e446b2ff85154c3e"
+    },
+    {
+      "path": ".ans/roles/supervisor-engine/state.yaml",
+      "sha256": "b20ef1edbab52cbb80f2153e9e44e4dac116b66f6adea588775f82e013ca1e9f"
+    },
+    {
+      "path": ".ans/roles/tester/boundary.md",
+      "sha256": "cfb0f4e19bca6b5f318424388669cc96210c5957e866a424678cd8d725697c46"
+    },
+    {
+      "path": ".ans/roles/tester/boundary.yaml",
+      "sha256": "9df92e10eea82a9cacd53a3b54d157cde9a0dec1f2e14e400124da849360d7ba"
+    },
+    {
+      "path": ".ans/roles/tester/changelog.md",
+      "sha256": "2118f83d8eef16ddef3efe1ff4fe6ada4b89dc85971a891062b047179dfe85e5"
+    },
+    {
+      "path": ".ans/roles/tester/README.md",
+      "sha256": "475286d4422581fbe6da6266baba286ce66eb34998f2b054ed670ec36cb0d635"
+    },
+    {
+      "path": ".ans/roles/tester/role-card.md",
+      "sha256": "2de0864db241c485a572b05a590d5e085021fb2cfb23b24f2e0f9f7859490116"
+    },
+    {
+      "path": ".ans/roles/tester/role.yaml",
+      "sha256": "22eb9990096b8e349fcc983b2c00968a2ec47d5c29f1c0a8f2056e6b2d06bd54"
+    },
+    {
+      "path": ".ans/roles/tester/state.yaml",
+      "sha256": "88122ddb71001e0a255ae9d53ded4bc9daba1e111c28bcf3d671e4d52622494d"
+    },
+    {
+      "path": "docs/design/2026-10-07_design_organization-proposal-v1.md",
+      "sha256": "9f03a79e51ffff13f87cc1805431e0a5a65520150d52c93dbf0451fb32caf49d"
+    },
+    {
+      "path": "docs/design/2026-10-07_original-requirements.txt",
+      "sha256": "4f4c7e45b1aee8d6fdf6f24a9a74ae078bfb4fc702e0b33b469837044e9bdbd5"
+    }
+  ]
+}

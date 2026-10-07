@@ -1,0 +1,19 @@
+schema_version: 1
+id: agent-adapter
+name: 'Agent 适配开发'
+responsibility: '实现隔离 Agent 通道与固定角色绑定，只产生提案，不提供原始 mutation 工具'
+status: SUPERSEDED
+read_scope: ['project/**']
+write_scope: []
+deny_scope: [outside_accepted_boundary]
+authority_source: boundary.yaml
+tools: [read, propose]
+capabilities: ['固定 Role 身份与 Agent 提案通道']
+allowed_actions: [investigate, propose_within_role]
+forbidden_actions: [self_expand_authority, self_approve, bypass_kernel, mutate_peer_resources]
+delegation_scope: []
+handoff_targets: ['project-manager']
+required_approvals: [human_acceptance, task_implementation_authorization]
+reporting_line: project-manager
+memory_scope: '.ans/roles/agent-adapter/docs/'
+contracts: [policy-decision, control-plane-commit, organization-change, mission-handoff, agent-proposal]

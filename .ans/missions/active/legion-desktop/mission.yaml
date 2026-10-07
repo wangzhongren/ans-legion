@@ -1,0 +1,11 @@
+schema_version: 1
+id: legion-desktop
+status: COMPLETE
+organization_version: v004
+project_manager: ProjectManager
+scheduler: Supervisor
+goal: single_ProjectManager_conversation_confirmed_dynamic_agents_focus_desktop_and_portable_ZIP
+authorization: ../../../decisions/legion-desktop-workbench-v2-authorization.md
+canonical: ../../../../docs/design/2026-10-07_design_desktop-workbench-v2.md
+current_scheduler_record: ../../../../docs/scheduling/legion-desktop-workbench-v2-fixture-repair.md
+actual_progress: state.yaml

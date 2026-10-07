@@ -1,0 +1,19 @@
+schema_version: 1
+id: Tester
+name: Tester
+responsibility: "独立真实Pi协议、完整执行/取消/重启/项目隔离和实际ZIP GUI回归；不修生产"
+status: ACCEPTED
+read_scope: ['project/**']
+write_scope: ["tests/integration/test_permission_flow.mjs","tests/integration/test_generic_agents.mjs","apps/desktop/tests/integration/workbench-flow.test.mjs","apps/desktop/tests/e2e/workbench-ui.test.mjs","docs/roles/Tester/feature-map.md","docs/roles/Tester/functional-description.md","docs/roles/Tester/api-spec.md","docs/roles/Tester/changelog.md","docs/roles/Tester/docs/design/2026-10-07_design_desktop-workbench-v2.md","docs/roles/Tester/docs/verification-desktop-workbench-v2.md"]
+authority_source: boundary.md
+deny_scope: [outside_boundary]
+tools: [read,scoped_edit,approved_checks]
+capabilities: ['workbench_v2_authorized_role_task']
+allowed_actions: [authorized_role_task]
+forbidden_actions: [self_expand,self_approve,peer_mutation]
+delegation_scope: []
+handoff_targets: ['Supervisor']
+required_approvals: [human_for_material_scope_change]
+reporting_line: Supervisor
+memory_scope: 'docs/roles/Tester/'
+contracts: [desktop-workbench,kernel-adapter,kernel-runtime]

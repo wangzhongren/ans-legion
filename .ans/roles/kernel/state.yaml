@@ -1,0 +1,7 @@
+schema_version: 1
+role_id: kernel
+status: SUPERSEDED
+active_agent: null
+active_tasks: []
+organization_version: null
+last_event_id: null

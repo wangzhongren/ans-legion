@@ -1,0 +1,11 @@
+schema_version: 1
+project_id: legion-runtime
+name: Legion Runtime
+status: IMPLEMENTATION_AUTHORIZED
+timezone: Asia/Shanghai
+organization_version: v004
+project_manager: ProjectManager
+scheduler: Supervisor
+execution_scope_config: project.json
+implementation_design: ../docs/design/2026-10-07_design_desktop-workbench-v2.md
+authorization_source: direct_customer_workbench_v2_confirm_2026-10-07

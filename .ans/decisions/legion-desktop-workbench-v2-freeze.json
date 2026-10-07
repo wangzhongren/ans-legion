@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "phase": "legion-desktop-workbench-v2",
+  "status": "GOVERNANCE_FROZEN_IMPLEMENTATION_AUTHORIZED_NOT_VERIFIED",
+  "configSha256": "2546ebd0b8756eccb83bced6808c10d1c25c3bc175ca8f676a9f1d5172cb706b",
+  "designSha256": "715639b5dd278437059f29bde1e7c02ac90d94af18f9bf5a6b5367d16e9ab5d3",
+  "authorizationSha256": "252ca93cd951947923cc22bc7ce52873a3696c6fe75683e509f52ceda96ce773",
+  "manifestSha256": "3a4e87e01d6bab7cfff0e9f06f97c925aeb9cfabc71fb96ba74fe3923525e39b",
+  "authoredFileCount": 121,
+  "roles": [
+    "ProjectManager",
+    "Supervisor",
+    "KernelEngineer",
+    "AgentAdapterEngineer",
+    "DesktopEngineer",
+    "Reviewer",
+    "Tester"
+  ],
+  "generatedEffects": {
+    "ProjectManager": [
+      ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/",
+      ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/npm-cache/",
+      ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/tmp/",
+      ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/packaging/",
+      ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/npm-cache/",
+      ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/electron-cache/",
+      ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/user-data/",
+      ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/fixtures/",
+      ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/tmp/",
+      "node_modules/",
+      "apps/desktop/node_modules/",
+      "apps/desktop/out/"
+    ],
+    "Supervisor": [],
+    "KernelEngineer": [
+      ".ans/runtime/legion-desktop-workbench-v2/KernelEngineer/fixtures/",
+      ".ans/runtime/legion-desktop-workbench-v2/KernelEngineer/user-data/",
+      ".ans/runtime/legion-desktop-workbench-v2/KernelEngineer/tmp/"
+    ],
+    "AgentAdapterEngineer": [
+      ".ans/runtime/legion-desktop-workbench-v2/AgentAdapterEngineer/fixtures/",
+      ".ans/runtime/legion-desktop-workbench-v2/AgentAdapterEngineer/user-data/",
+      ".ans/runtime/legion-desktop-workbench-v2/AgentAdapterEngineer/tmp/"
+    ],
+    "DesktopEngineer": [
+      ".ans/runtime/legion-desktop-workbench-v2/DesktopEngineer/fixtures/",
+      ".ans/runtime/legion-desktop-workbench-v2/DesktopEngineer/user-data/",
+      ".ans/runtime/legion-desktop-workbench-v2/DesktopEngineer/tmp/"
+    ],
+    "Reviewer": [
+      ".ans/runtime/legion-desktop-workbench-v2/Reviewer/node/packaging/",
+      ".ans/runtime/legion-desktop-workbench-v2/Reviewer/node/npm-cache/",
+      ".ans/runtime/legion-desktop-workbench-v2/Reviewer/node/tmp/",
+      ".ans/runtime/legion-desktop-workbench-v2/Reviewer/desktop/fixtures/",
+      ".ans/runtime/legion-desktop-workbench-v2/Reviewer/desktop/user-data/",
+      ".ans/runtime/legion-desktop-workbench-v2/Reviewer/desktop/tmp/"
+    ],
+    "Tester": [
+      ".ans/runtime/legion-desktop-workbench-v2/Tester/node/packaging/",
+      ".ans/runtime/legion-desktop-workbench-v2/Tester/node/npm-cache/",
+      ".ans/runtime/legion-desktop-workbench-v2/Tester/node/tmp/",
+      ".ans/runtime/legion-desktop-workbench-v2/Tester/desktop/fixtures/",
+      ".ans/runtime/legion-desktop-workbench-v2/Tester/desktop/user-data/",
+      ".ans/runtime/legion-desktop-workbench-v2/Tester/desktop/tmp/"
+    ]
+  },
+  "previousPolicy": ".ans/decisions/legion-desktop-workbench-v2-previous-policy.json",
+  "previousPolicySha256": "e72ba37fc080453ecf9ef0229c5f6f11bf4e41ecf017cf2febf85cea6ef6d89d",
+  "review": ".ans/decisions/legion-desktop-workbench-v2-review.md",
+  "defaultLayout": "focus_conversation",
+  "publicSymbolsContract": ".ans/contracts/desktop-workbench.yaml",
+  "versions": {
+    "runtime": "0.4.0",
+    "desktop": "0.2.0"
+  },
+  "stageScopesSha256": "97cc48bb844c9a9f37594870e0e43e2dc3d2852c51a10538d32df015f5db60aa",
+  "contractSha256": "22e3b93ec4ad525320b0139716c17d116ae8a472ab5eb5d98a454e28a3f7a2fb",
+  "productOwnershipSha256": "87808cec2739fdbbc9520631637b4ddcb2adc2f8680a6e849ec8885d01a35187",
+  "organizationSha256": "492c387000fa2d0dad634842436d9067df86cf6c01ea31019b0e6411bb4e7215"
+}

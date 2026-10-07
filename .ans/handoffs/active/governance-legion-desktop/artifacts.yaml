@@ -1,0 +1,15 @@
+schema_version: 1
+canonical_design: docs/design/2026-10-07_design_desktop-workbench-v2.md
+execution_config: .ans/project.json
+manifest: .ans/decisions/legion-desktop-workbench-v2-manifest.json
+stage_scopes: .ans/decisions/legion-desktop-workbench-v2-stages.json
+freeze: .ans/decisions/legion-desktop-workbench-v2-freeze.json
+ownership: .ans/decisions/legion-desktop-workbench-v2-product-ownership.json
+contract: .ans/contracts/desktop-workbench.yaml
+organization: .ans/organization/versions/v004.yaml
+mission: .ans/missions/active/legion-desktop/
+policy_sha256: 2546ebd0b8756eccb83bced6808c10d1c25c3bc175ca8f676a9f1d5172cb706b
+design_sha256: 715639b5dd278437059f29bde1e7c02ac90d94af18f9bf5a6b5367d16e9ab5d3
+authorization: .ans/decisions/legion-desktop-workbench-v2-authorization.md
+review: .ans/decisions/legion-desktop-workbench-v2-review.md
+protected_baseline: .ans/decisions/legion-desktop-workbench-v2-protected-baseline.json

@@ -1,0 +1,9 @@
+schema_version: 1
+role_id: KernelEngineer
+status: ACCEPTED
+version: legion-desktop-workbench-v2
+read_scope: ['project/**']
+write_scope: ["src/kernel/models/core.mjs","src/kernel/models/agent.mjs","src/kernel/models/workbench.mjs","src/kernel/services/impl/policy.mjs","src/kernel/providers/impl/storage.mjs","tests/kernel/test_models.test.mjs","tests/kernel/test_agent_models.test.mjs","tests/kernel/test_agent_scope.test.mjs","tests/kernel/test_workbench_models.test.mjs","tests/kernel/test_mutation.test.mjs","tests/kernel/test_policy.test.mjs","docs/roles/KernelEngineer/feature-map.md","docs/roles/KernelEngineer/functional-description.md","docs/roles/KernelEngineer/api-spec.md","docs/roles/KernelEngineer/changelog.md","docs/roles/KernelEngineer/docs/design/2026-10-07_design_desktop-workbench-v2.md","docs/roles/KernelEngineer/docs/feature/permission.md","docs/roles/KernelEngineer/docs/feature/generic-agents.md"]
+generated_effect_scope: [".ans/runtime/legion-desktop-workbench-v2/KernelEngineer/fixtures/",".ans/runtime/legion-desktop-workbench-v2/KernelEngineer/user-data/",".ans/runtime/legion-desktop-workbench-v2/KernelEngineer/tmp/"]
+deny_scope: ['outside_boundary', '.ans/organization/**', '.ans/roles/**', '.ans/project.json', 'historical_runtime_artifacts']
+approval_source: direct_customer_workbench_v2_confirm_2026-10-07

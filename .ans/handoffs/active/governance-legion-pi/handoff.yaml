@@ -1,0 +1,11 @@
+schema_version: 1
+id: governance-legion-pi
+from: ANS_Governance
+to: Supervisor
+status: COMPLETED
+organization_version: v002
+config_sha256: 25e46e9b7811685847116393d9c9982062e975f66e151ce3d094ef2be020cccb
+design_sha256: 342fd522343126c31c7a7f1ee3c8befab9f363d5372297847ebc8f42b5f30bae
+validation: .ans/decisions/legion-node-pi-v3-validation.md
+final_task: docs/scheduling/legion-pi-node-v3-close-repair.md
+final_task_state_revision: 44

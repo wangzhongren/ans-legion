@@ -1,0 +1,14 @@
+schema_version: 1
+id: agent-proposal
+revision: proposal-v1
+status: SUPERSEDED
+primary_owner: agent-adapter
+callers: 'supervisor-engine'
+public_entry: 'src/services/public/agent.py'
+input_fields: 'bound_actor_id,bound_role_id,task_context,allowed_proposal_types'
+output_fields: 'ActionProposal_or_OrganizationRequest'
+errors: 'UNBOUND_ROLE,INVALID_OUTPUT,FORBIDDEN_TOOL,ADAPTER_FAILURE'
+guarantees: '模型输出只作为建议；不向 Agent 暴露宿主写入、通用 shell 或审批写入'
+canonical_design: ../../docs/design/2026-10-07_design_organization-proposal-v1.md
+verification: owner_contract_tests_and_independent_integration
+implementation_status: NOT_IMPLEMENTED

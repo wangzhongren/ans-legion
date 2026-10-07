@@ -1,0 +1,37 @@
+schema_version: 1
+status: SUPERSEDED
+proposal_version: proposal-v1
+role_id: supervisor-engine
+read_scope: ['project/**']
+write_scope:
+  - 'src/models/mission.py'
+  - 'src/pipelines/mission.py'
+  - 'src/pipelines/work.py'
+  - 'src/pipelines/handoff.py'
+  - 'src/services/abstract/mission.py'
+  - 'src/services/public/mission.py'
+  - 'src/services/impl/mission.py'
+  - '.ans/roles/supervisor-engine/feature-map.md'
+  - '.ans/roles/supervisor-engine/functional-description.md'
+  - '.ans/roles/supervisor-engine/api-spec.md'
+  - '.ans/roles/supervisor-engine/changelog.md'
+  - '.ans/roles/supervisor-engine/docs/design/'
+  - '.ans/roles/supervisor-engine/docs/feature/'
+  - '.ans/roles/supervisor-engine/docs/change/'
+  - '.ans/roles/supervisor-engine/docs/fix/'
+  - 'src/common/supervisor-engine/'
+  - 'tests/supervisor-engine/'
+deny_scope:
+  - '其他角色的源文件、私有 common 和 tests'
+  - '.ans/roles/*/role.yaml'
+  - '.ans/roles/*/boundary.yaml'
+  - '.ans/roles/*/role-card.md'
+  - '.ans/roles/*/boundary.md'
+  - '.ans/project.yaml'
+  - '.ans/organization/'
+  - '.ans/approvals/'
+  - '.ans/events/'
+  - ''
+activation_requires: [human_accepted_boundary, authorized_task, fixed_role_context]
+required_approvals: [human_for_scope_or_organization_change]
+delegation_scope: []

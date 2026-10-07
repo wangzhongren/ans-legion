@@ -1,0 +1,9 @@
+schema_version: 1
+id: bootstrap-phase1
+status: SUPERSEDED
+owner: human-project-owner
+coordinator_candidate: project-manager
+organization_version: null
+proposal: ../../../../docs/design/2026-10-07_design_organization-proposal-v1.md
+goals: [deny_unauthorized_write,approve_role_creation,explicit_handoff_acceptance]
+authorization: null

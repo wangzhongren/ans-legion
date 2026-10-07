@@ -1,0 +1,6 @@
+schema_version: 1
+role_id: Supervisor
+status: ACCEPTED
+active_agent: null
+organization_version: v003
+active_tasks: []

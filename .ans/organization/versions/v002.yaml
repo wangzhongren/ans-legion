@@ -1,0 +1,18 @@
+schema_version: 1
+status: ACCEPTED
+version: v002
+approval_source: direct_customer_node_and_pi_messages_2026-10-07
+roles:
+  - {id: ProjectManager, status: ACCEPTED, reporting_line: Human, role: '../roles/ProjectManager/role.yaml', boundary: '../roles/ProjectManager/boundary.yaml'}
+  - {id: Supervisor, status: ACCEPTED, reporting_line: ProjectManager, role: '../roles/Supervisor/role.yaml', boundary: '../roles/Supervisor/boundary.yaml'}
+  - {id: KernelEngineer, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/KernelEngineer/role.yaml', boundary: '../roles/KernelEngineer/boundary.yaml'}
+  - {id: AgentAdapterEngineer, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/AgentAdapterEngineer/role.yaml', boundary: '../roles/AgentAdapterEngineer/boundary.yaml'}
+  - {id: Tester, status: ACCEPTED, reporting_line: Supervisor, role: '../roles/Tester/role.yaml', boundary: '../roles/Tester/boundary.yaml'}
+  - {id: Reviewer, status: ACCEPTED, reporting_line: Human, role: '../roles/Reviewer/role.yaml', boundary: '../roles/Reviewer/boundary.yaml'}
+delegations: []
+handoff_topology: graph.yaml
+
+canonical_design: docs/design/2026-10-07_design_node-pi-v3.md
+design_sha256: 342fd522343126c31c7a7f1ee3c8befab9f363d5372297847ebc8f42b5f30bae
+policy_sha256: 25e46e9b7811685847116393d9c9982062e975f66e151ce3d094ef2be020cccb
+path_base: project_root_for_canonical_design; organization_directory_for_role_refs

@@ -1,0 +1,19 @@
+schema_version: 1
+id: control-plane
+name: '控制面与受控执行开发'
+responsibility: '实现确定路径、许可核验、受控 mutation、原子提交、组织版本、事件与恢复'
+status: SUPERSEDED
+read_scope: ['project/**']
+write_scope: []
+deny_scope: [outside_accepted_boundary]
+authority_source: boundary.yaml
+tools: [read, propose]
+capabilities: ['Control Plane、Event、OrganizationVersion、受控执行']
+allowed_actions: [investigate, propose_within_role]
+forbidden_actions: [self_expand_authority, self_approve, bypass_kernel, mutate_peer_resources]
+delegation_scope: []
+handoff_targets: ['project-manager']
+required_approvals: [human_acceptance, task_implementation_authorization]
+reporting_line: project-manager
+memory_scope: '.ans/roles/control-plane/docs/'
+contracts: [policy-decision, control-plane-commit, organization-change, mission-handoff, agent-proposal]

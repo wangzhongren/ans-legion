@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion Runtime",
+  "authorizationSource": "Direct customer: 开发 after reviewed GUI v1 approval brief, 2026-10-07; .ans/decisions/legion-desktop-gui-v1-authorization.md",
+  "designFiles": [
+    "docs/design/2026-10-07_design_desktop-gui-v1.md"
+  ],
+  "maxConcurrentWorkers": 2,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "ProjectManager": {
+      "autoDispatch": true,
+      "card": ".ans/roles/ProjectManager/role-card.md",
+      "boundary": ".ans/roles/ProjectManager/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json",
+        "apps/desktop/forge.config.mjs",
+        "apps/desktop/main.mjs",
+        "apps/desktop/README.md",
+        "apps/desktop/tests/package/desktop-package.test.mjs",
+        "docs/roles/ProjectManager/feature-map.md",
+        "docs/roles/ProjectManager/functional-description.md",
+        "docs/roles/ProjectManager/api-spec.md",
+        "docs/roles/ProjectManager/changelog.md",
+        "docs/roles/ProjectManager/docs/design/2026-10-07_design_desktop-gui-v1.md",
+        "docs/roles/ProjectManager/docs/architecture.md",
+        "docs/roles/ProjectManager/docs/feature/desktop-distribution.md",
+        "apps/desktop/scripts/install-electron.mjs",
+        "apps/desktop/scripts/verify-dependencies.mjs"
+      ],
+      "checks": {
+        "dependencies": {
+          "argv": [
+            "node",
+            "D:/soft/nodejs/node_modules/npm/bin/npm-cli.js",
+            "--prefix",
+            "apps/desktop",
+            "ls",
+            "--all",
+            "--json"
+          ],
+          "timeoutSeconds": 120
+        },
+        "sdk": {
+          "argv": [
+            "node",
+            "apps/desktop/scripts/verify-dependencies.mjs"
+          ],
+          "timeoutSeconds": 120
+        },
+        "package": {
+          "argv": [
+            "node",
+            "--test",
+            "apps/desktop/tests/package/desktop-package.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Supervisor": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Supervisor/role-card.md",
+      "boundary": ".ans/roles/Supervisor/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "docs/roles/Supervisor/feature-map.md",
+        "docs/roles/Supervisor/functional-description.md",
+        "docs/roles/Supervisor/api-spec.md",
+        "docs/roles/Supervisor/changelog.md",
+        "docs/roles/Supervisor/docs/design/2026-10-07_design_desktop-gui-v1.md",
+        "docs/roles/Supervisor/docs/architecture.md",
+        "docs/roles/Supervisor/docs/delivery-desktop-gui-v1.md"
+      ],
+      "checks": {}
+    },
+    "KernelEngineer": {
+      "autoDispatch": false,
+      "card": ".ans/roles/KernelEngineer/role-card.md",
+      "boundary": ".ans/roles/KernelEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [],
+      "checks": {}
+    },
+    "AgentAdapterEngineer": {
+      "autoDispatch": false,
+      "card": ".ans/roles/AgentAdapterEngineer/role-card.md",
+      "boundary": ".ans/roles/AgentAdapterEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [],
+      "checks": {}
+    },
+    "DesktopEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "apps/desktop/src/models/desktop.mjs",
+        "apps/desktop/src/providers/abstract/settings.mjs",
+        "apps/desktop/src/providers/public/settings.mjs",
+        "apps/desktop/src/providers/impl/settings.mjs",
+        "apps/desktop/src/providers/abstract/probe.mjs",
+        "apps/desktop/src/providers/public/probe.mjs",
+        "apps/desktop/src/providers/impl/probe.mjs",
+        "apps/desktop/src/services/abstract/profiles.mjs",
+        "apps/desktop/src/services/public/profiles.mjs",
+        "apps/desktop/src/services/impl/profiles.mjs",
+        "apps/desktop/tests/unit/profiles.test.mjs",
+        "docs/roles/DesktopEngineer/docs/design/2026-10-07_design_desktop-gui-v1.md",
+        "apps/desktop/src/providers/abstract/workspace.mjs",
+        "apps/desktop/src/providers/public/workspace.mjs",
+        "apps/desktop/src/providers/impl/workspace.mjs",
+        "apps/desktop/src/services/abstract/workspace.mjs",
+        "apps/desktop/src/services/public/workspace.mjs",
+        "apps/desktop/src/services/impl/workspace.mjs",
+        "apps/desktop/tests/unit/workspace.test.mjs",
+        "apps/desktop/src/interface/main.mjs",
+        "apps/desktop/src/interface/preload.cjs",
+        "apps/desktop/src/interface/index.html",
+        "apps/desktop/src/interface/renderer.mjs",
+        "apps/desktop/src/interface/styles.css",
+        "apps/desktop/src/pipelines/desktop.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "apps/desktop/tests/unit/ipc.test.mjs",
+        "docs/roles/DesktopEngineer/feature-map.md",
+        "docs/roles/DesktopEngineer/functional-description.md",
+        "docs/roles/DesktopEngineer/api-spec.md",
+        "docs/roles/DesktopEngineer/changelog.md",
+        "docs/roles/DesktopEngineer/docs/feature/desktop-console.md"
+      ],
+      "checks": {
+        "profiles": {
+          "argv": [
+            "node",
+            "--test",
+            "apps/desktop/tests/unit/profiles.test.mjs"
+          ],
+          "timeoutSeconds": 180
+        },
+        "workspace": {
+          "argv": [
+            "node",
+            "--test",
+            "apps/desktop/tests/unit/workspace.test.mjs"
+          ],
+          "timeoutSeconds": 180
+        },
+        "interface": {
+          "argv": [
+            "node",
+            "--test",
+            "apps/desktop/tests/unit/pipeline.test.mjs",
+            "apps/desktop/tests/unit/ipc.test.mjs"
+          ],
+          "timeoutSeconds": 180
+        }
+      }
+    },
+    "Reviewer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Reviewer/role-card.md",
+      "boundary": ".ans/roles/Reviewer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs",
+        "docs/roles/Reviewer/feature-map.md",
+        "docs/roles/Reviewer/functional-description.md",
+        "docs/roles/Reviewer/api-spec.md",
+        "docs/roles/Reviewer/changelog.md",
+        "docs/roles/Reviewer/docs/design/2026-10-07_design_desktop-gui-v1.md",
+        "docs/roles/Reviewer/docs/review-desktop-gui-v1.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Tester": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Tester/role-card.md",
+      "boundary": ".ans/roles/Tester/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "apps/desktop/tests/integration/desktop-flow.test.mjs",
+        "apps/desktop/tests/e2e/desktop-ui.test.mjs",
+        "docs/roles/Tester/feature-map.md",
+        "docs/roles/Tester/functional-description.md",
+        "docs/roles/Tester/api-spec.md",
+        "docs/roles/Tester/changelog.md",
+        "docs/roles/Tester/docs/design/2026-10-07_design_desktop-gui-v1.md",
+        "docs/roles/Tester/docs/verification-desktop-gui-v1.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/integration/desktop-flow.test.mjs",
+            "apps/desktop/tests/e2e/desktop-ui.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

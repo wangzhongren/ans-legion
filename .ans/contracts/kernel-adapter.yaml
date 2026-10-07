@@ -1,0 +1,13 @@
+schema_version: 1
+id: kernel-adapter
+version: legion-node-pi-v3
+status: ACCEPTED
+primary_model_owner: KernelEngineer
+adapter_owner: AgentAdapterEngineer
+input: trusted_instance_identity_and_PiToolRequest
+output: ActionProposal_PiToolResult_PiRunResult
+service_methods: [start_run,next_event,respond_tool,cancel,close]
+event_types: [tool_request,run_event,run_finished,run_failed,run_cancelled]
+guarantee: no_upward_callback_no_authority_leak_request_instance_run_binding_single_response
+pi_sdk: '@earendil-works/pi-coding-agent@1.0.4'
+canonical_design: ../../docs/design/2026-10-07_design_node-pi-v3.md

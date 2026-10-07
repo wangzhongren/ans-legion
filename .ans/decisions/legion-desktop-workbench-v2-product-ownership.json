@@ -1,0 +1,376 @@
+{
+  "schemaVersion": 1,
+  "sourcePolicy": ".ans/decisions/legion-node-pi-v3-project-policy.json",
+  "sourcePolicySha256": "25e46e9b7811685847116393d9c9982062e975f66e151ce3d094ef2be020cccb",
+  "phase": "legion-desktop-workbench-v2",
+  "status": "FROZEN_PRIMARY_OWNERSHIP_FOR_ACCEPTED_V2_EXACT_POLICY",
+  "meaning": "Long-term source ownership and baseline; never replaces active boundary/config/dispatch",
+  "files": {
+    "src/kernel/models/core.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "f62168160c1863bfeca4a80f3a1204b945d9dac4913520c77b1eed257ebe7ecc",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "src/kernel/models/agent.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "23c9ed318741f31dddfacc9aaa1bc45ddf4d80b9eb05543b9dd72421649a51c2",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "src/kernel/services/abstract/policy.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "85e0697e6098746f956276f4556414e79e9cb10d25d174974e3dcd59c4f71b12",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/services/public/policy.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "7addc2cad7c14e6aa0f4c34567d9e24b29e6c5a0c11be6268d5a63f372754642",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/services/impl/policy.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "8f809a821abf02f1a263de0835b9fc145dc6af4054b88db5ee98bbf279f53753",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "src/kernel/services/abstract/mutation.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "07ac9aa7b51ca4593b6d17d64b86c48f2c236cfd85ad74747e2535b28c499ff2",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/services/public/mutation.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "3ab3ada7e41c39dfaee961c69591c6a1b4a56a073a0ff9abfe9b1024479889af",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/services/impl/mutation.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "9cec7b4acbfbe7369a5ee49f5d1b3a58d141ebaafe3cc81e2f6c657680f2a240",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/providers/abstract/storage.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "009b1ddfdd13cf5c39e5cb1d75721a3904cccc01dbb2422d82841563a88f9518",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/providers/public/storage.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "5f39b1be79a869be9c5ae68698a3b4210659c6bd1cdac415bca89ce58d234cbd",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/providers/impl/storage.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "d52d5aad10ff8b0fe93d0d8d53279d6f41131eb2efd0c32d3472fb480a0138e2",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "src/kernel/pipelines/permission.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "87d2403805099e3579592aabc32adeb65a713fc03004160d4458717e1979844e",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/interface/runtime.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "ba5349438e5620a2e2860205ff44f22a7c302902b2241443f2769b9893dc35ba",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/interface/demo.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": "04671bb9196932cf5b53e74772a0d79bc10c5f01df6c60ca6db7fb1a83e51e52",
+      "mutation": "READ_ONLY"
+    },
+    "src/adapters/services/abstract/proposal.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "baselineSha256": "ae1484967e18d481971b4a76deb084282c22233c85ec4f0c05c99adbeeb19fd1",
+      "mutation": "READ_ONLY"
+    },
+    "src/adapters/services/public/proposal.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "baselineSha256": "09f170b5c4b0d5f7be371d12896862047d1a63b46622f3b8554337ec42bb9ef3",
+      "mutation": "READ_ONLY"
+    },
+    "src/adapters/services/impl/proposal.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "baselineSha256": "4d88952e696214aea5184eb7496964781ae3407c2ff599d9d89d8efc08676344",
+      "mutation": "READ_ONLY"
+    },
+    "src/adapters/services/abstract/pi_agent.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "baselineSha256": "a13c5d55013edad2418b04492a867f120017e34646958157fe7822b8e95cc1a0",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "src/adapters/services/public/pi_agent.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "baselineSha256": "c14040bd22ad87512ddb3d9d08ee681b3e06ce8d625f526bcf9b46a1de9f054e",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "src/adapters/services/impl/pi_agent.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "baselineSha256": "f605e8c7a4fd92935eb21dfefe2ae354239ee2e8995d1c3679c022ce309149cc",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "src/adapters/providers/abstract/pi_session.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "baselineSha256": "3e531766baf7469978a9396f3f4a4174cf3e81ab3968df94a28c8b5d3d161562",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "src/adapters/providers/public/pi_session.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "baselineSha256": "3b89c0951f8fbda93098578292eab91703ac5a13e8a685cfd5bd7297363b6e74",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "src/adapters/providers/impl/pi_session.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "baselineSha256": "73583a83a907c6bcf50ee61665b6384de41d7ad73e85c30caf8cb8d7173f6df6",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "runtime.mjs": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "60bf11c3b9da04c155988e99e5ae7cb8f8be672d0589ecab9237ecfb95ccd3b3",
+      "mutation": "READ_ONLY"
+    },
+    "bin/legion.mjs": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "0ff9d0bd3e5dd7646fbd3cfa38ba037b75679e83202b7d5b50589c0151746a56",
+      "mutation": "READ_ONLY"
+    },
+    "src/kernel/models/workbench.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/models/workbench.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/pipelines/workbench.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/providers/abstract/project.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/providers/public/project.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/providers/impl/project.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/abstract/project.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/public/project.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/impl/project.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/providers/abstract/history.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/providers/public/history.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/providers/impl/history.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/abstract/history.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/public/history.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/impl/history.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/abstract/profiles.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "d50962c47e76832003f05ef0a43044ed7636bfd95a7eec133cb2735a1c95a53f",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/public/profiles.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "0905d42404a02e269dcbf10d9e5b5039a16442e3d0f002b59e320435378fae1b",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/impl/profiles.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "50b6259c139a5a2e084b4ed0893470332c1fc8a08aedeead6881eb2d012f6220",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/providers/abstract/workspace.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "70fd30b655011bf897c2c4a570124e18d6de43ee2dec0080109d510659fab24a",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/providers/public/workspace.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "c3dc0d44fa79673ae2576c74ba37b9b8a58a177984261f39b410da7d0c2f128e",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/providers/impl/workspace.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "9906d98f34321fc178162ef9903e6908fddfaed35366f1e96dcd32c9fed4fcd3",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/abstract/workspace.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "4617eee6f44bb0f8ba9433cd5ee608ea06ce5974729d19bfdff19c2e6c45fbec",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/public/workspace.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "0d714891820e52a19f4e7208a5ac3860b8166b9fc537c74b6eaa8bcbdf133556",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/services/impl/workspace.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "5b30749150d5f7ddf50746fde183130c359d40653df8b2667e8e1687bc3e3026",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/interface/main.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "cf166fa068cda1f9f79e9c88c2807cb18f679ec25a8c0d0b2ae81cb673cc794f",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/interface/preload.cjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "031bde3aa906a4800f9b9231b9f358b426acaab400bede072fcc84a57fedd244",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/interface/index.html": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "dfcafe45d53da5d4263ef281a9d0114ccebe675f9ed9a783d1a9f6d3edbf2eb1",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/interface/renderer.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "7b1c4bc149ac20c5c3057addbf4071b8718e21a2a524481ea581af1c2dab4c7b",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/interface/styles.css": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "52565381a4fc37f284e5076bd804460dce037fc071c744ae801f16c8bec21f5e",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "package.json": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "09c91316f22a7b3f3c1097b71e1a6e0388736ff4d7540ea9e0583c9f0ddd6e0b",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "package-lock.json": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "f4649c6a7b8c2aa623c07097f01de2f340b561228d3cfa75a0a48cc7acdfb34b",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "workbench.mjs": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": null,
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "README.md": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "8ae390ca2c059a1fb04d01d54912caece60ec68934d1181087aab990a90d2894",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/package.json": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "270ca9d35828253d233e2d47b0d517e1bf1ada95d3d4ada6a543693ad7259e43",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/package-lock.json": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "1a5eb579b6ff118f97b7aeebb3fc35f54b3aec0bee2efdd24d14dc49f6264d98",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/forge.config.mjs": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "9d243573578c8e7f9608fe733885ce33b6741f267a91b10938efd85d9144c0ba",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/main.mjs": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "f11c0882165db422ab44c3e723853f702fda837d52f37ad76bcc0f57a566e795",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/README.md": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "ff0b0eb68d684f37cd212f01a35f7cfec583ef39ceb34a6307c3bf8b4f8ab252",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/scripts/install-electron.mjs": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "b122787079a6923dac2649360a69fd65616a0c32a5ba371e51529a3803931fa4",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/scripts/verify-dependencies.mjs": {
+      "primaryOwner": "ProjectManager",
+      "baselineSha256": "90db77300669659b39c2f25c88abc210c44e692b0a73cda6343e670e45cf4225",
+      "mutation": "AUTHORIZED_ONLY_BY_EXACT_V2_DISPATCH"
+    },
+    "apps/desktop/src/models/desktop.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "928ec533ff08459e69c857c86b869c6feb4229118dc191b8ac796ae2230cc43a",
+      "mutation": "READ_ONLY"
+    },
+    "apps/desktop/src/providers/abstract/settings.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "aed03bc25d63c5bd54cffc94528c8eb681eb3329be08d354f4840f69e9807c54",
+      "mutation": "READ_ONLY"
+    },
+    "apps/desktop/src/providers/public/settings.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "e0845d4b86edda66eb77447bd9465740fa55cd6a881fc247196cc0a1387bb469",
+      "mutation": "READ_ONLY"
+    },
+    "apps/desktop/src/providers/impl/settings.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "e9f439b91b77b87aeb4e60d712c608b4a1431828773e9b0bdbeda0b5ecd49089",
+      "mutation": "READ_ONLY"
+    },
+    "apps/desktop/src/providers/abstract/probe.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "655eb97d0221f89866fe6fd5ae927ed504c56e9db713006ef54ac2abc3f38074",
+      "mutation": "READ_ONLY"
+    },
+    "apps/desktop/src/providers/public/probe.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "c47958cd6d45f0e55a93c307a0e80bd59f5c03e2111c4f3063a33cd35124e82b",
+      "mutation": "READ_ONLY"
+    },
+    "apps/desktop/src/providers/impl/probe.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "f72e8900d18da0e8bdcb640cf03617a714bd81332e8ee9eb6fa51c43639271bb",
+      "mutation": "READ_ONLY"
+    },
+    "apps/desktop/src/pipelines/desktop.mjs": {
+      "primaryOwner": "DesktopEngineer",
+      "baselineSha256": "914239ee5ad67061bba6e20f21ce8658c9f3a7c9cf59631ab92f5c3f05ba90f0",
+      "mutation": "READ_ONLY"
+    }
+  },
+  "activePolicySha256": "2546ebd0b8756eccb83bced6808c10d1c25c3bc175ca8f676a9f1d5172cb706b"
+}

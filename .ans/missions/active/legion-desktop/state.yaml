@@ -1,0 +1,259 @@
+schema_version: 1
+status: COMPLETE
+phase: legion-desktop-workbench-v2
+source: docs/scheduling/legion-desktop-workbench-v2-fixture-repair.md
+observed_revision: 36
+verified_nodes: [kernel,adapter,core-package-deps,cap-fixtures,desktop-interface,desktop-package,reviewer,tester]
+active_workers: []
+active_stage: none
+default_layout: focus_conversation
+customer_chat_entry: single_ProjectManager
+canonical: docs/design/2026-10-07_design_desktop-workbench-v2.md
+canonical_sha256: 715639b5dd278437059f29bde1e7c02ac90d94af18f9bf5a6b5367d16e9ab5d3
+authorization: .ans/decisions/legion-desktop-workbench-v2-authorization.md
+implementation_authorization: DIRECT_CUSTOMER_CONFIRMED
+review_recommendation: RECOMMEND_APPROVAL
+policy_sha256: 2546ebd0b8756eccb83bced6808c10d1c25c3bc175ca8f676a9f1d5172cb706b
+authored_files: 121
+generated_scopes: 33
+application_acceptance: VERIFIED_COMPLETE_REQUIRED_CHECKS
+verified_stage_evidence:
+  kernel:
+    producer: KernelEngineer
+    scheduler_verified_revision: 7
+    candidate_sha256: 62e19281594766df248f5e063bcfc04757d351e3cb06595d5252d9f31f0f9eeb
+    required_check: unit
+    result: {pass: 100, fail: 0, skip: 0, cancelled: 0, todo: 0}
+    log_filename: kernel-1-unit-2f1dde00.log
+    log_sha256: 5ce5749596c684938e0d91dddb72af85075639edbf396acc69466a3ac33ae6ed
+    acceptance: kernel_candidate_only_not_complete_product
+  adapter:
+    producer: AgentAdapterEngineer
+    scheduler_verified_revision: 14
+    candidate_sha256: 90a2d2b8f1d1b576aec8ef52ebfc6c7c20d206877d73436f341593a980846f6e
+    required_check: unit
+    result: {pass: 38, fail: 0, skip: 0, cancelled: 0, todo: 0}
+    log_filename: adapter-1-unit-978565dd.log
+    log_sha256: e730ed8c3f3521246352b13cb7c0bb1c681209184354e20f99ba8e60275c88fa
+    acceptance: adapter_candidate_only_not_complete_product
+  core-package-deps:
+    producer: ProjectManager
+    scheduler_verified_revision: 25
+    candidate_sha256: e22a6341029fcce3d729a98e47b1a6f825da28ffd58ac94137102e50adf74765
+    required_checks: [core-package,install-electron,verify-dependencies]
+    package_result: {pass: 2, fail: 0, skip: 0, cancelled: 0}
+    electron_install: official_binary_checksum_verified
+    protocols: {real_SDK: true, protocols: 3, turns_per_protocol: 2, local_requests: 6, history_restore_requests: 0}
+    tarball: .ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/legion-runtime-0.4.0.tgz
+    tarball_sha256: f3114a19205b69542c5629cfbb4a2664e9aebc62fc81f76a69d332e6f922140c
+    tarball_file_count: 29
+    product_mjs_file_count: 27
+    product_mjs_aggregate_sha256: fa803823991e81e54149289880a90e3a4693cfb313e36a821301b778ff785bd7
+    desktop_install: actual_local_tarball_offline_ignore_scripts
+    acceptance: package_and_installed_dependencies_only_not_complete_desktop
+  desktop-capabilities-original:
+    producer: DesktopEngineer
+    scheduler_verified_revision: 30
+    candidate_sha256: 5c0dcb4dc64a5ed69d6860def4ef3335f4f7ce1872e85efa26710f5bb2f6ea55
+    required_check: capabilities
+    result: {pass: 47, fail: 0, skip: 0, cancelled: 0, todo: 0}
+    log_filename: desktop-capabilities-1-capabilities-f383c29e.log
+    log_sha256: 2d9f31cd59b898c3526cb5f1ed7a8a6eaa3354b8e3f0c4da0f33451bb4a9cdb4
+    acceptance: historical_candidate_before_five_fixture_tests_repair
+  cap-fixtures:
+    producer: DesktopEngineer
+    scheduler_verified_revision: 6
+    candidate_sha256: ac97a5af88dbbfa31f82459ec0af0b34224292700fc5a1296b451ee048b43fa0
+    required_check: capabilities
+    result: {pass: 47, fail: 0, skip: 0, cancelled: 0, todo: 0}
+    log_filename: cap-fixtures-1-capabilities-1b5d65c9.log
+    log_sha256: 3221624c51c4e2a0f80e78c4cdd11c0019ada9c532c370b64dd5d4a5a2498eb8
+    acceptance: repaired_fixtures_and_unchanged_25_cap_outputs_only_interface_and_distribution_pending
+  desktop-interface:
+    producer: DesktopEngineer
+    scheduler_verified_revision: 11
+    candidate_sha256: e0c5a3da7eb84b2998604c9b201141a70e6aa74b640e98900744079a6bf7f0c0
+    required_check: interface
+    result: {pass: 7, fail: 0, skip: 0, cancelled: 0, todo: 0}
+    log_filename: desktop-interface-1-interface-9722e13b.log
+    log_sha256: c9dfbf9f0e440b8b6babaec9438c3a98e2a64415193a321aa2a80336fa283fab
+    acceptance: interface_only_native_desktop_package_and_independent_validation_pending
+  desktop-package:
+    producer: ProjectManager
+    scheduler_verified_revision: 19
+    candidate_sha256: fc352fb8aea135d43fe5bf8ab227fef90aa8bd7adf34d578ff220a54a67d8c58
+    required_check: desktop-package
+    result: {pass: 2, fail: 0, skip: 0, cancelled: 0, todo: 0}
+    elapsed_seconds: 144.229
+    log_filename: desktop-package-1-desktop-package-481dd41e.log
+    log_sha256: 55cf42dba1412f70b1e20c30067dcb0bb47e09c01d2503265f52270dc3dd81aa
+    complete_descriptor_sha256: 56467145d66891b76d288ee91c80f404a5a5e4abf32a36d8dce198ab0007b5af
+    artifact: .ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/packaging/LegionDesktop-0.2.0-win32-x64.zip
+    artifact_sha256: 755e0950cbc2b44beb1d1888a19d85995ae781a2aedd36d3bce11bb3afbf6f56
+    artifact_bytes: 194645336
+    root_artifact_sha_recomputed: true
+    native_coverage: actual_ZIP_exe_real_owned_folder_dialog_three_protocols_same_PM_plan_confirmation_exact_write_stop_DPAPI_restart_authenticated_continuation
+    desktop_source_package_files: 38
+    runtime_entries: 29
+    public_Model_symbols: 30
+    SDK_local_requests: 9
+    finite_IPC_operations: 14
+    tracked_executable_exits: [0,0]
+    consumers_remaining: 0
+    root_visual_coverage: actual_conversation_light_settings_dark_conversation_minimum_dark_readable_no_obvious_overflow
+    acceptance: historical_755_ZIP_package_stage_current_11_ZIP_covered_by_final_public_and_artifact_rechecks
+  reviewer:
+    producer: Reviewer
+    scheduler_verified_revision: 27
+    candidate_sha256: 4d97d8e76524a674ed9577afb97c78dc18fcd2acfd09776ffc63d37a46420213
+    required_checks: [node-unit,desktop-unit]
+    node_result: {pass: 22, fail: 0, skip: 0}
+    desktop_result: {pass: 15, fail: 0, skip: 0}
+    node_log_sha256: 4af8a24aee0ab356b9aeea2e88cd9e150ad7262c1e709715348e463819b81501
+    desktop_log_sha256: ee76c08550797939c955a1350213c96c94a4b58076c47f78a6377e72d4eba023
+    failed_desktop_first_log_sha256: 3c31d8b3083e8eff5c2880f30ca3611945f72f475bda8343852abbb5597ee5b7
+    acceptance: initial_independent_boundary_checks_current_ZIP_rechecked_separately
+  tester:
+    producer: Tester
+    scheduler_verified_revision: 36
+    candidate_sha256: 04defa92ac27adf53158f527bfafa9e66034c3a331d81fb3734c97fe8ee2118b
+    required_checks: [unit,regression]
+    unit_result: {tests: 2, pass: 2, fail: 0, skip: 0, cancelled: 0}
+    regression_result: {tests: 182, pass: 182, fail: 0, skip: 0, cancelled: 0}
+    unit_log_filename: tester-1-unit-3fd74614.log
+    unit_log_sha256: 2c6754d041c0ea6917a02cba1825a30404acef229aa4016426bea844db2c2fa2
+    regression_log_filename: tester-1-regression-cb0d8dee.log
+    regression_log_sha256: 43dcc322101f7a0775f0680c4240492fb1e21cc225b944730817261d207ae8ab
+    generated_verification_sha256: be279dc149c494253cb07f0dad94314b12288f595bf94d01486d250af6870ace
+    actual_coverage: nine_public_flow_scenarios_real_SDK_actual_ZIP_native_mainPID_folder_chooser_Human_confirmation_files_audit_stop_DPAPI_restart_seven_screenshots
+    protected_original_files: 1767
+    protected_changed: []
+    original_Node_integration_assertions: 20_unchanged_with_only_TEMP_ROOT_expression_relocated
+    acceptance: independent_complete_flows_and_public_Node_182_regression_current_ZIP_rechecked_separately
+historical_check_retries:
+  desktop-package:
+    producer: ProjectManager
+    status: three_historical_failed_checks_followed_by_verified_current_candidate
+    failed_checks:
+      - candidate_sha256: 0a8558076a72948cde38dbe0ae799f382b2738f2700fa89b979fb0e104461a1b
+        required_check: desktop-package
+        exit_code: 124
+        timed_out: true
+        total_budget_seconds: 300
+        log_filename: desktop-package-1-desktop-package-7eefbbd0.log
+        log_sha256: 6e0970ca5eaed1dcc68979e72aeafc5db74b5ee0bec6562bb8d28aa14d39f546
+        actual_coverage: inert_entry_and_Forge_make_passed_Expand_Archive_timed_out_native_UI_not_reached
+      - required_check: desktop-package
+        timed_out: false
+        result: {pass: 1, fail: 1, skip: 0, cancelled: 0}
+        log_filename: desktop-package-1-desktop-package-e45a6dd3.log
+        log_sha256: 847e498c663369ecc358a1e26cb05879d42cc78a811200713767574cb5fd63fa
+        actual_coverage: NET_extract_runtime29_SDK_publicModels30_source_identity_actual_exe_start_isolation_readiness_passed
+        failed_observation: currentProject_not_present_within_15_seconds_after_native_folder_chooser
+        cause: not_yet_determined_chooser_driver_or_product_path
+        unverified: conversation_DPAPI_restart_screenshots
+      - required_check: desktop-package
+        timed_out: false
+        result: {pass: 1, fail: 1, skip: 0, cancelled: 0}
+        log_filename: desktop-package-1-desktop-package-03451846.log
+        log_sha256: f0482511320e8eabaf3f81b7a962be86a2113771e81436120dc60b812f79ba28
+        failed_observation: packaged_manifest_private_metadata_removed_expected_transform_incomplete
+        cause_primary_source: apps/desktop/node_modules/@electron/packager/dist/sanitize-package-json.js
+        repair: exact_known_default_transform_preserve_whole_manifest_deepEqual
+        unverified: full_native_flow_not_reached_in_this_run
+    latest_native_diagnostic: actual_mainPID_owned_dialog_folder_selection_returned_correct_customer_identity
+    root_visual_observation:
+      screenshot: .ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/packaging/chooser-diagnostic-current-window.png
+      coverage: actual_initial_ZIP_window_1244x821_focus_layout_no_obvious_overflow
+      acceptance: initial_visual_only_not_full_conversation_or_package_acceptance
+    initial_zip_sha256: e78d0bc394e9c05ec2699914a748c9fd05c3ff6f2be684cfed730b94ceb82b01
+    initial_zip_bytes: 194645336
+    acceptance: generated_ZIP_only_not_native_package_or_UI_acceptance
+fixture_isolation_repair:
+  governance: .ans/decisions/legion-desktop-workbench-v2-fixture-isolation-repair.md
+  governance_sha256: 8181cc7fafc7eb5cf6bf5dc804061bbac7af5d8b84783756e38d8a5c9c19233b
+  successor_task: legion-desktop-workbench-v2-fixture-repair
+  status: successor_all_five_nodes_verified_revision_36
+  original_task_revision: 34
+  original_Interface: blocked_and_stopped
+  repair_scope: five_original_DesktopEngineer_fixture_tests_only
+  product_change: none
+  prior_three_candidate_and_five_log_hashes: actually_recomputed_unchanged_by_Supervisor
+  capabilities_evidence: prior_47_is_historical_new_47_verified_revision_6
+  repair_pinned_inputs: five_before_hashes_25_unchanged_cap_outputs_three_candidates_five_logs
+  original_task: docs/scheduling/legion-desktop-workbench-v2.md
+final_public_entry_check:
+  status: verified_revision_6_and_current_ZIP_affected_checks_verified
+  source: docs/scheduling/legion-desktop-workbench-v2-desktop-public.md
+  observed_revision: 6
+  producer: ProjectManager
+  authored_write_set: []
+  required_check: desktop-public
+  coverage: fixed_public_desktop_test_13_modules_serial
+  total_budget_seconds: 300
+  candidate_sha256: e945b68989eda22e61a1c5e878f2f60ba9c609ccd5d38f86d33d7f5f6bfb1643
+  result: {tests: 73, pass: 73, fail: 0, skip: 0, cancelled: 0, todo: 0}
+  elapsed_seconds: 203.280
+  log_sha256: 675e8e724359e92c29026854a7865d0c92e2708d7635fbf0f7552a8953454d8b
+  current_zip_sha256: 11c16a8c308d05f81ae66831f0a661d47547fd8a1e1606b4dcc149164722b298
+  current_zip_bytes: 194645336
+  before_zip_sha256: 755e0950cbc2b44beb1d1888a19d85995ae781a2aedd36d3bce11bb3afbf6f56
+  before_zip_evidence: historical_prior_to_public_remake
+  authored_and_product_source_hashes: unchanged
+  pending_current_ZIP_checks: []
+  current_descriptor_sha256: fa6acd9b2245c337407847da23b9dbfd055b3b5030560b26598244a7e7c7f0aa
+  current_public_evidence: .ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/packaging/final-public-npm-test.json
+  current_public_evidence_sha256: e52a45a99d96ccf5e0010229478f17efa31e8ac8630b4553ecbeb50f7e68c3f2
+current_artifact_recheck:
+  source: docs/scheduling/legion-desktop-workbench-v2-artifact-recheck.md
+  observed_revision: 11
+  status: both_nodes_verified_and_inactive
+  authored_write_set: []
+  required_checks: [Reviewer_desktop-unit,Tester_unit]
+  artifact_sha256: 11c16a8c308d05f81ae66831f0a661d47547fd8a1e1606b4dcc149164722b298
+  unaffected_Node_regression: verified_182_not_repeated
+  candidate_sha256: 2dc1e056a395f72b85333d9313e68bc74c25365e6210ef0125aaf81426166dae
+  reviewer:
+    scheduler_verified_revision: 6
+    result: {tests: 15, pass: 15, fail: 0, skip: 0, cancelled: 0, todo: 0}
+    log_sha256: 7b932f2f8069942ca357d3001be956e46c7487fc06d2a0ff9bf964e703dfa0cc
+    generated_report_sha256: 0d3cd11799adb2fb289a00e97f0b291a24b8d50ee2b27a0727208733e3134d71
+  tester:
+    scheduler_verified_revision: 11
+    result: {tests: 2, pass: 2, fail: 0, skip: 0, cancelled: 0, todo: 0}
+    log_sha256: 198ab4ef8873837a8062396580e23bd5c2658cf63b980e3fdcb820ff020f949f
+    generated_report_sha256: a4a4fd465a2ad84c1e2e1dba595cd58439533109c837b38f25fce67823f7e98e
+    coverage: actual_current_ZIP_native_mainPID_chooser_DPAPI_authenticated_restart_confirmed_files_audit_stop_seven_screenshots
+  authored_and_product_sources: unchanged
+legacy_GUI_v1:
+  source: docs/scheduling/legion-desktop-gui-v1.md
+  revision: 36
+  verified_nodes: [deps,profiles,workspace,interface,package,reviewer]
+  active_workers: []
+  reviewer_tests: {pass: 8, fail: 0, skip: 0}
+  tester: NOT_DISPATCHED_CUSTOMER_REVISION
+  artifact: .ans/runtime/legion-desktop-gui-v1/packaging/LegionDesktop-0.1.0-win32-x64.zip
+  sha256: 728a7da8fb0c94f5dade821a2edf9b6fa369410d8e2812c4f6417dc7383cf2a8
+  acceptance: PROTOTYPE_NOT_CUSTOMER_ACCEPTED_WORKBENCH
+  optional_O1: PENDING_NOT_SELECTED_IN_V1_SUPERSEDED_BY_V2_REQUIREMENTS
+  known_limit: three_task_documents_including_current_GUI_task_exceed_1MB
+legacy_Node_compatibility:
+  task: legion-node-fixture-compat-v1
+  revision: 17
+  status: ALL_THREE_NODES_VERIFIED
+  public_Node_suite: {tests: 141, pass: 141, fail: 0, skip: 0}
+delivery_documentation:
+  source: docs/roles/Supervisor/docs/delivery-desktop-workbench-v2.md
+  sha256: fd467eaefc99014b600e93e6c8040c98c2523401af20f0e5df6b20b8ff3159ac
+  Supervisor_owned_files: 7
+  canonical_aggregate_sha256: 30bdcf241fff6444a22abec419d14f76f0b5b871e122e7d0b9f6273438038077
+  Root_independently_recomputed_seven_file_hashes: matched
+  all_role_contexts: stopped_writing
+final_product_source:
+  count: 64
+  canonical_aggregate_sha256: 6394d750b636729bc3dc45d312f3b960b21146b543a51c0488c7eae3cbb7c454
+  stage_checks: 12
+  supplemental_checks: 3
+  software_checks_executor: absent_not_executed
+  paid_model_calls: 0
+meaning: actual_task_records_role_test_evidence_and_scheduler_acceptance_with_explicit_coverage_limits

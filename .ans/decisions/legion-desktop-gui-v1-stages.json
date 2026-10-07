@@ -1,0 +1,78 @@
+{
+  "profiles": [
+    "apps/desktop/src/models/desktop.mjs",
+    "apps/desktop/src/providers/abstract/settings.mjs",
+    "apps/desktop/src/providers/public/settings.mjs",
+    "apps/desktop/src/providers/impl/settings.mjs",
+    "apps/desktop/src/providers/abstract/probe.mjs",
+    "apps/desktop/src/providers/public/probe.mjs",
+    "apps/desktop/src/providers/impl/probe.mjs",
+    "apps/desktop/src/services/abstract/profiles.mjs",
+    "apps/desktop/src/services/public/profiles.mjs",
+    "apps/desktop/src/services/impl/profiles.mjs",
+    "apps/desktop/tests/unit/profiles.test.mjs",
+    "docs/roles/DesktopEngineer/docs/design/2026-10-07_design_desktop-gui-v1.md"
+  ],
+  "workspace": [
+    "apps/desktop/src/providers/abstract/workspace.mjs",
+    "apps/desktop/src/providers/public/workspace.mjs",
+    "apps/desktop/src/providers/impl/workspace.mjs",
+    "apps/desktop/src/services/abstract/workspace.mjs",
+    "apps/desktop/src/services/public/workspace.mjs",
+    "apps/desktop/src/services/impl/workspace.mjs",
+    "apps/desktop/tests/unit/workspace.test.mjs"
+  ],
+  "interface": [
+    "apps/desktop/src/interface/main.mjs",
+    "apps/desktop/src/interface/preload.cjs",
+    "apps/desktop/src/interface/index.html",
+    "apps/desktop/src/interface/renderer.mjs",
+    "apps/desktop/src/interface/styles.css",
+    "apps/desktop/src/pipelines/desktop.mjs",
+    "apps/desktop/tests/unit/pipeline.test.mjs",
+    "apps/desktop/tests/unit/ipc.test.mjs",
+    "docs/roles/DesktopEngineer/feature-map.md",
+    "docs/roles/DesktopEngineer/functional-description.md",
+    "docs/roles/DesktopEngineer/api-spec.md",
+    "docs/roles/DesktopEngineer/changelog.md",
+    "docs/roles/DesktopEngineer/docs/feature/desktop-console.md"
+  ],
+  "deps": [
+    "apps/desktop/package.json",
+    "apps/desktop/package-lock.json",
+    "apps/desktop/scripts/install-electron.mjs",
+    "apps/desktop/scripts/verify-dependencies.mjs"
+  ],
+  "package": [
+    "apps/desktop/forge.config.mjs",
+    "apps/desktop/main.mjs",
+    "apps/desktop/README.md",
+    "apps/desktop/tests/package/desktop-package.test.mjs",
+    "docs/roles/ProjectManager/feature-map.md",
+    "docs/roles/ProjectManager/functional-description.md",
+    "docs/roles/ProjectManager/api-spec.md",
+    "docs/roles/ProjectManager/changelog.md",
+    "docs/roles/ProjectManager/docs/design/2026-10-07_design_desktop-gui-v1.md",
+    "docs/roles/ProjectManager/docs/architecture.md",
+    "docs/roles/ProjectManager/docs/feature/desktop-distribution.md"
+  ],
+  "reviewer": [
+    "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs",
+    "docs/roles/Reviewer/feature-map.md",
+    "docs/roles/Reviewer/functional-description.md",
+    "docs/roles/Reviewer/api-spec.md",
+    "docs/roles/Reviewer/changelog.md",
+    "docs/roles/Reviewer/docs/design/2026-10-07_design_desktop-gui-v1.md",
+    "docs/roles/Reviewer/docs/review-desktop-gui-v1.md"
+  ],
+  "tester": [
+    "apps/desktop/tests/integration/desktop-flow.test.mjs",
+    "apps/desktop/tests/e2e/desktop-ui.test.mjs",
+    "docs/roles/Tester/feature-map.md",
+    "docs/roles/Tester/functional-description.md",
+    "docs/roles/Tester/api-spec.md",
+    "docs/roles/Tester/changelog.md",
+    "docs/roles/Tester/docs/design/2026-10-07_design_desktop-gui-v1.md",
+    "docs/roles/Tester/docs/verification-desktop-gui-v1.md"
+  ]
+}

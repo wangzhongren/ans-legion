@@ -1,0 +1,9 @@
+schema_version: 1
+role_id: Supervisor
+status: ACCEPTED
+version: legion-desktop-workbench-v2
+read_scope: ['project/**']
+write_scope: ["docs/roles/Supervisor/feature-map.md","docs/roles/Supervisor/functional-description.md","docs/roles/Supervisor/api-spec.md","docs/roles/Supervisor/changelog.md","docs/roles/Supervisor/docs/design/2026-10-07_design_desktop-workbench-v2.md","docs/roles/Supervisor/docs/architecture.md","docs/roles/Supervisor/docs/delivery-desktop-workbench-v2.md"]
+generated_effect_scope: []
+deny_scope: ['outside_boundary', '.ans/organization/**', '.ans/roles/**', '.ans/project.json', 'historical_runtime_artifacts']
+approval_source: direct_customer_workbench_v2_confirm_2026-10-07

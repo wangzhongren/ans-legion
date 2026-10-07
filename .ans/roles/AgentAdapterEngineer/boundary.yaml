@@ -1,0 +1,9 @@
+schema_version: 1
+role_id: AgentAdapterEngineer
+status: ACCEPTED
+version: legion-desktop-workbench-v2
+read_scope: ['project/**']
+write_scope: ["src/adapters/services/abstract/pi_agent.mjs","src/adapters/services/public/pi_agent.mjs","src/adapters/services/impl/pi_agent.mjs","src/adapters/providers/abstract/pi_session.mjs","src/adapters/providers/public/pi_session.mjs","src/adapters/providers/impl/pi_session.mjs","tests/adapters/test_pi_provider.mjs","tests/adapters/test_pi_service.mjs","docs/roles/AgentAdapterEngineer/feature-map.md","docs/roles/AgentAdapterEngineer/functional-description.md","docs/roles/AgentAdapterEngineer/api-spec.md","docs/roles/AgentAdapterEngineer/changelog.md","docs/roles/AgentAdapterEngineer/docs/design/2026-10-07_design_desktop-workbench-v2.md","docs/roles/AgentAdapterEngineer/docs/feature/pi-agent.md"]
+generated_effect_scope: [".ans/runtime/legion-desktop-workbench-v2/AgentAdapterEngineer/fixtures/",".ans/runtime/legion-desktop-workbench-v2/AgentAdapterEngineer/user-data/",".ans/runtime/legion-desktop-workbench-v2/AgentAdapterEngineer/tmp/"]
+deny_scope: ['outside_boundary', '.ans/organization/**', '.ans/roles/**', '.ans/project.json', 'historical_runtime_artifacts']
+approval_source: direct_customer_workbench_v2_confirm_2026-10-07

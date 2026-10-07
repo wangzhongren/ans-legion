@@ -1,0 +1,195 @@
+{
+  "allowRequirementRevision": false,
+  "projectName": "Legion Runtime",
+  "schemaVersion": 1,
+  "designFiles": [
+    "docs/design/2026-10-07_design_legion-v1.md"
+  ],
+  "authorizationSource": "Direct human Legion Runtime Organization Proposal v1 and development instruction, 2026-10-07",
+  "maxConcurrentWorkers": 2,
+  "roles": {
+    "AgentAdapterEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/AgentAdapterEngineer/role-card.md",
+      "boundary": ".ans/roles/AgentAdapterEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "src/adapters/services/abstract/proposal.py",
+        "src/adapters/services/public/proposal.py",
+        "src/adapters/services/impl/proposal.py",
+        "tests/adapters/test_proposal.py",
+        "docs/roles/AgentAdapterEngineer/feature-map.md",
+        "docs/roles/AgentAdapterEngineer/functional-description.md",
+        "docs/roles/AgentAdapterEngineer/api-spec.md",
+        "docs/roles/AgentAdapterEngineer/changelog.md",
+        "docs/roles/AgentAdapterEngineer/docs/design/2026-10-07_design_phase1.md",
+        "docs/roles/AgentAdapterEngineer/docs/feature/proposal-adapters.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "python",
+            "-c",
+            "import sys,unittest;sys.path.insert(0,'src');result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover('tests/adapters'));sys.exit(not result.wasSuccessful())"
+          ],
+          "timeoutSeconds": 90
+        }
+      }
+    },
+    "ProjectManager": {
+      "autoDispatch": true,
+      "card": ".ans/roles/ProjectManager/role-card.md",
+      "boundary": ".ans/roles/ProjectManager/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "docs/roles/ProjectManager/feature-map.md",
+        "docs/roles/ProjectManager/functional-description.md",
+        "docs/roles/ProjectManager/api-spec.md",
+        "docs/roles/ProjectManager/changelog.md",
+        "docs/roles/ProjectManager/docs/design/2026-10-07_design_phase1.md",
+        "docs/roles/ProjectManager/docs/architecture.md"
+      ],
+      "checks": {}
+    },
+    "Reviewer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Reviewer/role-card.md",
+      "boundary": ".ans/roles/Reviewer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "tests/reviewer/test_structure.py",
+        "docs/roles/Reviewer/feature-map.md",
+        "docs/roles/Reviewer/functional-description.md",
+        "docs/roles/Reviewer/api-spec.md",
+        "docs/roles/Reviewer/changelog.md",
+        "docs/roles/Reviewer/docs/design/2026-10-07_design_phase1.md",
+        "docs/roles/Reviewer/docs/review.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "python",
+            "-c",
+            "import sys,unittest;sys.path.insert(0,'src');result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover('tests/reviewer'));sys.exit(not result.wasSuccessful())"
+          ],
+          "timeoutSeconds": 90
+        }
+      }
+    },
+    "Tester": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Tester/role-card.md",
+      "boundary": ".ans/roles/Tester/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "tests/integration/test_permission_flow.py",
+        "docs/roles/Tester/feature-map.md",
+        "docs/roles/Tester/functional-description.md",
+        "docs/roles/Tester/api-spec.md",
+        "docs/roles/Tester/changelog.md",
+        "docs/roles/Tester/docs/design/2026-10-07_design_phase1.md",
+        "docs/roles/Tester/docs/verification.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "python",
+            "-c",
+            "import sys,unittest;sys.path.insert(0,'src');result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover('tests/integration'));sys.exit(not result.wasSuccessful())"
+          ],
+          "timeoutSeconds": 90
+        }
+      }
+    },
+    "Supervisor": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Supervisor/role-card.md",
+      "boundary": ".ans/roles/Supervisor/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "docs/roles/Supervisor/feature-map.md",
+        "docs/roles/Supervisor/functional-description.md",
+        "docs/roles/Supervisor/api-spec.md",
+        "docs/roles/Supervisor/changelog.md",
+        "docs/roles/Supervisor/docs/design/2026-10-07_design_phase1.md",
+        "docs/roles/Supervisor/docs/architecture.md",
+        "docs/roles/Supervisor/docs/delivery.md"
+      ],
+      "checks": {}
+    },
+    "KernelEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/KernelEngineer/role-card.md",
+      "boundary": ".ans/roles/KernelEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "src/kernel/models/core.py",
+        "src/kernel/services/abstract/policy.py",
+        "src/kernel/services/public/policy.py",
+        "src/kernel/services/impl/policy.py",
+        "src/kernel/services/abstract/mutation.py",
+        "src/kernel/services/public/mutation.py",
+        "src/kernel/services/impl/mutation.py",
+        "src/kernel/providers/abstract/storage.py",
+        "src/kernel/providers/public/storage.py",
+        "src/kernel/providers/impl/storage.py",
+        "src/kernel/pipelines/permission.py",
+        "src/kernel/interface/demo.py",
+        "tests/kernel/test_models.py",
+        "tests/kernel/test_policy.py",
+        "tests/kernel/test_mutation.py",
+        "tests/kernel/test_events.py",
+        "tests/kernel/test_demo.py",
+        "docs/roles/KernelEngineer/feature-map.md",
+        "docs/roles/KernelEngineer/functional-description.md",
+        "docs/roles/KernelEngineer/api-spec.md",
+        "docs/roles/KernelEngineer/changelog.md",
+        "docs/roles/KernelEngineer/docs/design/2026-10-07_design_phase1.md",
+        "docs/roles/KernelEngineer/docs/feature/permission.md"
+      ],
+      "checks": {
+        "demo": {
+          "argv": [
+            "python",
+            "-c",
+            "import sys,runpy;sys.path.insert(0,'src');runpy.run_module('kernel.interface.demo',run_name='__main__')"
+          ],
+          "timeoutSeconds": 60
+        },
+        "unit": {
+          "argv": [
+            "python",
+            "-c",
+            "import sys,unittest;sys.path.insert(0,'src');result=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover('tests/kernel'));sys.exit(not result.wasSuccessful())"
+          ],
+          "timeoutSeconds": 90
+        }
+      }
+    }
+  },
+  "allowDesignRevision": true
+}

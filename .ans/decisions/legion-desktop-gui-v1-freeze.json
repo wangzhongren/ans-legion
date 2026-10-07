@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "phase": "legion-desktop-gui-v1",
+  "status": "GOVERNANCE_FROZEN_IMPLEMENTATION_AUTHORIZED_NOT_VERIFIED",
+  "configSha256": "e72ba37fc080453ecf9ef0229c5f6f11bf4e41ecf017cf2febf85cea6ef6d89d",
+  "designSha256": "58c79cae70bc45dcdda038e0e7944883dbee3ecfb2e277664a5954c3ec6a398d",
+  "authorizationSha256": "f6d9f891f4046d16785eefdd3516578556da857e53bfcb4cbf907d4f94194ad2",
+  "authoredFileCount": 69,
+  "roles": [
+    "ProjectManager",
+    "Supervisor",
+    "KernelEngineer",
+    "AgentAdapterEngineer",
+    "DesktopEngineer",
+    "Reviewer",
+    "Tester"
+  ],
+  "generatedEffects": {
+    "ProjectManager": [
+      "apps/desktop/node_modules/",
+      "apps/desktop/out/",
+      ".ans/runtime/legion-desktop-gui-v1/npm-cache/",
+      ".ans/runtime/legion-desktop-gui-v1/packaging/",
+      ".ans/runtime/legion-desktop-gui-v1/user-data/ProjectManager/",
+      ".ans/runtime/legion-desktop-gui-v1/fixtures/ProjectManager/",
+      ".ans/runtime/legion-desktop-gui-v1/electron-cache/"
+    ],
+    "Supervisor": [],
+    "KernelEngineer": [],
+    "AgentAdapterEngineer": [],
+    "DesktopEngineer": [
+      ".ans/runtime/legion-desktop-gui-v1/user-data/DesktopEngineer/",
+      ".ans/runtime/legion-desktop-gui-v1/fixtures/DesktopEngineer/"
+    ],
+    "Reviewer": [
+      ".ans/runtime/legion-desktop-gui-v1/user-data/Reviewer/",
+      ".ans/runtime/legion-desktop-gui-v1/fixtures/Reviewer/"
+    ],
+    "Tester": [
+      ".ans/runtime/legion-desktop-gui-v1/user-data/Tester/",
+      ".ans/runtime/legion-desktop-gui-v1/fixtures/Tester/"
+    ]
+  },
+  "previousPolicy": ".ans/decisions/legion-node-pi-v3-project-policy.json",
+  "previousPolicySha256": "25e46e9b7811685847116393d9c9982062e975f66e151ce3d094ef2be020cccb",
+  "review": ".ans/decisions/legion-desktop-gui-v1-review.md",
+  "optionalO1": "PENDING_NOT_SELECTED",
+  "scopeAmendment": ".ans/decisions/legion-desktop-gui-v1-install-scope.md"
+}

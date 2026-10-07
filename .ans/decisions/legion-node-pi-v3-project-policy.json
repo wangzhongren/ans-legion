@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion Runtime",
+  "authorizationSource": "Direct human: 开发把; 你整个运行都切换成node 把，后面发行也好发行点, 2026-10-07; .ans/decisions/legion-pi-authorization.md",
+  "designFiles": [
+    "docs/design/2026-10-07_design_node-pi-v3.md"
+  ],
+  "maxConcurrentWorkers": 2,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "ProjectManager": {
+      "autoDispatch": true,
+      "card": ".ans/roles/ProjectManager/role-card.md",
+      "boundary": ".ans/roles/ProjectManager/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "package.json",
+        "package-lock.json",
+        "runtime.mjs",
+        "bin/legion.mjs",
+        "README.md",
+        "tests/package/test_package.mjs",
+        "docs/roles/ProjectManager/feature-map.md",
+        "docs/roles/ProjectManager/functional-description.md",
+        "docs/roles/ProjectManager/api-spec.md",
+        "docs/roles/ProjectManager/changelog.md",
+        "docs/roles/ProjectManager/docs/design/2026-10-07_design_node-pi-v3.md",
+        "docs/roles/ProjectManager/docs/architecture.md",
+        "docs/roles/ProjectManager/docs/feature/distribution.md"
+      ],
+      "checks": {
+        "dependencies": {
+          "argv": [
+            "node",
+            "D:/soft/nodejs/node_modules/npm/bin/npm-cli.js",
+            "ls",
+            "--all",
+            "--json"
+          ],
+          "timeoutSeconds": 120
+        },
+        "sdk": {
+          "argv": [
+            "node",
+            "--input-type=module",
+            "-e",
+            "import assert from 'node:assert/strict';import fs from 'node:fs';import * as sdk from '@earendil-works/pi-coding-agent';import * as ai from '@earendil-works/pi-ai';for(const key of ['createAgentSession','ModelRuntime','SessionManager','SettingsManager','createExtensionRuntime'])assert.equal(typeof sdk[key],'function',key);assert.equal(typeof ai.Type.Object,'function');for(const name of ['pi-coding-agent','pi-ai'])assert.equal(JSON.parse(fs.readFileSync('node_modules/@earendil-works/'+name+'/package.json','utf8')).version,'1.0.4');console.log('Public Pi SDK and AI 1.0.4 verified');"
+          ],
+          "timeoutSeconds": 90
+        },
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/package/test_package.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "pack": {
+          "argv": [
+            "node",
+            "D:/soft/nodejs/node_modules/npm/bin/npm-cli.js",
+            "pack",
+            "--dry-run",
+            "--json",
+            "--ignore-scripts"
+          ],
+          "timeoutSeconds": 120
+        },
+        "cli": {
+          "argv": [
+            "node",
+            "bin/legion.mjs",
+            "demo"
+          ],
+          "timeoutSeconds": 90
+        }
+      }
+    },
+    "Supervisor": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Supervisor/role-card.md",
+      "boundary": ".ans/roles/Supervisor/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "docs/roles/Supervisor/feature-map.md",
+        "docs/roles/Supervisor/functional-description.md",
+        "docs/roles/Supervisor/api-spec.md",
+        "docs/roles/Supervisor/changelog.md",
+        "docs/roles/Supervisor/docs/design/2026-10-07_design_node-pi-v3.md",
+        "docs/roles/Supervisor/docs/architecture.md",
+        "docs/roles/Supervisor/docs/delivery-node-pi-v3.md"
+      ],
+      "checks": {}
+    },
+    "KernelEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/KernelEngineer/role-card.md",
+      "boundary": ".ans/roles/KernelEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "src/kernel/models/core.mjs",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/services/abstract/policy.mjs",
+        "src/kernel/services/public/policy.mjs",
+        "src/kernel/services/impl/policy.mjs",
+        "src/kernel/services/abstract/mutation.mjs",
+        "src/kernel/services/public/mutation.mjs",
+        "src/kernel/services/impl/mutation.mjs",
+        "src/kernel/providers/abstract/storage.mjs",
+        "src/kernel/providers/public/storage.mjs",
+        "src/kernel/providers/impl/storage.mjs",
+        "src/kernel/pipelines/permission.mjs",
+        "src/kernel/interface/runtime.mjs",
+        "src/kernel/interface/demo.mjs",
+        "tests/kernel/test_models.test.mjs",
+        "tests/kernel/test_agent_models.test.mjs",
+        "tests/kernel/test_policy.test.mjs",
+        "tests/kernel/test_mutation.test.mjs",
+        "tests/kernel/test_events.test.mjs",
+        "tests/kernel/test_demo.test.mjs",
+        "tests/kernel/test_agent_scope.test.mjs",
+        "tests/kernel/test_agent_runtime.test.mjs",
+        "docs/roles/KernelEngineer/feature-map.md",
+        "docs/roles/KernelEngineer/functional-description.md",
+        "docs/roles/KernelEngineer/api-spec.md",
+        "docs/roles/KernelEngineer/changelog.md",
+        "docs/roles/KernelEngineer/docs/design/2026-10-07_design_node-pi-v3.md",
+        "docs/roles/KernelEngineer/docs/feature/permission.md",
+        "docs/roles/KernelEngineer/docs/feature/generic-agents.md"
+      ],
+      "checks": {
+        "model": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/kernel/test_models.test.mjs",
+            "tests/kernel/test_agent_models.test.mjs"
+          ],
+          "timeoutSeconds": 120
+        },
+        "policy": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/kernel/test_policy.test.mjs",
+            "tests/kernel/test_agent_scope.test.mjs"
+          ],
+          "timeoutSeconds": 120
+        },
+        "mutation": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/kernel/test_mutation.test.mjs",
+            "tests/kernel/test_events.test.mjs"
+          ],
+          "timeoutSeconds": 120
+        },
+        "pipeline": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/kernel/test_agent_runtime.test.mjs"
+          ],
+          "timeoutSeconds": 120
+        },
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/kernel/test_models.test.mjs",
+            "tests/kernel/test_agent_models.test.mjs",
+            "tests/kernel/test_policy.test.mjs",
+            "tests/kernel/test_mutation.test.mjs",
+            "tests/kernel/test_events.test.mjs",
+            "tests/kernel/test_demo.test.mjs",
+            "tests/kernel/test_agent_scope.test.mjs",
+            "tests/kernel/test_agent_runtime.test.mjs"
+          ],
+          "timeoutSeconds": 120
+        },
+        "demo": {
+          "argv": [
+            "node",
+            "src/kernel/interface/demo.mjs"
+          ],
+          "timeoutSeconds": 90
+        }
+      }
+    },
+    "AgentAdapterEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/AgentAdapterEngineer/role-card.md",
+      "boundary": ".ans/roles/AgentAdapterEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "src/adapters/services/abstract/proposal.mjs",
+        "src/adapters/services/public/proposal.mjs",
+        "src/adapters/services/impl/proposal.mjs",
+        "src/adapters/services/abstract/pi_agent.mjs",
+        "src/adapters/services/public/pi_agent.mjs",
+        "src/adapters/services/impl/pi_agent.mjs",
+        "src/adapters/providers/abstract/pi_session.mjs",
+        "src/adapters/providers/public/pi_session.mjs",
+        "src/adapters/providers/impl/pi_session.mjs",
+        "tests/adapters/test_proposal.mjs",
+        "tests/adapters/test_pi_provider.mjs",
+        "tests/adapters/test_pi_service.mjs",
+        "docs/roles/AgentAdapterEngineer/feature-map.md",
+        "docs/roles/AgentAdapterEngineer/functional-description.md",
+        "docs/roles/AgentAdapterEngineer/api-spec.md",
+        "docs/roles/AgentAdapterEngineer/changelog.md",
+        "docs/roles/AgentAdapterEngineer/docs/design/2026-10-07_design_node-pi-v3.md",
+        "docs/roles/AgentAdapterEngineer/docs/feature/proposal-adapters.md",
+        "docs/roles/AgentAdapterEngineer/docs/feature/pi-agent.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/adapters/test_proposal.mjs",
+            "tests/adapters/test_pi_provider.mjs",
+            "tests/adapters/test_pi_service.mjs"
+          ],
+          "timeoutSeconds": 120
+        }
+      }
+    },
+    "Tester": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Tester/role-card.md",
+      "boundary": ".ans/roles/Tester/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "tests/integration/test_permission_flow.mjs",
+        "tests/integration/test_generic_agents.mjs",
+        "tests/integration/controlled_pi_model.mjs",
+        "docs/roles/Tester/feature-map.md",
+        "docs/roles/Tester/functional-description.md",
+        "docs/roles/Tester/api-spec.md",
+        "docs/roles/Tester/changelog.md",
+        "docs/roles/Tester/docs/design/2026-10-07_design_node-pi-v3.md",
+        "docs/roles/Tester/docs/verification-node-pi-v3.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/integration/test_permission_flow.mjs",
+            "tests/integration/test_generic_agents.mjs"
+          ],
+          "timeoutSeconds": 180
+        }
+      }
+    },
+    "Reviewer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Reviewer/role-card.md",
+      "boundary": ".ans/roles/Reviewer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "tests/reviewer/test_structure.mjs",
+        "docs/roles/Reviewer/feature-map.md",
+        "docs/roles/Reviewer/functional-description.md",
+        "docs/roles/Reviewer/api-spec.md",
+        "docs/roles/Reviewer/changelog.md",
+        "docs/roles/Reviewer/docs/design/2026-10-07_design_node-pi-v3.md",
+        "docs/roles/Reviewer/docs/review-node-pi-v3.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/reviewer/test_structure.mjs"
+          ],
+          "timeoutSeconds": 120
+        }
+      }
+    }
+  }
+}

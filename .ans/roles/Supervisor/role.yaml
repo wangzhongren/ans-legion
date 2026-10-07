@@ -1,0 +1,19 @@
+schema_version: 1
+id: Supervisor
+name: Supervisor
+responsibility: "唯一task_ops scheduler、精确派发、依赖验证与完整工作台交付"
+status: ACCEPTED
+read_scope: ['project/**']
+write_scope: ["docs/roles/Supervisor/feature-map.md","docs/roles/Supervisor/functional-description.md","docs/roles/Supervisor/api-spec.md","docs/roles/Supervisor/changelog.md","docs/roles/Supervisor/docs/design/2026-10-07_design_desktop-workbench-v2.md","docs/roles/Supervisor/docs/architecture.md","docs/roles/Supervisor/docs/delivery-desktop-workbench-v2.md"]
+authority_source: boundary.md
+deny_scope: [outside_boundary]
+tools: [read,scoped_edit,approved_checks]
+capabilities: ['workbench_v2_authorized_role_task']
+allowed_actions: [authorized_role_task]
+forbidden_actions: [self_expand,self_approve,peer_mutation]
+delegation_scope: []
+handoff_targets: ['Supervisor']
+required_approvals: [human_for_material_scope_change]
+reporting_line: ProjectManager
+memory_scope: 'docs/roles/Supervisor/'
+contracts: [desktop-workbench,kernel-adapter,kernel-runtime]

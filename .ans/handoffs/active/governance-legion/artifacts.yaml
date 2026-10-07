@@ -1,0 +1,11 @@
+changed_files:
+  - .ans/project.json
+  - .ans/project.yaml
+  - .ans/organization/current.yaml
+  - .ans/organization/graph.yaml
+  - .ans/organization/versions/v001.yaml
+  - docs/design/2026-10-07_design_legion-v1.md
+contracts: [kernel-adapter, kernel-runtime]
+tests: []
+outputs: [accepted_six_role_definitions, authorized_task_policy]
+references: [direct_customer_message_2026-10-07]

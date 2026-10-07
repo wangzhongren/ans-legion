@@ -1,0 +1,41 @@
+{
+  "name": "legion-runtime",
+  "version": "0.4.0",
+  "description": "Node.js permission runtime with controlled Pi agent sessions",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "exports": {
+    ".": "./runtime.mjs",
+    "./workbench-models": "./workbench.mjs",
+    "./services/policy": "./src/kernel/services/public/policy.mjs",
+    "./services/mutation": "./src/kernel/services/public/mutation.mjs",
+    "./services/proposal": "./src/adapters/services/public/proposal.mjs",
+    "./services/pi-agent": "./src/adapters/services/public/pi_agent.mjs"
+  },
+  "bin": {
+    "legion": "./bin/legion.mjs"
+  },
+  "files": [
+    "runtime.mjs",
+    "workbench.mjs",
+    "bin/legion.mjs",
+    "README.md",
+    "src/kernel/**/*.mjs",
+    "src/adapters/**/*.mjs"
+  ],
+  "scripts": {
+    "demo": "node bin/legion.mjs demo",
+    "test": "node --test --test-concurrency=1 tests/kernel/test_models.test.mjs tests/kernel/test_agent_models.test.mjs tests/kernel/test_policy.test.mjs tests/kernel/test_mutation.test.mjs tests/kernel/test_events.test.mjs tests/kernel/test_demo.test.mjs tests/kernel/test_agent_scope.test.mjs tests/kernel/test_agent_runtime.test.mjs tests/kernel/test_workbench_models.test.mjs tests/adapters/test_proposal.mjs tests/adapters/test_pi_provider.mjs tests/adapters/test_pi_service.mjs tests/package/test_package.mjs tests/reviewer/test_structure.mjs tests/integration/test_permission_flow.mjs tests/integration/test_generic_agents.mjs",
+    "test:kernel": "node --test --test-concurrency=1 tests/kernel/test_models.test.mjs tests/kernel/test_agent_models.test.mjs tests/kernel/test_policy.test.mjs tests/kernel/test_mutation.test.mjs tests/kernel/test_events.test.mjs tests/kernel/test_demo.test.mjs tests/kernel/test_agent_scope.test.mjs tests/kernel/test_agent_runtime.test.mjs tests/kernel/test_workbench_models.test.mjs",
+    "test:adapters": "node --test tests/adapters/test_proposal.mjs tests/adapters/test_pi_provider.mjs tests/adapters/test_pi_service.mjs",
+    "test:package": "node --test tests/package/test_package.mjs",
+    "test:reviewer": "node --test tests/reviewer/test_structure.mjs",
+    "test:integration": "node --test tests/integration/test_permission_flow.mjs tests/integration/test_generic_agents.mjs"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.0.4",
+    "@earendil-works/pi-coding-agent": "1.0.4"
+  }
+}

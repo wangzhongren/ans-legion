@@ -1,0 +1,19 @@
+schema_version: 1
+id: kernel
+name: '确定性策略内核开发'
+responsibility: '实现身份、deny、scope、capability、tool、task、delegation、version 的确定性决策与执行许可'
+status: SUPERSEDED
+read_scope: ['project/**']
+write_scope: []
+deny_scope: [outside_accepted_boundary]
+authority_source: boundary.yaml
+tools: [read, propose]
+capabilities: ['ActionProposal / PolicyDecision']
+allowed_actions: [investigate, propose_within_role]
+forbidden_actions: [self_expand_authority, self_approve, bypass_kernel, mutate_peer_resources]
+delegation_scope: []
+handoff_targets: ['project-manager']
+required_approvals: [human_acceptance, task_implementation_authorization]
+reporting_line: project-manager
+memory_scope: '.ans/roles/kernel/docs/'
+contracts: [policy-decision, control-plane-commit, organization-change, mission-handoff, agent-proposal]

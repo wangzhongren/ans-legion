@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "legion-node-fixture-compat-v1",
+  "status": "NECESSARY_TEST_SCOPE_AUTHORIZED_NOT_VERIFIED",
+  "configPath": ".ans/decisions/legion-node-fixture-compat-v1-project.json",
+  "configSha256": "69f8dd552c107396517e3c18f912cbc7f49782f2003738d5e456bf841a9d8b28",
+  "proposal": ".ans/decisions/legion-node-fixture-compat-v1-proposal.md",
+  "proposalSha256": "af1ad886119904717c5ed650462b63ec6ee874a07aedaf0ac4a232a49d6a1bae",
+  "parentGuiConfigSha256": "e72ba37fc080453ecf9ef0229c5f6f11bf4e41ecf017cf2febf85cea6ef6d89d",
+  "nodePolicySha256": "25e46e9b7811685847116393d9c9982062e975f66e151ce3d094ef2be020cccb",
+  "authoredFiles": {
+    "ProjectManager": [
+      "tests/package/test_package.mjs"
+    ],
+    "Reviewer": [
+      "tests/reviewer/test_structure.mjs"
+    ]
+  },
+  "generatedEffects": {
+    "ProjectManager": [
+      ".ans/runtime/legion-node-fixture-compat-v1/ProjectManager/packaging/",
+      ".ans/runtime/legion-node-fixture-compat-v1/ProjectManager/npm-cache/",
+      ".ans/runtime/legion-node-fixture-compat-v1/ProjectManager/tmp/"
+    ],
+    "Reviewer": [
+      ".ans/runtime/legion-node-fixture-compat-v1/Reviewer/packaging/",
+      ".ans/runtime/legion-node-fixture-compat-v1/Reviewer/npm-cache/",
+      ".ans/runtime/legion-node-fixture-compat-v1/Reviewer/tmp/"
+    ]
+  },
+  "requiredChecks": {
+    "ProjectManager": [
+      "package"
+    ],
+    "Reviewer": [
+      "unit",
+      "regression"
+    ]
+  },
+  "requiredCounts": {
+    "package": 2,
+    "reviewer": 22,
+    "publicNodeSuite": 141
+  },
+  "environmentRule": "Role enum; own isolated TEMP/TMP/npm_config_cache; NODE_DISABLE_COMPILE_CACHE=1; inherited task_ops caller only",
+  "protectedProductAggregate": "75ab247b8aafc224d39c926119e170bc56bbda966073a73eeab3bfa4a4bb8327",
+  "protectedTarball": ".ans/runtime/legion-pi-node-v3/packaging/legion-runtime-0.3.0.tgz",
+  "protectedTarballSha256": "a83a86499c4aaa7c997d94cabbb697efdc82f81475b622b85307ac682de4d8f0",
+  "review": "Original fixed PM read-only recommendation relayed by Supervisor",
+  "authorization": "Same reviewed GUI v1 customer 开发, necessary strict regression compatibility; no new GUI behavior",
+  "originalAuthoredSha256": {
+    "tests/package/test_package.mjs": "ccdeb1ec04d79544e9fb8126076e130cf350b089d671abe24eff83f2b8670fec",
+    "tests/reviewer/test_structure.mjs": "fec4aa42af8fc7c0801cf4fa21942dba712485b8673b4b9c02b6b3e3877f2f53"
+  },
+  "protectedAdditionalFilesSha256": {
+    "package.json": "09c91316f22a7b3f3c1097b71e1a6e0388736ff4d7540ea9e0583c9f0ddd6e0b",
+    "package-lock.json": "f4649c6a7b8c2aa623c07097f01de2f340b561228d3cfa75a0a48cc7acdfb34b",
+    "README.md": "8ae390ca2c059a1fb04d01d54912caece60ec68934d1181087aab990a90d2894",
+    "runtime.mjs": "60bf11c3b9da04c155988e99e5ae7cb8f8be672d0589ecab9237ecfb95ccd3b3",
+    "bin/legion.mjs": "0ff9d0bd3e5dd7646fbd3cfa38ba037b75679e83202b7d5b50589c0151746a56"
+  }
+}

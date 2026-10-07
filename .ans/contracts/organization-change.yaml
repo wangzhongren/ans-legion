@@ -1,0 +1,14 @@
+schema_version: 1
+id: organization-change
+revision: proposal-v1
+status: SUPERSEDED
+primary_owner: organization-engine
+callers: 'assembly'
+public_entry: 'src/pipelines/organization.py'
+input_fields: 'OrganizationRequest,current_organization,contracts,approval_if_present'
+output_fields: 'CandidateRoleDefinition,OrganizationChangeProposal,risk_findings,CommitPlan'
+errors: 'OVERLAP,MISSING_OWNER,SELF_APPROVAL,APPROVAL_MISMATCH,CAPABILITY_GAP'
+guarantees: '先候选后审批；正式角色注册和扩权只通过受控提交；不自产人类批准'
+canonical_design: ../../docs/design/2026-10-07_design_organization-proposal-v1.md
+verification: owner_contract_tests_and_independent_integration
+implementation_status: NOT_IMPLEMENTED

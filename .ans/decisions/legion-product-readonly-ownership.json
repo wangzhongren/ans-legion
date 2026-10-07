@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "sourcePolicy": ".ans/decisions/legion-node-pi-v3-project-policy.json",
+  "sourcePolicySha256": "25e46e9b7811685847116393d9c9982062e975f66e151ce3d094ef2be020cccb",
+  "meaning": "Long-term product ownership; never grants GUI mutation permission",
+  "files": {
+    "src/kernel/models/core.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "f62168160c1863bfeca4a80f3a1204b945d9dac4913520c77b1eed257ebe7ecc",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/models/agent.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "23c9ed318741f31dddfacc9aaa1bc45ddf4d80b9eb05543b9dd72421649a51c2",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/services/abstract/policy.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "85e0697e6098746f956276f4556414e79e9cb10d25d174974e3dcd59c4f71b12",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/services/public/policy.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "7addc2cad7c14e6aa0f4c34567d9e24b29e6c5a0c11be6268d5a63f372754642",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/services/impl/policy.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "8f809a821abf02f1a263de0835b9fc145dc6af4054b88db5ee98bbf279f53753",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/services/abstract/mutation.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "07ac9aa7b51ca4593b6d17d64b86c48f2c236cfd85ad74747e2535b28c499ff2",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/services/public/mutation.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "3ab3ada7e41c39dfaee961c69591c6a1b4a56a073a0ff9abfe9b1024479889af",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/services/impl/mutation.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "9cec7b4acbfbe7369a5ee49f5d1b3a58d141ebaafe3cc81e2f6c657680f2a240",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/providers/abstract/storage.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "009b1ddfdd13cf5c39e5cb1d75721a3904cccc01dbb2422d82841563a88f9518",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/providers/public/storage.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "5f39b1be79a869be9c5ae68698a3b4210659c6bd1cdac415bca89ce58d234cbd",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/providers/impl/storage.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "d52d5aad10ff8b0fe93d0d8d53279d6f41131eb2efd0c32d3472fb480a0138e2",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/pipelines/permission.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "87d2403805099e3579592aabc32adeb65a713fc03004160d4458717e1979844e",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/interface/runtime.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "ba5349438e5620a2e2860205ff44f22a7c302902b2241443f2769b9893dc35ba",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/kernel/interface/demo.mjs": {
+      "primaryOwner": "KernelEngineer",
+      "sha256": "04671bb9196932cf5b53e74772a0d79bc10c5f01df6c60ca6db7fb1a83e51e52",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/adapters/services/abstract/proposal.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "sha256": "ae1484967e18d481971b4a76deb084282c22233c85ec4f0c05c99adbeeb19fd1",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/adapters/services/public/proposal.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "sha256": "09f170b5c4b0d5f7be371d12896862047d1a63b46622f3b8554337ec42bb9ef3",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/adapters/services/impl/proposal.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "sha256": "4d88952e696214aea5184eb7496964781ae3407c2ff599d9d89d8efc08676344",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/adapters/services/abstract/pi_agent.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "sha256": "a13c5d55013edad2418b04492a867f120017e34646958157fe7822b8e95cc1a0",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/adapters/services/public/pi_agent.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "sha256": "c14040bd22ad87512ddb3d9d08ee681b3e06ce8d625f526bcf9b46a1de9f054e",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/adapters/services/impl/pi_agent.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "sha256": "f605e8c7a4fd92935eb21dfefe2ae354239ee2e8995d1c3679c022ce309149cc",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/adapters/providers/abstract/pi_session.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "sha256": "3e531766baf7469978a9396f3f4a4174cf3e81ab3968df94a28c8b5d3d161562",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/adapters/providers/public/pi_session.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "sha256": "3b89c0951f8fbda93098578292eab91703ac5a13e8a685cfd5bd7297363b6e74",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "src/adapters/providers/impl/pi_session.mjs": {
+      "primaryOwner": "AgentAdapterEngineer",
+      "sha256": "73583a83a907c6bcf50ee61665b6384de41d7ad73e85c30caf8cb8d7173f6df6",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "runtime.mjs": {
+      "primaryOwner": "ProjectManager",
+      "sha256": "60bf11c3b9da04c155988e99e5ae7cb8f8be672d0589ecab9237ecfb95ccd3b3",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    },
+    "bin/legion.mjs": {
+      "primaryOwner": "ProjectManager",
+      "sha256": "0ff9d0bd3e5dd7646fbd3cfa38ba037b75679e83202b7d5b50589c0151746a56",
+      "thisGuiPhaseMutation": "READ_ONLY"
+    }
+  }
+}

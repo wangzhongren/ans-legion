@@ -1,0 +1,14 @@
+schema_version: 1
+id: mission-handoff
+revision: proposal-v1
+status: SUPERSEDED
+primary_owner: supervisor-engine
+callers: 'assembly'
+public_entry: 'src/pipelines/mission.py,src/pipelines/handoff.py'
+input_fields: 'Mission,Task,dependency_evidence,role_topology,handoff_sender,handoff_receiver'
+output_fields: 'TaskGraph,HandoffPlan,CapabilityGap,task_transition'
+errors: 'INVALID_TRANSITION,UNACCEPTED_HANDOFF,MISSING_TARGET,STALE_EVIDENCE'
+guarantees: 'Graph 限定合法状态；接收者明确接受；交接不传递权限'
+canonical_design: ../../docs/design/2026-10-07_design_organization-proposal-v1.md
+verification: owner_contract_tests_and_independent_integration
+implementation_status: NOT_IMPLEMENTED

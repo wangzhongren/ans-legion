@@ -1,0 +1,96 @@
+schema_version: 1
+id: desktop-workbench
+version: legion-desktop-workbench-v2
+status: ACCEPTED
+approval_source: direct_customer_confirm_2026-10-07
+canonical_design: ../../docs/design/2026-10-07_design_desktop-workbench-v2.md
+canonical_sha256: 715639b5dd278437059f29bde1e7c02ac90d94af18f9bf5a6b5367d16e9ab5d3
+pipeline_owner: DesktopEngineer
+shared_authority_and_pi_model_owner: KernelEngineer
+adapter_owner: AgentAdapterEngineer
+public_package_owner: ProjectManager
+public_package_subpaths:
+  services_policy: [PolicyService, createPolicyService]
+  services_mutation: [MutationService, MutationError, createMutationService]
+  services_proposal: [ProposalService, createProposalService, createCodexAdapter, createClaudeAdapter]
+  services_pi_agent: [PiAgentService, createPiAgentService]
+  workbench_models:
+    workbench: [ContextReadConfirmation, ContextSnapshot, ConfirmedTaskGrant, MutationVerification, createWorkbenchAuthority, isWorkbenchMutationAuthority]
+    agent: [PiConnection, PiConnectionProfile, AgentScope, AgentConfig, TaskDispatchContext, AgentInstance, PiEventType, PiTextDelta, PiConversationHistory, PiConversationCheckpoint, PiToolRequest, PiToolResult, PiRunResult]
+    core: [AgentSession, RoleBoundary, ActionProposal, PolicyDecision, ExecutionPermit, MutationResult, Event, Outcome, normalizeResource, normalizeScope, digestValue]
+public_export_rules: transparent_named_only_no_export_star_private_helpers_or_lower_layer_capabilities
+pi_lifecycle:
+  default: single_run_preserved
+  additional: conversation
+  operations: [start_run, next_event, respond_tool, cancel_turn, get_history, restore_history, cancel, close]
+  conversation_terminal: back_to_idle_current_turn_cancel_does_not_dispose_session
+  instance_close: revoke_and_abort_wait_for_idle_then_dispose
+  limits: {maxQueueEvents: 256, maxTextCharsPerTurn: 65536, maxOutputTokens: 2048, turnTimeoutMs: 60000}
+  queue: bounded_merge_deltas_keep_terminal_late_event_run_identity_guard_overflow_aborts_explicitly
+customer_entry: single_ProjectManager_created_or_reused_on_first_message_per_workspace
+default_layout: focus_conversation
+other_agents: task_details_and_status_read_only_no_Human_direct_chat_or_start
+discussion_effects: adapter_conversation_and_userData_only_no_customer_workspace_mutation_or_audit
+execution_effects: Human_confirmed_exact_plan_then_controlled_legion_write_file_and_Kernel_workspace_audit
+layer_edges:
+  - Desktop_Interface_to_Workbench_Pipeline
+  - Workbench_Pipeline_to_public_Profiles_Project_History_Kernel_Policy_Mutation_Adapter_PiAgent_Services
+  - Services_to_own_public_Providers
+  - PiSession_Provider_to_installed_Pi_SDK_public_apis
+forbidden_edges:
+  - Desktop_Pipeline_to_Core_Interface_or_peer_PermissionRuntime_Pipeline
+  - Pipeline_constructed_streamSimple_upward_callback
+  - private_authority_helper_or_lower_layer_objects_exported_to_Desktop
+connection:
+  private_main_process: [connection, credentials]
+  pure_profile_fields: [profileId, profileVersion, protocol, provider, model, baseUrl, modelMetadata]
+  credentials_fields: [apiKey]
+  allowed_protocols: [openai-completions, openai-responses, anthropic-messages]
+  new_and_legacy_inputs: connection_credentials_XOR_modelProviders
+  matching: exact_trusted_provider_and_model
+  metadata: unknown_if_unavailable_no_display_of_SDK_zero_cost_placeholders
+  isolation: per_instance_session_credentials_registry_stream_queue_and_frozen_profileVersion
+context:
+  source: Human_selected_exact_read_set
+  per_file_bytes: 262144
+  max_files: 16
+  total_bytes: 2097152
+  content: validated_UTF8_text_resources_bytes_SHA
+  authority: ContextReadConfirmation_then_ContextSnapshot
+  provider_brand_gate: 'ContextReadConfirmation.assertForRead(readAuthorization, {workspaceIdentity, organizationVersion, profileVersion, resources})'
+  forged_authorization: constructor_data_is_not_permission_no_controller_passed_down
+  commit_guard: real_root_link_and_context_SHA_recheck_before_write
+confirmation_bindings:
+  - workspaceIdentity
+  - planDigest
+  - organizationVersion
+  - roleId
+  - taskId
+  - writeSet
+  - tools
+  - profileVersion
+  - contextSnapshotDigest
+confirmation_lifecycle: once_use_no_replay_revoke_on_cancel_close_version_or_scope_change
+mutation_verification:
+  fields: [workspaceIdentity, organizationVersion, profileVersion, planDigest, contextSnapshotDigest, contextFiles]
+  context_file_fields: [resource, byteLength, sha256]
+  lower_methods: [consume, recheck, release]
+  release_signature: 'release(receipt, {verificationFailure} = {})'
+  verification_failure_reasons: [root_identity_changed, context_changed, verification_unavailable]
+  verified_success: release_only_this_branded_receipt_other_valid_task_permits_remain
+  verified_failure: permanently_invalidate_entire_authority_clear_permits_receipts_read_approvals_task_confirmations_revoke_instances
+  failed_scope_restoration: restoring_old_SHA_or_version_does_not_revive_authority
+  malformed_failure: foreign_receipt_or_unknown_reason_TypeError_cannot_revoke_another_authority
+existing_requiredApprovals: preserved
+control_plane_write: hard_deny
+software_check_status: not_executed_until_actual_executor_evidence_no_arbitrary_Shell
+history: validated_user_assistant_text_only_no_permit_confirmation_pending_tools_active_tasks_or_credentials
+restart: interrupted_runs_not_automatically_resumed_or_reexecuted
+task_records:
+  document_bytes: 16777216
+  max_events: 4096
+  refresh_total_bytes: 67108864
+  integrity: complete_hash_chain_and_rendered_record_verification_no_truncation_as_success
+  cache: verified_source_only_identity_and_observation_times_separate
+distribution: new_real_local_tarball_installed_before_Desktop_bare_imports_new_independent_Windows_ZIP
+validation: owner_unit_checks_full_Node_regression_real_localhost_three_protocols_native_GUI_restart_and_actual_ZIP_independent_Reviewer_Tester

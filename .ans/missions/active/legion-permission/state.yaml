@@ -1,0 +1,12 @@
+mission_id: legion-permission
+status: COMPLETED
+verification_status: VERIFIED
+active_workers: []
+verified_nodes: [kernel, adapter, reviewer, tester]
+current_task_record: ../../../../docs/scheduling/legion-v1-approval-repair.md
+historical_task_record: ../../../../docs/scheduling/legion-v1-development.md
+current_step: delivery_complete
+reason: all_four_current_nodes_verified_101_tests_zero_skips_and_cli_demo_passed
+verified_at: '2026-10-07T10:38:27+08:00'
+final_candidate: ae40078ff7460318d20028f263ef042a3635c684a3154a97df1d3a968111cd7e
+validation_record: ../../../decisions/legion-validation.md

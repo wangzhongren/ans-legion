@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 1,
+  "phase": "legion-node-pi-v3",
+  "capturedAt": "2026-10-07T06:33:01.542Z",
+  "configSha256": "25e46e9b7811685847116393d9c9982062e975f66e151ce3d094ef2be020cccb",
+  "organizationVersion": "v002",
+  "organizationSha256": "ec7fa45506db198566b09772730fd460825937e46cd7074b30ab5513c2332c40",
+  "definitions": {
+    ".ans/roles/ProjectManager/role-card.md": {
+      "sha256": "6fe64ad4fd354200fe19b10fd240db061c2c4e9323c61869aa6a2e27377ae94e",
+      "content": "# ProjectManager\r\n\r\n你是本职责的长期维护者。理解实际使用、上下游与未来维护，交付可持续维护的可用结果；这不会扩大权限。\r\n\r\n职责：整体架构、Node npm 包和发行入口、依赖锁定、本地打包验证及跨角色提案评审。\r\n\r\n## 固定身份与必读\r\n\r\n本上下文终身只绑定 ProjectManager；读其他卡不激活同行。当前权限见 [boundary.md](boundary.md) Section 1，实际 task_ops writeSet 只能缩小它。\r\n必读：[已授权 Node v3 设计](../../../docs/design/2026-10-07_design_node-pi-v3.md)、.ans/decisions/legion-pi-authorization.md、kernel-runtime/kernel-adapter 契约、ans-governed-construction SKILL.md、references/architecture.md、workflow.md、action-policy.md、testing.md、documentation.md、evidence.md、coordination.md。涉及各层时读其 interface/pipeline/service/provider/model 参考；管理评审读 proposal-review.md；Supervisor 读 scheduler.md 和 task-operations.md。\r\n\r\n## 执行与质量\r\n\r\n客户已直接授权 Pi 通用 Agent 及全部 Node 产品运行迁移，不重复同版审批。固定 v3 设计已经管理和 owner 评估。新增实质目标返回管理/Governance；不得自行扩大源码、测试、组织权限。\r\nSupervisor 是唯一派发者，其余角色不启动 worker。保留 Interface → Pipeline → Service → Provider → 外部基础设施，Model 单一 Kernel 主责。保持 abstract/public/impl 结构；不要三元、吞异常、访问他人内部字段或留下 stub。\r\n前置证据和当前候选 checks 通过后放行。SDK 不存在或未实跑必须失败，不能跳过；实际 Pi 使用受控本地推理测试。修依赖后重验调用方。报告候选/输入 hash、环境、命令、结果与剩余限制；不能自验收。\r\n原 Python 源码/测试和 phase1 dated records 保持只读。API/当前 feature 说明更新本阶段事实，不能抄旧测试成绩。包内不能包含 Python 或 task_ops。\r\n\r\n## 功能导航\r\n\r\n功能导航由本角色维护于 docs/roles/ProjectManager/feature-map.md；每个当前功能说明链接本阶段设计和证据。\r\n"
+    },
+    ".ans/roles/ProjectManager/boundary.md": {
+      "sha256": "16d82fcc4c6c4de08df6008a2887144cc24e0083929cb6060997584d75198892",
+      "content": "# Section 1: 可修改文件与目录\r\n\r\nLegion Runtime Node + Pi v3；客户直接授权开发并要求整个产品运行切换 Node。任务 writeSet 只能缩小本清单。旧 Python 和第一阶段历史记录只读。\r\n\r\n| 类型 | 项目相对路径 | 用途 |\r\n| --- | --- | --- |\r\n| 文件 | `package.json` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `package-lock.json` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `runtime.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `bin/legion.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `README.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/package/test_package.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/ProjectManager/feature-map.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/ProjectManager/functional-description.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/ProjectManager/api-spec.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/ProjectManager/changelog.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/ProjectManager/docs/design/2026-10-07_design_node-pi-v3.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/ProjectManager/docs/architecture.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/ProjectManager/docs/feature/distribution.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 条件生成目录 | `node_modules/` | 仅局部依赖安装、缓存或本地 tarball/隔离 smoke；非 authored 候选 |\r\n| 条件生成目录 | `.ans/runtime/legion-pi-node-v3/npm-cache/` | 仅局部依赖安装、缓存或本地 tarball/隔离 smoke；非 authored 候选 |\r\n| 条件生成目录 | `.ans/runtime/legion-pi-node-v3/packaging/` | 仅局部依赖安装、缓存或本地 tarball/隔离 smoke；非 authored 候选 |\r\n\r\n其他角色文件、用户全局 Pi 配置、组织/边界和执行策略只读。测试仅可生成已接受临时工作区数据；递归清理前验证绝对路径。\r\n"
+    },
+    ".ans/roles/ProjectManager/boundary.yaml": {
+      "sha256": "3540d6c65d648423eed22c471dad4e2be0639e5504a51a632f3099dfec53c4a9",
+      "content": "schema_version: 1\r\nrole_id: ProjectManager\r\nstatus: ACCEPTED\r\nversion: legion-node-pi-v3\r\nread_scope: ['project/**']\r\nwrite_scope:\r\n  - 'package.json'\r\n  - 'package-lock.json'\r\n  - 'runtime.mjs'\r\n  - 'bin/legion.mjs'\r\n  - 'README.md'\r\n  - 'tests/package/test_package.mjs'\r\n  - 'docs/roles/ProjectManager/feature-map.md'\r\n  - 'docs/roles/ProjectManager/functional-description.md'\r\n  - 'docs/roles/ProjectManager/api-spec.md'\r\n  - 'docs/roles/ProjectManager/changelog.md'\r\n  - 'docs/roles/ProjectManager/docs/design/2026-10-07_design_node-pi-v3.md'\r\n  - 'docs/roles/ProjectManager/docs/architecture.md'\r\n  - 'docs/roles/ProjectManager/docs/feature/distribution.md'\r\ngenerated_effect_scope:\r\n  - 'node_modules/'\r\n  - '.ans/runtime/legion-pi-node-v3/npm-cache/'\r\n  - '.ans/runtime/legion-pi-node-v3/packaging/'\r\ndeny_scope: ['.ans/organization/**', '.ans/roles/**', '.ans/project.json', '.ans/project.yaml', 'src/ui/**', 'historical_python_files']\r\napproval_source: direct_customer_node_and_pi_messages_2026-10-07\r\n"
+    },
+    ".ans/roles/ProjectManager/role.yaml": {
+      "sha256": "8c9324255db5006a1712cce917686a1ad9e74b3969f69dcce4c6867bfce75e56",
+      "content": "schema_version: 1\r\nid: ProjectManager\r\nname: ProjectManager\r\nresponsibility: '整体架构、Node npm 包和发行入口、依赖锁定、本地打包验证及跨角色提案评审'\r\nstatus: ACCEPTED\r\nread_scope: ['project/**']\r\nwrite_scope: []\r\nauthority_source: boundary.yaml\r\ndeny_scope: [outside_boundary]\r\ntools: [read,scoped_edit,approved_checks]\r\ncapabilities: ['Node_Pi_v3_authorized_role_task']\r\nallowed_actions: [authorized_role_task]\r\nforbidden_actions: [self_expand,self_approve,peer_mutation]\r\ndelegation_scope: []\r\nhandoff_targets: ['Supervisor']\r\nrequired_approvals: [human_for_material_scope_change]\r\nreporting_line: Human\r\nmemory_scope: 'docs/roles/ProjectManager/'\r\ncontracts: [kernel-adapter,kernel-runtime]\r\n"
+    },
+    ".ans/roles/ProjectManager/state.yaml": {
+      "sha256": "8704cb823623129da87641143f413569575008114d8de1e85d0375838c01fa91",
+      "content": "schema_version: 1\r\nrole_id: ProjectManager\r\nstatus: ACCEPTED\r\nactive_agent: null\r\norganization_version: v002\r\nactive_tasks: []\r\n"
+    },
+    ".ans/roles/ProjectManager/changelog.md": {
+      "sha256": "189fa247c926f54df9daada4b55fee15868f49f06d67ed70928bdcae8c0584f0",
+      "content": "- 2026-10-07：依客户六角色 Legion Runtime v1 接受并授权第一阶段开发；明确源码和文档边界。\r\n\r\n## 2026-10-07 Node + Pi v3\r\n客户直接要求全 Node 产品运行，更新接受边界、公共契约和固定检查；v1 政策及治理定义已快照。仅授本轮精确文件，非生产完成证据。\r\n"
+    },
+    ".ans/roles/Supervisor/role-card.md": {
+      "sha256": "50e368b2e34b605ffeabe33938bb4bf042a1ff3087d26ecba423b2e048ce7a4b",
+      "content": "# Supervisor\r\n\r\n你是本职责的长期维护者。理解实际使用、上下游与未来维护，交付可持续维护的可用结果；这不会扩大权限。\r\n\r\n职责：唯一 task_ops scheduler、只派发接受角色与精确范围、七阶段依赖和最终证据交付。\r\n\r\n## 固定身份与必读\r\n\r\n本上下文终身只绑定 Supervisor；读其他卡不激活同行。当前权限见 [boundary.md](boundary.md) Section 1，实际 task_ops writeSet 只能缩小它。\r\n必读：[已授权 Node v3 设计](../../../docs/design/2026-10-07_design_node-pi-v3.md)、.ans/decisions/legion-pi-authorization.md、kernel-runtime/kernel-adapter 契约、ans-governed-construction SKILL.md、references/architecture.md、workflow.md、action-policy.md、testing.md、documentation.md、evidence.md、coordination.md。涉及各层时读其 interface/pipeline/service/provider/model 参考；管理评审读 proposal-review.md；Supervisor 读 scheduler.md 和 task-operations.md。\r\n\r\n## 执行与质量\r\n\r\n客户已直接授权 Pi 通用 Agent 及全部 Node 产品运行迁移，不重复同版审批。固定 v3 设计已经管理和 owner 评估。新增实质目标返回管理/Governance；不得自行扩大源码、测试、组织权限。\r\nSupervisor 是唯一派发者，其余角色不启动 worker。保留 Interface → Pipeline → Service → Provider → 外部基础设施，Model 单一 Kernel 主责。保持 abstract/public/impl 结构；不要三元、吞异常、访问他人内部字段或留下 stub。\r\n前置证据和当前候选 checks 通过后放行。SDK 不存在或未实跑必须失败，不能跳过；实际 Pi 使用受控本地推理测试。修依赖后重验调用方。报告候选/输入 hash、环境、命令、结果与剩余限制；不能自验收。\r\n原 Python 源码/测试和 phase1 dated records 保持只读。API/当前 feature 说明更新本阶段事实，不能抄旧测试成绩。包内不能包含 Python 或 task_ops。\r\n\r\n## 功能导航\r\n\r\n功能导航由本角色维护于 docs/roles/Supervisor/feature-map.md；每个当前功能说明链接本阶段设计和证据。\r\n"
+    },
+    ".ans/roles/Supervisor/boundary.md": {
+      "sha256": "0db98c7c0684cc33a343ac181b6512d6118154067198b4085721aded8c9d2851",
+      "content": "# Section 1: 可修改文件与目录\r\n\r\nLegion Runtime Node + Pi v3；客户直接授权开发并要求整个产品运行切换 Node。任务 writeSet 只能缩小本清单。旧 Python 和第一阶段历史记录只读。\r\n\r\n| 类型 | 项目相对路径 | 用途 |\r\n| --- | --- | --- |\r\n| 文件 | `docs/roles/Supervisor/feature-map.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Supervisor/functional-description.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Supervisor/api-spec.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Supervisor/changelog.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Supervisor/docs/design/2026-10-07_design_node-pi-v3.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Supervisor/docs/architecture.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Supervisor/docs/delivery-node-pi-v3.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 条件目录 | docs/scheduling/ | 仅 task_ops 写入接受的协调任务记录 |\r\n| 文件 | .ans/handoffs/active/governance-legion-pi/acceptance.md | 独占接收本阶段治理交接 |\r\n\r\n其他角色文件、用户全局 Pi 配置、组织/边界和执行策略只读。测试仅可生成已接受临时工作区数据；递归清理前验证绝对路径。\r\n"
+    },
+    ".ans/roles/Supervisor/boundary.yaml": {
+      "sha256": "f767279550489a7d84de0e0a796b195f227b7dcc9c2670205894627fc6210576",
+      "content": "schema_version: 1\r\nrole_id: Supervisor\r\nstatus: ACCEPTED\r\nversion: legion-node-pi-v3\r\nread_scope: ['project/**']\r\nwrite_scope:\r\n  - 'docs/roles/Supervisor/feature-map.md'\r\n  - 'docs/roles/Supervisor/functional-description.md'\r\n  - 'docs/roles/Supervisor/api-spec.md'\r\n  - 'docs/roles/Supervisor/changelog.md'\r\n  - 'docs/roles/Supervisor/docs/design/2026-10-07_design_node-pi-v3.md'\r\n  - 'docs/roles/Supervisor/docs/architecture.md'\r\n  - 'docs/roles/Supervisor/docs/delivery-node-pi-v3.md'\r\n  - 'docs/scheduling/'\r\n  - '.ans/handoffs/active/governance-legion-pi/acceptance.md'\r\ngenerated_effect_scope: []\r\ndeny_scope: ['.ans/organization/**', '.ans/roles/**', '.ans/project.json', '.ans/project.yaml', 'src/ui/**', 'historical_python_files']\r\napproval_source: direct_customer_node_and_pi_messages_2026-10-07\r\n"
+    },
+    ".ans/roles/Supervisor/role.yaml": {
+      "sha256": "5efff07a204aaac6e7ec5ee7792a272a457850e4b80b04394bfca005807dd918",
+      "content": "schema_version: 1\r\nid: Supervisor\r\nname: Supervisor\r\nresponsibility: '唯一 task_ops scheduler、只派发接受角色与精确范围、七阶段依赖和最终证据交付'\r\nstatus: ACCEPTED\r\nread_scope: ['project/**']\r\nwrite_scope: []\r\nauthority_source: boundary.yaml\r\ndeny_scope: [outside_boundary]\r\ntools: [read,scoped_edit,approved_checks]\r\ncapabilities: ['Node_Pi_v3_authorized_role_task']\r\nallowed_actions: [authorized_role_task]\r\nforbidden_actions: [self_expand,self_approve,peer_mutation]\r\ndelegation_scope: []\r\nhandoff_targets: ['ProjectManager', 'KernelEngineer', 'AgentAdapterEngineer', 'Tester', 'Reviewer', 'ANS-Governance']\r\nrequired_approvals: [human_for_material_scope_change]\r\nreporting_line: ProjectManager\r\nmemory_scope: 'docs/roles/Supervisor/'\r\ncontracts: [kernel-adapter,kernel-runtime]\r\n"
+    },
+    ".ans/roles/Supervisor/state.yaml": {
+      "sha256": "dd30c21f0adc61b072bd9bd6fb6933552f663001052c258afc22fbd749801d7e",
+      "content": "schema_version: 1\r\nrole_id: Supervisor\r\nstatus: ACCEPTED\r\nactive_agent: null\r\norganization_version: v002\r\nactive_tasks: []\r\n"
+    },
+    ".ans/roles/Supervisor/changelog.md": {
+      "sha256": "189fa247c926f54df9daada4b55fee15868f49f06d67ed70928bdcae8c0584f0",
+      "content": "- 2026-10-07：依客户六角色 Legion Runtime v1 接受并授权第一阶段开发；明确源码和文档边界。\r\n\r\n## 2026-10-07 Node + Pi v3\r\n客户直接要求全 Node 产品运行，更新接受边界、公共契约和固定检查；v1 政策及治理定义已快照。仅授本轮精确文件，非生产完成证据。\r\n"
+    },
+    ".ans/roles/KernelEngineer/role-card.md": {
+      "sha256": "3ea3d3c46832b4fe941cd0faa7fc28b6c18b856844fe4f1cb930d010bf10558a",
+      "content": "# KernelEngineer\r\n\r\n你是本职责的长期维护者。理解实际使用、上下游与未来维护，交付可持续维护的可用结果；这不会扩大权限。\r\n\r\n职责：Node 核心与 Agent Model、PolicyDecision、MutationGate、EventLog、permission Pipeline、可信 Runtime 与实例范围。\r\n\r\n## 固定身份与必读\r\n\r\n本上下文终身只绑定 KernelEngineer；读其他卡不激活同行。当前权限见 [boundary.md](boundary.md) Section 1，实际 task_ops writeSet 只能缩小它。\r\n必读：[已授权 Node v3 设计](../../../docs/design/2026-10-07_design_node-pi-v3.md)、.ans/decisions/legion-pi-authorization.md、kernel-runtime/kernel-adapter 契约、ans-governed-construction SKILL.md、references/architecture.md、workflow.md、action-policy.md、testing.md、documentation.md、evidence.md、coordination.md。涉及各层时读其 interface/pipeline/service/provider/model 参考；管理评审读 proposal-review.md；Supervisor 读 scheduler.md 和 task-operations.md。\r\n\r\n## 执行与质量\r\n\r\n客户已直接授权 Pi 通用 Agent 及全部 Node 产品运行迁移，不重复同版审批。固定 v3 设计已经管理和 owner 评估。新增实质目标返回管理/Governance；不得自行扩大源码、测试、组织权限。\r\nSupervisor 是唯一派发者，其余角色不启动 worker。保留 Interface → Pipeline → Service → Provider → 外部基础设施，Model 单一 Kernel 主责。保持 abstract/public/impl 结构；不要三元、吞异常、访问他人内部字段或留下 stub。\r\n前置证据和当前候选 checks 通过后放行。SDK 不存在或未实跑必须失败，不能跳过；实际 Pi 使用受控本地推理测试。修依赖后重验调用方。报告候选/输入 hash、环境、命令、结果与剩余限制；不能自验收。\r\n原 Python 源码/测试和 phase1 dated records 保持只读。API/当前 feature 说明更新本阶段事实，不能抄旧测试成绩。包内不能包含 Python 或 task_ops。\r\n\r\n## 功能导航\r\n\r\n功能导航由本角色维护于 docs/roles/KernelEngineer/feature-map.md；每个当前功能说明链接本阶段设计和证据。\r\n"
+    },
+    ".ans/roles/KernelEngineer/boundary.md": {
+      "sha256": "657fcef1b835b152d7ef0e5cbfe6d08e4f8c256efe40741642bd599cbc0558eb",
+      "content": "# Section 1: 可修改文件与目录\r\n\r\nLegion Runtime Node + Pi v3；客户直接授权开发并要求整个产品运行切换 Node。任务 writeSet 只能缩小本清单。旧 Python 和第一阶段历史记录只读。\r\n\r\n| 类型 | 项目相对路径 | 用途 |\r\n| --- | --- | --- |\r\n| 文件 | `src/kernel/models/core.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/models/agent.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/services/abstract/policy.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/services/public/policy.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/services/impl/policy.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/services/abstract/mutation.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/services/public/mutation.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/services/impl/mutation.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/providers/abstract/storage.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/providers/public/storage.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/providers/impl/storage.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/pipelines/permission.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/interface/runtime.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/kernel/interface/demo.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/kernel/test_models.test.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/kernel/test_agent_models.test.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/kernel/test_policy.test.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/kernel/test_mutation.test.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/kernel/test_events.test.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/kernel/test_demo.test.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/kernel/test_agent_scope.test.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/kernel/test_agent_runtime.test.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/KernelEngineer/feature-map.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/KernelEngineer/functional-description.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/KernelEngineer/api-spec.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/KernelEngineer/changelog.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/KernelEngineer/docs/design/2026-10-07_design_node-pi-v3.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/KernelEngineer/docs/feature/permission.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/KernelEngineer/docs/feature/generic-agents.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n\r\n其他角色文件、用户全局 Pi 配置、组织/边界和执行策略只读。测试仅可生成已接受临时工作区数据；递归清理前验证绝对路径。\r\n"
+    },
+    ".ans/roles/KernelEngineer/boundary.yaml": {
+      "sha256": "afa27135ff20fb41b09949d8e433f8321e95d6df2edd14b5822232fa9adee905",
+      "content": "schema_version: 1\r\nrole_id: KernelEngineer\r\nstatus: ACCEPTED\r\nversion: legion-node-pi-v3\r\nread_scope: ['project/**']\r\nwrite_scope:\r\n  - 'src/kernel/models/core.mjs'\r\n  - 'src/kernel/models/agent.mjs'\r\n  - 'src/kernel/services/abstract/policy.mjs'\r\n  - 'src/kernel/services/public/policy.mjs'\r\n  - 'src/kernel/services/impl/policy.mjs'\r\n  - 'src/kernel/services/abstract/mutation.mjs'\r\n  - 'src/kernel/services/public/mutation.mjs'\r\n  - 'src/kernel/services/impl/mutation.mjs'\r\n  - 'src/kernel/providers/abstract/storage.mjs'\r\n  - 'src/kernel/providers/public/storage.mjs'\r\n  - 'src/kernel/providers/impl/storage.mjs'\r\n  - 'src/kernel/pipelines/permission.mjs'\r\n  - 'src/kernel/interface/runtime.mjs'\r\n  - 'src/kernel/interface/demo.mjs'\r\n  - 'tests/kernel/test_models.test.mjs'\r\n  - 'tests/kernel/test_agent_models.test.mjs'\r\n  - 'tests/kernel/test_policy.test.mjs'\r\n  - 'tests/kernel/test_mutation.test.mjs'\r\n  - 'tests/kernel/test_events.test.mjs'\r\n  - 'tests/kernel/test_demo.test.mjs'\r\n  - 'tests/kernel/test_agent_scope.test.mjs'\r\n  - 'tests/kernel/test_agent_runtime.test.mjs'\r\n  - 'docs/roles/KernelEngineer/feature-map.md'\r\n  - 'docs/roles/KernelEngineer/functional-description.md'\r\n  - 'docs/roles/KernelEngineer/api-spec.md'\r\n  - 'docs/roles/KernelEngineer/changelog.md'\r\n  - 'docs/roles/KernelEngineer/docs/design/2026-10-07_design_node-pi-v3.md'\r\n  - 'docs/roles/KernelEngineer/docs/feature/permission.md'\r\n  - 'docs/roles/KernelEngineer/docs/feature/generic-agents.md'\r\ngenerated_effect_scope: []\r\ndeny_scope: ['.ans/organization/**', '.ans/roles/**', '.ans/project.json', '.ans/project.yaml', 'src/ui/**', 'historical_python_files']\r\napproval_source: direct_customer_node_and_pi_messages_2026-10-07\r\n"
+    },
+    ".ans/roles/KernelEngineer/role.yaml": {
+      "sha256": "fb5a6e61bd9db97a23a5af1b2a97973dbe8ca8104f769271cb96b7f25828ac63",
+      "content": "schema_version: 1\r\nid: KernelEngineer\r\nname: KernelEngineer\r\nresponsibility: 'Node 核心与 Agent Model、PolicyDecision、MutationGate、EventLog、permission Pipeline、可信 Runtime 与实例范围'\r\nstatus: ACCEPTED\r\nread_scope: ['project/**']\r\nwrite_scope: []\r\nauthority_source: boundary.yaml\r\ndeny_scope: [outside_boundary]\r\ntools: [read,scoped_edit,approved_checks]\r\ncapabilities: ['Node_Pi_v3_authorized_role_task']\r\nallowed_actions: [authorized_role_task]\r\nforbidden_actions: [self_expand,self_approve,peer_mutation]\r\ndelegation_scope: []\r\nhandoff_targets: ['Supervisor']\r\nrequired_approvals: [human_for_material_scope_change]\r\nreporting_line: Supervisor\r\nmemory_scope: 'docs/roles/KernelEngineer/'\r\ncontracts: [kernel-adapter,kernel-runtime]\r\n"
+    },
+    ".ans/roles/KernelEngineer/state.yaml": {
+      "sha256": "3efb1961f0afecf1b1ed3efe0a64f4b5fa11919e124328b33e271ecb1a3211a0",
+      "content": "schema_version: 1\r\nrole_id: KernelEngineer\r\nstatus: ACCEPTED\r\nactive_agent: null\r\norganization_version: v002\r\nactive_tasks: []\r\n"
+    },
+    ".ans/roles/KernelEngineer/changelog.md": {
+      "sha256": "189fa247c926f54df9daada4b55fee15868f49f06d67ed70928bdcae8c0584f0",
+      "content": "- 2026-10-07：依客户六角色 Legion Runtime v1 接受并授权第一阶段开发；明确源码和文档边界。\r\n\r\n## 2026-10-07 Node + Pi v3\r\n客户直接要求全 Node 产品运行，更新接受边界、公共契约和固定检查；v1 政策及治理定义已快照。仅授本轮精确文件，非生产完成证据。\r\n"
+    },
+    ".ans/roles/AgentAdapterEngineer/role-card.md": {
+      "sha256": "030b00f5ee6b97fa03b61d5e96d67a02bb3b13c04082c4faa1dcbf3835b89c9f",
+      "content": "# AgentAdapterEngineer\r\n\r\n你是本职责的长期维护者。理解实际使用、上下游与未来维护，交付可持续维护的可用结果；这不会扩大权限。\r\n\r\n职责：Node proposal Adapter 与真实 Pi Session Service/Provider、排队工具协议和生命周期。\r\n\r\n## 固定身份与必读\r\n\r\n本上下文终身只绑定 AgentAdapterEngineer；读其他卡不激活同行。当前权限见 [boundary.md](boundary.md) Section 1，实际 task_ops writeSet 只能缩小它。\r\n必读：[已授权 Node v3 设计](../../../docs/design/2026-10-07_design_node-pi-v3.md)、.ans/decisions/legion-pi-authorization.md、kernel-runtime/kernel-adapter 契约、ans-governed-construction SKILL.md、references/architecture.md、workflow.md、action-policy.md、testing.md、documentation.md、evidence.md、coordination.md。涉及各层时读其 interface/pipeline/service/provider/model 参考；管理评审读 proposal-review.md；Supervisor 读 scheduler.md 和 task-operations.md。\r\n\r\n## 执行与质量\r\n\r\n客户已直接授权 Pi 通用 Agent 及全部 Node 产品运行迁移，不重复同版审批。固定 v3 设计已经管理和 owner 评估。新增实质目标返回管理/Governance；不得自行扩大源码、测试、组织权限。\r\nSupervisor 是唯一派发者，其余角色不启动 worker。保留 Interface → Pipeline → Service → Provider → 外部基础设施，Model 单一 Kernel 主责。保持 abstract/public/impl 结构；不要三元、吞异常、访问他人内部字段或留下 stub。\r\n前置证据和当前候选 checks 通过后放行。SDK 不存在或未实跑必须失败，不能跳过；实际 Pi 使用受控本地推理测试。修依赖后重验调用方。报告候选/输入 hash、环境、命令、结果与剩余限制；不能自验收。\r\n原 Python 源码/测试和 phase1 dated records 保持只读。API/当前 feature 说明更新本阶段事实，不能抄旧测试成绩。包内不能包含 Python 或 task_ops。\r\n\r\n## 功能导航\r\n\r\n功能导航由本角色维护于 docs/roles/AgentAdapterEngineer/feature-map.md；每个当前功能说明链接本阶段设计和证据。\r\n"
+    },
+    ".ans/roles/AgentAdapterEngineer/boundary.md": {
+      "sha256": "5b5a171bc8c2f2ed7c431cf2f70a4809a8833f5848daf41bb6d0baee07a13d7e",
+      "content": "# Section 1: 可修改文件与目录\r\n\r\nLegion Runtime Node + Pi v3；客户直接授权开发并要求整个产品运行切换 Node。任务 writeSet 只能缩小本清单。旧 Python 和第一阶段历史记录只读。\r\n\r\n| 类型 | 项目相对路径 | 用途 |\r\n| --- | --- | --- |\r\n| 文件 | `src/adapters/services/abstract/proposal.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/adapters/services/public/proposal.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/adapters/services/impl/proposal.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/adapters/services/abstract/pi_agent.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/adapters/services/public/pi_agent.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/adapters/services/impl/pi_agent.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/adapters/providers/abstract/pi_session.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/adapters/providers/public/pi_session.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `src/adapters/providers/impl/pi_session.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/adapters/test_proposal.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/adapters/test_pi_provider.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/adapters/test_pi_service.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/AgentAdapterEngineer/feature-map.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/AgentAdapterEngineer/functional-description.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/AgentAdapterEngineer/api-spec.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/AgentAdapterEngineer/changelog.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/AgentAdapterEngineer/docs/design/2026-10-07_design_node-pi-v3.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/AgentAdapterEngineer/docs/feature/proposal-adapters.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/AgentAdapterEngineer/docs/feature/pi-agent.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n\r\n其他角色文件、用户全局 Pi 配置、组织/边界和执行策略只读。测试仅可生成已接受临时工作区数据；递归清理前验证绝对路径。\r\n"
+    },
+    ".ans/roles/AgentAdapterEngineer/boundary.yaml": {
+      "sha256": "c3cd347b52d3b36bd7cbb0be1853e71c6c0ccb51e427013e2f011621ead5c70e",
+      "content": "schema_version: 1\r\nrole_id: AgentAdapterEngineer\r\nstatus: ACCEPTED\r\nversion: legion-node-pi-v3\r\nread_scope: ['project/**']\r\nwrite_scope:\r\n  - 'src/adapters/services/abstract/proposal.mjs'\r\n  - 'src/adapters/services/public/proposal.mjs'\r\n  - 'src/adapters/services/impl/proposal.mjs'\r\n  - 'src/adapters/services/abstract/pi_agent.mjs'\r\n  - 'src/adapters/services/public/pi_agent.mjs'\r\n  - 'src/adapters/services/impl/pi_agent.mjs'\r\n  - 'src/adapters/providers/abstract/pi_session.mjs'\r\n  - 'src/adapters/providers/public/pi_session.mjs'\r\n  - 'src/adapters/providers/impl/pi_session.mjs'\r\n  - 'tests/adapters/test_proposal.mjs'\r\n  - 'tests/adapters/test_pi_provider.mjs'\r\n  - 'tests/adapters/test_pi_service.mjs'\r\n  - 'docs/roles/AgentAdapterEngineer/feature-map.md'\r\n  - 'docs/roles/AgentAdapterEngineer/functional-description.md'\r\n  - 'docs/roles/AgentAdapterEngineer/api-spec.md'\r\n  - 'docs/roles/AgentAdapterEngineer/changelog.md'\r\n  - 'docs/roles/AgentAdapterEngineer/docs/design/2026-10-07_design_node-pi-v3.md'\r\n  - 'docs/roles/AgentAdapterEngineer/docs/feature/proposal-adapters.md'\r\n  - 'docs/roles/AgentAdapterEngineer/docs/feature/pi-agent.md'\r\ngenerated_effect_scope: []\r\ndeny_scope: ['.ans/organization/**', '.ans/roles/**', '.ans/project.json', '.ans/project.yaml', 'src/ui/**', 'historical_python_files']\r\napproval_source: direct_customer_node_and_pi_messages_2026-10-07\r\n"
+    },
+    ".ans/roles/AgentAdapterEngineer/role.yaml": {
+      "sha256": "50ab3ee00e315731470e7c38709f6b2ca0beed75a2cfbec182abf9dd680a6970",
+      "content": "schema_version: 1\r\nid: AgentAdapterEngineer\r\nname: AgentAdapterEngineer\r\nresponsibility: 'Node proposal Adapter 与真实 Pi Session Service/Provider、排队工具协议和生命周期'\r\nstatus: ACCEPTED\r\nread_scope: ['project/**']\r\nwrite_scope: []\r\nauthority_source: boundary.yaml\r\ndeny_scope: [outside_boundary]\r\ntools: [read,scoped_edit,approved_checks]\r\ncapabilities: ['Node_Pi_v3_authorized_role_task']\r\nallowed_actions: [authorized_role_task]\r\nforbidden_actions: [self_expand,self_approve,peer_mutation]\r\ndelegation_scope: []\r\nhandoff_targets: ['Supervisor']\r\nrequired_approvals: [human_for_material_scope_change]\r\nreporting_line: Supervisor\r\nmemory_scope: 'docs/roles/AgentAdapterEngineer/'\r\ncontracts: [kernel-adapter,kernel-runtime]\r\n"
+    },
+    ".ans/roles/AgentAdapterEngineer/state.yaml": {
+      "sha256": "299c50709331378d6af358c5e26f0ba94f0d17cf43bf8682502fe8c151eea9e7",
+      "content": "schema_version: 1\r\nrole_id: AgentAdapterEngineer\r\nstatus: ACCEPTED\r\nactive_agent: null\r\norganization_version: v002\r\nactive_tasks: []\r\n"
+    },
+    ".ans/roles/AgentAdapterEngineer/changelog.md": {
+      "sha256": "189fa247c926f54df9daada4b55fee15868f49f06d67ed70928bdcae8c0584f0",
+      "content": "- 2026-10-07：依客户六角色 Legion Runtime v1 接受并授权第一阶段开发；明确源码和文档边界。\r\n\r\n## 2026-10-07 Node + Pi v3\r\n客户直接要求全 Node 产品运行，更新接受边界、公共契约和固定检查；v1 政策及治理定义已快照。仅授本轮精确文件，非生产完成证据。\r\n"
+    },
+    ".ans/roles/Tester/role-card.md": {
+      "sha256": "ef0bbe2e2920ed4871d3c6d9d4fd935b507b9f4e3792e936fb68ee3dbf3ef38b",
+      "content": "# Tester\r\n\r\n你是本职责的长期维护者。理解实际使用、上下游与未来维护，交付可持续维护的可用结果；这不会扩大权限。\r\n\r\n职责：独立 Node 完整权限回归、真实 Pi 受控模型闭环与跨实例隔离验证。\r\n\r\n## 固定身份与必读\r\n\r\n本上下文终身只绑定 Tester；读其他卡不激活同行。当前权限见 [boundary.md](boundary.md) Section 1，实际 task_ops writeSet 只能缩小它。\r\n必读：[已授权 Node v3 设计](../../../docs/design/2026-10-07_design_node-pi-v3.md)、.ans/decisions/legion-pi-authorization.md、kernel-runtime/kernel-adapter 契约、ans-governed-construction SKILL.md、references/architecture.md、workflow.md、action-policy.md、testing.md、documentation.md、evidence.md、coordination.md。涉及各层时读其 interface/pipeline/service/provider/model 参考；管理评审读 proposal-review.md；Supervisor 读 scheduler.md 和 task-operations.md。\r\n\r\n## 执行与质量\r\n\r\n客户已直接授权 Pi 通用 Agent 及全部 Node 产品运行迁移，不重复同版审批。固定 v3 设计已经管理和 owner 评估。新增实质目标返回管理/Governance；不得自行扩大源码、测试、组织权限。\r\nSupervisor 是唯一派发者，其余角色不启动 worker。保留 Interface → Pipeline → Service → Provider → 外部基础设施，Model 单一 Kernel 主责。保持 abstract/public/impl 结构；不要三元、吞异常、访问他人内部字段或留下 stub。\r\n前置证据和当前候选 checks 通过后放行。SDK 不存在或未实跑必须失败，不能跳过；实际 Pi 使用受控本地推理测试。修依赖后重验调用方。报告候选/输入 hash、环境、命令、结果与剩余限制；不能自验收。\r\n原 Python 源码/测试和 phase1 dated records 保持只读。API/当前 feature 说明更新本阶段事实，不能抄旧测试成绩。包内不能包含 Python 或 task_ops。\r\n\r\n## 功能导航\r\n\r\n功能导航由本角色维护于 docs/roles/Tester/feature-map.md；每个当前功能说明链接本阶段设计和证据。\r\n"
+    },
+    ".ans/roles/Tester/boundary.md": {
+      "sha256": "3cfcdd11df56ba094ad3b005703292ef32e638d0fe57ffb6571ad1d00f212f04",
+      "content": "# Section 1: 可修改文件与目录\r\n\r\nLegion Runtime Node + Pi v3；客户直接授权开发并要求整个产品运行切换 Node。任务 writeSet 只能缩小本清单。旧 Python 和第一阶段历史记录只读。\r\n\r\n| 类型 | 项目相对路径 | 用途 |\r\n| --- | --- | --- |\r\n| 文件 | `tests/integration/test_permission_flow.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/integration/test_generic_agents.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `tests/integration/controlled_pi_model.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Tester/feature-map.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Tester/functional-description.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Tester/api-spec.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Tester/changelog.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Tester/docs/design/2026-10-07_design_node-pi-v3.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Tester/docs/verification-node-pi-v3.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n\r\n其他角色文件、用户全局 Pi 配置、组织/边界和执行策略只读。测试仅可生成已接受临时工作区数据；递归清理前验证绝对路径。\r\n"
+    },
+    ".ans/roles/Tester/boundary.yaml": {
+      "sha256": "710d4e6acf121861778ae6bd1638ed7c620d1d1af84bb2194dc572b884528fe6",
+      "content": "schema_version: 1\r\nrole_id: Tester\r\nstatus: ACCEPTED\r\nversion: legion-node-pi-v3\r\nread_scope: ['project/**']\r\nwrite_scope:\r\n  - 'tests/integration/test_permission_flow.mjs'\r\n  - 'tests/integration/test_generic_agents.mjs'\r\n  - 'tests/integration/controlled_pi_model.mjs'\r\n  - 'docs/roles/Tester/feature-map.md'\r\n  - 'docs/roles/Tester/functional-description.md'\r\n  - 'docs/roles/Tester/api-spec.md'\r\n  - 'docs/roles/Tester/changelog.md'\r\n  - 'docs/roles/Tester/docs/design/2026-10-07_design_node-pi-v3.md'\r\n  - 'docs/roles/Tester/docs/verification-node-pi-v3.md'\r\ngenerated_effect_scope: []\r\ndeny_scope: ['.ans/organization/**', '.ans/roles/**', '.ans/project.json', '.ans/project.yaml', 'src/ui/**', 'historical_python_files']\r\napproval_source: direct_customer_node_and_pi_messages_2026-10-07\r\n"
+    },
+    ".ans/roles/Tester/role.yaml": {
+      "sha256": "2ffa89eff9631d02d9d5a27825ab09deb67d29ddcb256cdf37e9b5abc1df978d",
+      "content": "schema_version: 1\r\nid: Tester\r\nname: Tester\r\nresponsibility: '独立 Node 完整权限回归、真实 Pi 受控模型闭环与跨实例隔离验证'\r\nstatus: ACCEPTED\r\nread_scope: ['project/**']\r\nwrite_scope: []\r\nauthority_source: boundary.yaml\r\ndeny_scope: [outside_boundary]\r\ntools: [read,scoped_edit,approved_checks]\r\ncapabilities: ['Node_Pi_v3_authorized_role_task']\r\nallowed_actions: [authorized_role_task]\r\nforbidden_actions: [self_expand,self_approve,peer_mutation]\r\ndelegation_scope: []\r\nhandoff_targets: ['Supervisor']\r\nrequired_approvals: [human_for_material_scope_change]\r\nreporting_line: Supervisor\r\nmemory_scope: 'docs/roles/Tester/'\r\ncontracts: [kernel-adapter,kernel-runtime]\r\n"
+    },
+    ".ans/roles/Tester/state.yaml": {
+      "sha256": "a4b213a13eba0675c69d43ad9d075088d9ffd7e0c16ac93865ba77ec8649bba4",
+      "content": "schema_version: 1\r\nrole_id: Tester\r\nstatus: ACCEPTED\r\nactive_agent: null\r\norganization_version: v002\r\nactive_tasks: []\r\n"
+    },
+    ".ans/roles/Tester/changelog.md": {
+      "sha256": "189fa247c926f54df9daada4b55fee15868f49f06d67ed70928bdcae8c0584f0",
+      "content": "- 2026-10-07：依客户六角色 Legion Runtime v1 接受并授权第一阶段开发；明确源码和文档边界。\r\n\r\n## 2026-10-07 Node + Pi v3\r\n客户直接要求全 Node 产品运行，更新接受边界、公共契约和固定检查；v1 政策及治理定义已快照。仅授本轮精确文件，非生产完成证据。\r\n"
+    },
+    ".ans/roles/Reviewer/role-card.md": {
+      "sha256": "abfdb4f0d0f9b9c4ff823b2950d4ba237fec83d240f63bb38133c57d23fea37a",
+      "content": "# Reviewer\r\n\r\n你是本职责的长期维护者。理解实际使用、上下游与未来维护，交付可持续维护的可用结果；这不会扩大权限。\r\n\r\n职责：独立 Node 结构、权限与发行入口评审；不修生产源码。\r\n\r\n## 固定身份与必读\r\n\r\n本上下文终身只绑定 Reviewer；读其他卡不激活同行。当前权限见 [boundary.md](boundary.md) Section 1，实际 task_ops writeSet 只能缩小它。\r\n必读：[已授权 Node v3 设计](../../../docs/design/2026-10-07_design_node-pi-v3.md)、.ans/decisions/legion-pi-authorization.md、kernel-runtime/kernel-adapter 契约、ans-governed-construction SKILL.md、references/architecture.md、workflow.md、action-policy.md、testing.md、documentation.md、evidence.md、coordination.md。涉及各层时读其 interface/pipeline/service/provider/model 参考；管理评审读 proposal-review.md；Supervisor 读 scheduler.md 和 task-operations.md。\r\n\r\n## 执行与质量\r\n\r\n客户已直接授权 Pi 通用 Agent 及全部 Node 产品运行迁移，不重复同版审批。固定 v3 设计已经管理和 owner 评估。新增实质目标返回管理/Governance；不得自行扩大源码、测试、组织权限。\r\nSupervisor 是唯一派发者，其余角色不启动 worker。保留 Interface → Pipeline → Service → Provider → 外部基础设施，Model 单一 Kernel 主责。保持 abstract/public/impl 结构；不要三元、吞异常、访问他人内部字段或留下 stub。\r\n前置证据和当前候选 checks 通过后放行。SDK 不存在或未实跑必须失败，不能跳过；实际 Pi 使用受控本地推理测试。修依赖后重验调用方。报告候选/输入 hash、环境、命令、结果与剩余限制；不能自验收。\r\n原 Python 源码/测试和 phase1 dated records 保持只读。API/当前 feature 说明更新本阶段事实，不能抄旧测试成绩。包内不能包含 Python 或 task_ops。\r\n\r\n## 功能导航\r\n\r\n功能导航由本角色维护于 docs/roles/Reviewer/feature-map.md；每个当前功能说明链接本阶段设计和证据。\r\n"
+    },
+    ".ans/roles/Reviewer/boundary.md": {
+      "sha256": "6ed52939ad5d0eb07f42cfe57aa504fdc7d306c69f2574f8db99a615515cb591",
+      "content": "# Section 1: 可修改文件与目录\r\n\r\nLegion Runtime Node + Pi v3；客户直接授权开发并要求整个产品运行切换 Node。任务 writeSet 只能缩小本清单。旧 Python 和第一阶段历史记录只读。\r\n\r\n| 类型 | 项目相对路径 | 用途 |\r\n| --- | --- | --- |\r\n| 文件 | `tests/reviewer/test_structure.mjs` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Reviewer/feature-map.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Reviewer/functional-description.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Reviewer/api-spec.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Reviewer/changelog.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Reviewer/docs/design/2026-10-07_design_node-pi-v3.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n| 文件 | `docs/roles/Reviewer/docs/review-node-pi-v3.md` | 本角色独占 authored 文件；实际任务需派发 |\r\n\r\n其他角色文件、用户全局 Pi 配置、组织/边界和执行策略只读。测试仅可生成已接受临时工作区数据；递归清理前验证绝对路径。\r\n"
+    },
+    ".ans/roles/Reviewer/boundary.yaml": {
+      "sha256": "4c68fb7f6fef299c4a4f71108c549d5936a2bdc0f653eb5139773082335446bd",
+      "content": "schema_version: 1\r\nrole_id: Reviewer\r\nstatus: ACCEPTED\r\nversion: legion-node-pi-v3\r\nread_scope: ['project/**']\r\nwrite_scope:\r\n  - 'tests/reviewer/test_structure.mjs'\r\n  - 'docs/roles/Reviewer/feature-map.md'\r\n  - 'docs/roles/Reviewer/functional-description.md'\r\n  - 'docs/roles/Reviewer/api-spec.md'\r\n  - 'docs/roles/Reviewer/changelog.md'\r\n  - 'docs/roles/Reviewer/docs/design/2026-10-07_design_node-pi-v3.md'\r\n  - 'docs/roles/Reviewer/docs/review-node-pi-v3.md'\r\ngenerated_effect_scope: []\r\ndeny_scope: ['.ans/organization/**', '.ans/roles/**', '.ans/project.json', '.ans/project.yaml', 'src/ui/**', 'historical_python_files']\r\napproval_source: direct_customer_node_and_pi_messages_2026-10-07\r\n"
+    },
+    ".ans/roles/Reviewer/role.yaml": {
+      "sha256": "278d54f29883dea98cd796d5a903857a753157bae15b6d2f0045daf3f42f4259",
+      "content": "schema_version: 1\r\nid: Reviewer\r\nname: Reviewer\r\nresponsibility: '独立 Node 结构、权限与发行入口评审；不修生产源码'\r\nstatus: ACCEPTED\r\nread_scope: ['project/**']\r\nwrite_scope: []\r\nauthority_source: boundary.yaml\r\ndeny_scope: [outside_boundary]\r\ntools: [read,scoped_edit,approved_checks]\r\ncapabilities: ['Node_Pi_v3_authorized_role_task']\r\nallowed_actions: [authorized_role_task]\r\nforbidden_actions: [self_expand,self_approve,peer_mutation]\r\ndelegation_scope: []\r\nhandoff_targets: ['Supervisor']\r\nrequired_approvals: [human_for_material_scope_change]\r\nreporting_line: Human\r\nmemory_scope: 'docs/roles/Reviewer/'\r\ncontracts: [kernel-adapter,kernel-runtime]\r\n"
+    },
+    ".ans/roles/Reviewer/state.yaml": {
+      "sha256": "1fa55f663d981246a7805a7a3f93e076e17580a2e9998fd8463c414c42b4c387",
+      "content": "schema_version: 1\r\nrole_id: Reviewer\r\nstatus: ACCEPTED\r\nactive_agent: null\r\norganization_version: v002\r\nactive_tasks: []\r\n"
+    },
+    ".ans/roles/Reviewer/changelog.md": {
+      "sha256": "189fa247c926f54df9daada4b55fee15868f49f06d67ed70928bdcae8c0584f0",
+      "content": "- 2026-10-07：依客户六角色 Legion Runtime v1 接受并授权第一阶段开发；明确源码和文档边界。\r\n\r\n## 2026-10-07 Node + Pi v3\r\n客户直接要求全 Node 产品运行，更新接受边界、公共契约和固定检查；v1 政策及治理定义已快照。仅授本轮精确文件，非生产完成证据。\r\n"
+    }
+  },
+  "authoredFiles": {
+    "src/kernel/models/core.mjs": "f62168160c1863bfeca4a80f3a1204b945d9dac4913520c77b1eed257ebe7ecc",
+    "src/kernel/models/agent.mjs": "23c9ed318741f31dddfacc9aaa1bc45ddf4d80b9eb05543b9dd72421649a51c2",
+    "src/kernel/services/abstract/policy.mjs": "85e0697e6098746f956276f4556414e79e9cb10d25d174974e3dcd59c4f71b12",
+    "src/kernel/services/public/policy.mjs": "7addc2cad7c14e6aa0f4c34567d9e24b29e6c5a0c11be6268d5a63f372754642",
+    "src/kernel/services/impl/policy.mjs": "8f809a821abf02f1a263de0835b9fc145dc6af4054b88db5ee98bbf279f53753",
+    "src/kernel/services/abstract/mutation.mjs": "07ac9aa7b51ca4593b6d17d64b86c48f2c236cfd85ad74747e2535b28c499ff2",
+    "src/kernel/services/public/mutation.mjs": "3ab3ada7e41c39dfaee961c69591c6a1b4a56a073a0ff9abfe9b1024479889af",
+    "src/kernel/services/impl/mutation.mjs": "9cec7b4acbfbe7369a5ee49f5d1b3a58d141ebaafe3cc81e2f6c657680f2a240",
+    "src/kernel/providers/abstract/storage.mjs": "009b1ddfdd13cf5c39e5cb1d75721a3904cccc01dbb2422d82841563a88f9518",
+    "src/kernel/providers/public/storage.mjs": "5f39b1be79a869be9c5ae68698a3b4210659c6bd1cdac415bca89ce58d234cbd",
+    "src/kernel/providers/impl/storage.mjs": "d52d5aad10ff8b0fe93d0d8d53279d6f41131eb2efd0c32d3472fb480a0138e2",
+    "src/kernel/pipelines/permission.mjs": "87d2403805099e3579592aabc32adeb65a713fc03004160d4458717e1979844e",
+    "src/kernel/interface/runtime.mjs": "ba5349438e5620a2e2860205ff44f22a7c302902b2241443f2769b9893dc35ba",
+    "src/kernel/interface/demo.mjs": "04671bb9196932cf5b53e74772a0d79bc10c5f01df6c60ca6db7fb1a83e51e52",
+    "tests/kernel/test_models.test.mjs": "13970488a4e3a3d476a573fa3bc615587bbb7908f9b44b6a260baaa85cc3491b",
+    "tests/kernel/test_agent_models.test.mjs": "551741b1b02bf4fb555f763d03c9e3cf75868960102fddbb501caaa1c69f2d7d",
+    "tests/kernel/test_policy.test.mjs": "20ac048bd6b4fa717debc9329fa7a3df0a722b5738ff3a9effa0c656c5df0ed5",
+    "tests/kernel/test_mutation.test.mjs": "b33dbb347894a7aee404ac376a95019974d847f1b896cab33c3602f65d7fcb4c",
+    "tests/kernel/test_events.test.mjs": "2257312d63abce04983bd4228b400c9f1697994863f30f219c016aa51272cdbc",
+    "tests/kernel/test_demo.test.mjs": "a75b03912593711e54f29489dfdea885a10bcc14a717c757df849302e00664c5",
+    "tests/kernel/test_agent_scope.test.mjs": "f44d2e65dd72b1743091713c2e9964914fff9b756af0deb227cce0af0272f9df",
+    "tests/kernel/test_agent_runtime.test.mjs": "b03acbdbafb6e0bdfafc3a04a250026e5cf268473f5cf767ccccc87a66b8e562",
+    "docs/roles/KernelEngineer/feature-map.md": "0e008376665a7977c618aaddc7bffa2ea04b91d8ab8e623c51c7c07400972119",
+    "docs/roles/KernelEngineer/functional-description.md": "af54cb2520f6a3359bc0accd320825e17ef3a63de2106c68820df671122ee394",
+    "docs/roles/KernelEngineer/api-spec.md": "e716e92dc9015f7a61dadb02cd8135904335c931f4b4f5499e06502b47437483",
+    "docs/roles/KernelEngineer/changelog.md": "a90e4a4090efa2f66ce380b579ae5f67e2872445d3740973c48d46f0f9ed7130",
+    "docs/roles/KernelEngineer/docs/design/2026-10-07_design_node-pi-v3.md": "f3cdb69a4ea5f51796306485bf17ccc71fac2b2d7f9b9af6bc0ac43e90706e16",
+    "docs/roles/KernelEngineer/docs/feature/permission.md": "c35d0438bd6e5a19925519fef04492c177efd79aa9a81fa4c1c0977c152d0134",
+    "docs/roles/KernelEngineer/docs/feature/generic-agents.md": "ff1792f45ab9dcc0e3803512571d00c2440295cc5b9e038a0be137307f966f9e",
+    "src/adapters/services/abstract/proposal.mjs": "ae1484967e18d481971b4a76deb084282c22233c85ec4f0c05c99adbeeb19fd1",
+    "src/adapters/services/public/proposal.mjs": "09f170b5c4b0d5f7be371d12896862047d1a63b46622f3b8554337ec42bb9ef3",
+    "src/adapters/services/impl/proposal.mjs": "4d88952e696214aea5184eb7496964781ae3407c2ff599d9d89d8efc08676344",
+    "src/adapters/services/abstract/pi_agent.mjs": "a13c5d55013edad2418b04492a867f120017e34646958157fe7822b8e95cc1a0",
+    "src/adapters/services/public/pi_agent.mjs": "c14040bd22ad87512ddb3d9d08ee681b3e06ce8d625f526bcf9b46a1de9f054e",
+    "src/adapters/services/impl/pi_agent.mjs": "f605e8c7a4fd92935eb21dfefe2ae354239ee2e8995d1c3679c022ce309149cc",
+    "src/adapters/providers/abstract/pi_session.mjs": "3e531766baf7469978a9396f3f4a4174cf3e81ab3968df94a28c8b5d3d161562",
+    "src/adapters/providers/public/pi_session.mjs": "3b89c0951f8fbda93098578292eab91703ac5a13e8a685cfd5bd7297363b6e74",
+    "src/adapters/providers/impl/pi_session.mjs": "73583a83a907c6bcf50ee61665b6384de41d7ad73e85c30caf8cb8d7173f6df6",
+    "tests/adapters/test_proposal.mjs": "5ebefea83600e7fd6d6d16139c6d59fd0940afa18d1b595f4e83e9597e23623e",
+    "tests/adapters/test_pi_provider.mjs": "3018e581e6c5d0441364273347324065ab8ba2f67df4abe7b80d1c0fddddd4a9",
+    "tests/adapters/test_pi_service.mjs": "32bb13d195d6c8c8ee212713f41e520bbd6ed04701bc76dffe35c49d845e9d0d",
+    "docs/roles/AgentAdapterEngineer/feature-map.md": "15dc4965287a4b857267bf33e0a5b3bce9bf16df09f3b8b33932142bff6786e7",
+    "docs/roles/AgentAdapterEngineer/functional-description.md": "3a062fcc29e122ff188b97dcd9893b1cf20eb463d746fa623386855776544010",
+    "docs/roles/AgentAdapterEngineer/api-spec.md": "e98e8c56ad05cf291d5a387052a8ad3750a596c83b22fe6c197f87cae4d678d9",
+    "docs/roles/AgentAdapterEngineer/changelog.md": "066352fcccb7bd9959501917557ced79d011842653d08f51d7673b6b0995e329",
+    "docs/roles/AgentAdapterEngineer/docs/design/2026-10-07_design_node-pi-v3.md": "2de774c8450334ad7905ee4f0df9ec94b65de066f152729a9631c2c137d16498",
+    "docs/roles/AgentAdapterEngineer/docs/feature/proposal-adapters.md": "366d5326ae911452a29290ea0887002ba836173d3e1c8b9eaa10f03ef7a401a9",
+    "docs/roles/AgentAdapterEngineer/docs/feature/pi-agent.md": "c0b032d65187c5458b3fa0e73e2a01accc86af7f03acfbeb3c426ac60d6fb7d1",
+    "package.json": "09c91316f22a7b3f3c1097b71e1a6e0388736ff4d7540ea9e0583c9f0ddd6e0b",
+    "package-lock.json": "f4649c6a7b8c2aa623c07097f01de2f340b561228d3cfa75a0a48cc7acdfb34b",
+    "runtime.mjs": "60bf11c3b9da04c155988e99e5ae7cb8f8be672d0589ecab9237ecfb95ccd3b3",
+    "bin/legion.mjs": "0ff9d0bd3e5dd7646fbd3cfa38ba037b75679e83202b7d5b50589c0151746a56",
+    "README.md": "8ae390ca2c059a1fb04d01d54912caece60ec68934d1181087aab990a90d2894",
+    "tests/package/test_package.mjs": "ccdeb1ec04d79544e9fb8126076e130cf350b089d671abe24eff83f2b8670fec",
+    "docs/roles/ProjectManager/feature-map.md": "599ff080d18360624f40fb1498954ef5353e1f8987808600e4b59cd5a9f1d3f7",
+    "docs/roles/ProjectManager/functional-description.md": "1505f0545f8c48b85ab7888181d0182b370ee758e09245feb8721387d857cf5a",
+    "docs/roles/ProjectManager/api-spec.md": "14a32eec0d951156a4ce9cf6ce151b05148fcd9dbee55408f55923a7c45bd0de",
+    "docs/roles/ProjectManager/changelog.md": "73de942b810a01d3a12ef8c5779eefc491a46a534c8b8f13cf8edf69dd4f08b9",
+    "docs/roles/ProjectManager/docs/design/2026-10-07_design_node-pi-v3.md": "90d378bdeae040bec99a00a389e7cad6714f5bf0095b20bd8615f83478dcac87",
+    "docs/roles/ProjectManager/docs/architecture.md": "25558e4cb24ae612bb895c0300fe00d08deba42921a98cb67719697b4ce220c1",
+    "docs/roles/ProjectManager/docs/feature/distribution.md": "6561dc9daa4a53800a0e2eae184516adebe465b286967dea1ff9661d7de0f57b",
+    "tests/reviewer/test_structure.mjs": "fec4aa42af8fc7c0801cf4fa21942dba712485b8673b4b9c02b6b3e3877f2f53",
+    "docs/roles/Reviewer/feature-map.md": "a65efc673c58a737cb548eebcebf77a168dc678b33ae38153e4d392395f8b8e1",
+    "docs/roles/Reviewer/functional-description.md": "bb0eda4d417f3dffcd9fbca3ee1a1408f07cec425e981411b36aaea9e2a3833b",
+    "docs/roles/Reviewer/api-spec.md": "82ab51c3329f20496684fb8280d5cce559c73906c766f227c693d8c4a65367c7",
+    "docs/roles/Reviewer/changelog.md": "6e70247bff7e28bcbfeefe43ee56df9369753376dc3d9fd1da629d7d79e3bdda",
+    "docs/roles/Reviewer/docs/design/2026-10-07_design_node-pi-v3.md": "929209c8e9758cc1ee69f629878a4b3ad33917d9a0442e8440a8af583606028f",
+    "docs/roles/Reviewer/docs/review-node-pi-v3.md": "8cc6e15278466c20784c0f8d8b16123b269831f0645a830e11206fcbfdb5abe3",
+    "tests/integration/test_permission_flow.mjs": "6cb2daff6047ca5194e7a7db377835dc1fa9a0d5c1ff84e43ee7eddbac41f57f",
+    "tests/integration/test_generic_agents.mjs": "4fff06e1c509f9225ade4fc60cea008a1a266253bbd9d56375b1af665a1e444a",
+    "tests/integration/controlled_pi_model.mjs": "787f6c845ea58755bc96c68af1ebad653b4680c1f48c54026b6cd1528d9c7dce",
+    "docs/roles/Tester/feature-map.md": "2c2ef3a2b948027be9d39f9b40bbc9974bd1a0f89b3427b8ce63ef694c0893bf",
+    "docs/roles/Tester/functional-description.md": "b2a87e1953c93568601813bd8d3ba3b23c1fe21f98f3bb9dc6f2c2cc4e48eef8",
+    "docs/roles/Tester/api-spec.md": "f19c301e470ca3ba295fd837c6f80829905ca121b05d4930c21d5c35525d2fe3",
+    "docs/roles/Tester/changelog.md": "243bd7bed825b074b6580af96b71fe433f8187c3b8b0ebe6d213dccad2266928",
+    "docs/roles/Tester/docs/design/2026-10-07_design_node-pi-v3.md": "baad1a8c47a93188cbaee132159151818a9e600bca8ea206b37e9876974fc783",
+    "docs/roles/Tester/docs/verification-node-pi-v3.md": "d5b6d71ee5a870d6dec9d167b0ca70793f618fd140798e00c3bf09dbae5a6f12",
+    "docs/roles/Supervisor/feature-map.md": "f52eb2363d5c3fbe5cb9428c5f54090a5dd05079e5a94d59f20b2774200129f1",
+    "docs/roles/Supervisor/functional-description.md": "580780f5b724ead97dc336e2a297f628c72b0b9657a58a0a761662d238f41464",
+    "docs/roles/Supervisor/api-spec.md": "8012f5845592f2df50ff2c95b286952d5500633eb2d081a22c4e6ad05f0743d3",
+    "docs/roles/Supervisor/changelog.md": "544dc23de408ac2ba8d865b32a2bdbd52feafc6c8a40472fea4491f59dc73701",
+    "docs/roles/Supervisor/docs/design/2026-10-07_design_node-pi-v3.md": "d20962fc572cb9f82e713e7b7deb6796019d3dc023bfa574d259ac15c882c874",
+    "docs/roles/Supervisor/docs/architecture.md": "b975c2d1f668c46afba3de630105236ae81d40a6f7cb11ba180e0dc336576712",
+    "docs/roles/Supervisor/docs/delivery-node-pi-v3.md": "84cd12d8fd2568c1a50586cdad672d25604fea19d93d64dc095a3c29dcc6a7c7"
+  },
+  "productAggregateSha256": "75ab247b8aafc224d39c926119e170bc56bbda966073a73eeab3bfa4a4bb8327",
+  "tarball": ".ans/runtime/legion-pi-node-v3/packaging/legion-runtime-0.3.0.tgz",
+  "tarballSha256": "a83a86499c4aaa7c997d94cabbb697efdc82f81475b622b85307ac682de4d8f0",
+  "fullTestEvidenceSha256": "0f35d694c56a9d6ca8d49a2e77d3af0f2f8b10ef9f7826fd63fd4752cfe369c2"
+}

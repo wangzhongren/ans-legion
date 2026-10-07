@@ -1,0 +1,28 @@
+{
+  "KernelEngineer": {
+    "unit": {"argv": ["node", "--test", "--test-concurrency=1", "tests/kernel/test_models.test.mjs", "tests/kernel/test_agent_models.test.mjs", "tests/kernel/test_policy.test.mjs", "tests/kernel/test_mutation.test.mjs", "tests/kernel/test_events.test.mjs", "tests/kernel/test_demo.test.mjs", "tests/kernel/test_agent_scope.test.mjs", "tests/kernel/test_agent_runtime.test.mjs", "tests/kernel/test_workbench_models.test.mjs"], "timeoutSeconds": 300}
+  },
+  "AgentAdapterEngineer": {
+    "unit": {"argv": ["node", "--test", "--test-concurrency=1", "tests/adapters/test_proposal.mjs", "tests/adapters/test_pi_provider.mjs", "tests/adapters/test_pi_service.mjs"], "timeoutSeconds": 180}
+  },
+  "ProjectManager": {
+    "core-package": {"argv": ["node", "--test", "tests/package/test_package.mjs"], "timeoutSeconds": 300},
+    "install-electron": {"argv": ["node", "apps/desktop/scripts/install-electron.mjs"], "timeoutSeconds": 300},
+    "verify-dependencies": {"argv": ["node", "apps/desktop/scripts/verify-dependencies.mjs"], "timeoutSeconds": 120},
+    "desktop-package": {"argv": ["node", "--test", "apps/desktop/tests/package/desktop-package.test.mjs"], "timeoutSeconds": 300},
+    "desktop-public": {"argv": ["node", "--input-type=module", "-e", "import {spawnSync} from 'node:child_process';import {resolve} from 'node:path';import {mkdirSync} from 'node:fs';const temporary=resolve('.ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/tmp');const cache=resolve('.ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/npm-cache');mkdirSync(temporary,{recursive:true});mkdirSync(cache,{recursive:true});delete process.env.NODE_OPTIONS;delete process.env.NODE_COMPILE_CACHE;const environment={...process.env,LEGION_NODE_TEST_ROLE:'ProjectManager',LEGION_DESKTOP_TEST_ROLE:'ProjectManager',TEMP:temporary,TMP:temporary,npm_config_cache:cache,NODE_DISABLE_COMPILE_CACHE:'1'};delete environment.NODE_OPTIONS;delete environment.NODE_COMPILE_CACHE;const result=spawnSync(process.execPath,['D:/soft/nodejs/node_modules/npm/bin/npm-cli.js','--prefix','apps/desktop','test','--ignore-scripts'],{cwd:process.cwd(),encoding:'utf8',timeout:280000,maxBuffer:16777216,env:environment});if(result.stdout)process.stdout.write(result.stdout);if(result.stderr)process.stderr.write(result.stderr);if(result.error)throw result.error;if(result.status===null)throw new Error('Desktop public checks did not exit');process.exit(result.status);"], "timeoutSeconds": 300}
+  },
+  "DesktopEngineer": {
+    "capabilities": {"argv": ["node", "--test", "--test-concurrency=1", "apps/desktop/tests/unit/workbench-model.test.mjs", "apps/desktop/tests/unit/project.test.mjs", "apps/desktop/tests/unit/history.test.mjs", "apps/desktop/tests/unit/workbench.test.mjs", "apps/desktop/tests/unit/profiles.test.mjs", "apps/desktop/tests/unit/workspace.test.mjs"], "timeoutSeconds": 300},
+    "interface": {"argv": ["node", "--test", "--test-concurrency=1", "apps/desktop/tests/unit/pipeline.test.mjs", "apps/desktop/tests/unit/ipc.test.mjs"], "timeoutSeconds": 300}
+  },
+  "Reviewer": {
+    "node-unit": {"argv": ["node", "--test", "tests/reviewer/test_structure.mjs"], "timeoutSeconds": 300},
+    "desktop-unit": {"argv": ["node", "--test", "--test-concurrency=1", "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs", "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs"], "timeoutSeconds": 300}
+  },
+  "Tester": {
+    "unit": {"argv": ["node", "--test", "--test-concurrency=1", "apps/desktop/tests/integration/workbench-flow.test.mjs", "apps/desktop/tests/e2e/workbench-ui.test.mjs"], "timeoutSeconds": 300},
+    "regression": {"argv": ["node", "--input-type=module", "-e", "import {spawnSync} from 'node:child_process';import {resolve} from 'node:path';import {mkdirSync} from 'node:fs';const temporary=resolve('.ans/runtime/legion-desktop-workbench-v2/Tester/node/tmp');const cache=resolve('.ans/runtime/legion-desktop-workbench-v2/Tester/node/npm-cache');mkdirSync(temporary,{recursive:true});mkdirSync(cache,{recursive:true});delete process.env.NODE_OPTIONS;delete process.env.NODE_COMPILE_CACHE;const environment={...process.env,LEGION_NODE_TEST_ROLE:'Tester',TEMP:temporary,TMP:temporary,npm_config_cache:cache,NODE_DISABLE_COMPILE_CACHE:'1'};delete environment.NODE_OPTIONS;delete environment.NODE_COMPILE_CACHE;const result=spawnSync(process.execPath,['D:/soft/nodejs/node_modules/npm/bin/npm-cli.js','test','--ignore-scripts'],{cwd:process.cwd(),encoding:'utf8',timeout:280000,maxBuffer:16777216,env:environment});if(result.stdout)process.stdout.write(result.stdout);if(result.stderr)process.stderr.write(result.stderr);if(result.error)throw result.error;if(result.status===null)throw new Error('Node regression did not exit');process.exit(result.status);"], "timeoutSeconds": 300}
+  },
+  "Supervisor": {}
+}

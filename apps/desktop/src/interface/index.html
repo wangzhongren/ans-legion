@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Legion 工作台</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="renderer.mjs"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">L</span><strong>Legion<small>项目工作台</small></strong></div>
+    <div class="sidebar-heading"><span>项目</span><button id="choose-project" class="icon-button" title="选择项目文件夹" aria-label="选择项目文件夹">＋</button></div>
+    <div id="project-list" class="project-list"></div>
+    <button id="conversation-nav" class="nav-item active" data-page="conversation">项目管理对话</button>
+    <div class="sidebar-heading"><span>项目成员</span><span id="role-count" class="muted">0</span></div>
+    <div id="member-list" class="member-list"></div>
+    <div class="sidebar-bottom"><button class="nav-item" data-page="settings">AI 连接设置</button><button id="theme-toggle" class="secondary compact">切换浅色 / 深色</button><p>确认范围后才执行<br>软件检查不会自动运行</p></div>
+  </aside>
+  <main>
+    <header class="topbar"><div><h1 id="project-name">选择一个项目开始</h1><p id="manager-connection">与项目管理讨论需求与方案</p></div><div class="header-actions"><button id="refresh-project" class="secondary compact">刷新</button><button id="details-toggle" class="secondary compact" aria-expanded="false" aria-controls="details-drawer">任务详情</button></div></header>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <section id="conversation-page" class="page conversation-page">
+      <div id="chat-scroll" class="chat-scroll"><div class="conversation-width">
+        <div id="welcome" class="welcome"><span class="welcome-mark">PM</span><h2>从一个目标开始</h2><p>选好项目文件夹，向项目管理描述你要做的事。<br>一起明确方案，再确认角色、任务和文件范围。</p><div class="suggestions"><button class="secondary" data-suggestion="先帮我梳理这个项目的目标和实施方案。">梳理实施方案</button><button class="secondary" data-suggestion="我需要修改现有项目，请先与我澄清需求和需要参考的文件。">修改现有项目</button></div><button id="welcome-choose" class="primary">选择项目文件夹</button></div>
+        <div id="messages" class="messages" aria-live="polite" aria-label="项目管理会话"></div>
+        <section id="plan-panel" class="plan-panel" hidden><div class="section-heading"><div><span class="eyebrow">方案与确认</span><h2 id="plan-goal"></h2></div><span id="plan-status" class="badge"></span></div><div id="plan-roles" class="plan-roles"></div><div id="plan-tasks"></div><p id="plan-binding" class="muted"></p><div class="plan-actions"><button id="confirm-plan" class="primary">确认以上计划并执行</button><button id="stop-execution" class="danger" hidden>停止当前执行</button></div><p class="muted">仅以上精确文件可写。讨论回复不能代替你的确认；软件检查尚未运行。</p></section>
+        <section id="execution-panel" class="execution-panel" hidden><h2>实际执行记录</h2><div id="execution-results"></div></section>
+      </div></div>
+      <div class="composer"><form id="message-form" class="conversation-width"><div class="composer-box"><textarea id="message-input" rows="3" maxlength="65536" placeholder="向项目管理说明需求… Ctrl + Enter 发送" aria-label="给项目管理的消息"></textarea><div class="composer-actions"><span id="conversation-status" class="muted">首条消息将创建此项目的项目管理</span><div><button id="cancel-turn" type="button" class="secondary" hidden>停止回复</button><button id="send-message" type="submit" class="primary">发送</button></div></div></div><p id="composer-hint" class="muted">每个项目独立会话。执行成员通过确认后的任务图工作。</p></form></div>
+    </section>
+    <section id="settings-page" class="page settings-page" hidden>
+      <div class="settings-content"><div class="section-heading"><div><h2>模型连接</h2><p class="muted">选择协议、模型和地址。密钥仅在本机加密保存。</p></div><button id="new-profile" class="secondary">新增连接</button></div>
+      <label class="default-profile">默认项目管理连接<select id="default-profile" aria-label="默认项目管理连接"></select></label>
+      <div class="profiles-layout"><div id="profile-list" class="profile-list"></div>
+        <form id="profile-form" class="card"><h3 id="form-title">新增连接</h3><input id="profile-id" type="hidden">
+          <label>连接名称<input id="profile-name" required maxlength="100" placeholder="例如：本地模型"></label>
+          <label>协议<select id="protocol"><option value="openai-completions">OpenAI Chat Completions</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></label>
+          <div class="form-row"><label>Provider 名称<input id="provider" required maxlength="100" placeholder="例如：OpenAI"></label><label>模型 ID<input id="model-id" required maxlength="200" placeholder="模型标识"></label></div>
+          <label>Base URL<input id="base-url" required maxlength="2048" placeholder="https://api.example.com/v1"><small>HTTPS 或明确的 localhost HTTP 地址</small></label>
+          <div class="key-heading"><span>API Key</span><span id="saved-key" class="badge">尚未保存密钥</span></div>
+          <label>密钥编辑动作<select id="key-action"><option value="replace">替换：保存新密钥</option><option value="keep">保留：使用已保存密钥</option><option value="clear">清除：移除已保存密钥</option></select></label>
+          <label>新密钥<input id="api-key" type="password" maxlength="8192" autocomplete="off" placeholder="保存后不会读回"></label>
+          <button id="save-profile" type="submit" class="primary">保存连接</button><p class="muted">保存连接会使当前计划失效并停止其执行。加密不可用时会明确失败。</p>
+        </form>
+      </div><div class="card probe-card"><div><h3>连接测试</h3><p id="probe-state" class="muted">尚未测试</p></div><button id="cancel-probe" class="secondary" disabled>取消测试</button></div>
+      </div>
+    </section>
+    <aside id="details-drawer" class="details-drawer" hidden>
+      <div class="drawer-heading"><h2>项目详情</h2><button id="details-close" class="icon-button" aria-label="收起详情">×</button></div>
+      <details open><summary>明确选择上下文</summary><p class="muted">每行一个精确相对文件，最多16个。单文件256KiB，总计2MiB。只读取你选择的文件。</p><textarea id="context-input" rows="4" placeholder="src/example.mjs&#10;README.md" aria-label="精确上下文文件"></textarea><button id="select-context" class="secondary">读取所列文件</button><p id="context-state" class="muted"></p><div id="context-files"></div></details>
+      <details id="member-details"><summary>成员与连接</summary><div id="role-list"></div></details>
+      <details><summary>任务范围与结果</summary><label>任务状态<select id="status-filter"><option value="all">全部</option><option value="pending">等待确认 / 执行</option><option value="running">执行中</option><option value="completed">目标已写入</option><option value="failed">失败</option><option value="blocked">阻塞</option><option value="cancelled">已取消</option><option value="interrupted">已中断</option></select></label><div id="task-list"></div></details>
+      <details><summary>真实记录来源</summary><p id="observation-state" class="muted"></p><div class="source-summary"><p id="governance-state"></p><p id="record-state"></p><p id="audit-state"></p></div><p id="snapshot-time" class="muted"></p><div id="observation-errors"></div><div id="source-list"></div><details><summary>任务阶段记录</summary><div id="record-list"></div></details><details><summary>治理 / 运行审计记录</summary><div id="audit-list"></div></details></details>
+    </aside>
+  </main>
+</body>
+</html>

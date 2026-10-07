@@ -1,0 +1,11 @@
+schema_version: 1
+status: ACCEPTED_PLAN
+max_concurrent_workers: 2
+nodes:
+  - {id: deps, role: ProjectManager, needs: []}
+  - {id: model, role: KernelEngineer, needs: []}
+  - {id: adapter, role: AgentAdapterEngineer, needs: [deps,model]}
+  - {id: kernel-runtime, role: KernelEngineer, needs: [model,adapter]}
+  - {id: package, role: ProjectManager, needs: [kernel-runtime]}
+  - {id: reviewer, role: Reviewer, needs: [package]}
+  - {id: tester, role: Tester, needs: [reviewer]}

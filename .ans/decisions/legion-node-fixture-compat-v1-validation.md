@@ -1,0 +1,7 @@
+# 2026-10-07 必要Node回归兼容修已验证
+
+同固定原角色完成四份测试的受控治理来源/隔离位置适配，无产品25files/CLI/root包配置修改。独立task已3节点verified、finalrev17、无活动writer；GUI e72不变。PM2、Reviewer22、Tester20与公开Node141全部通过，0fail/cancel/skip/todo；这些有重叠，不能相加当独立测试数。
+
+实际公开141日志 .ans/runtime/legion-node-fixture-compat-v1/evidence/integration-fixtures-1-regression-91575c14.log，SHAce16cf26e460f62d2b94370b29c8a8acd1638f4a762d3f95d8eedcd51ff2e04d；Tester证据verification.json SHA27e8381b9de7b2ee6c33ffcda8629ff8f33c9b33762964df6abd7d33594a207a，最终candidate f1075d0f82035e72176ce0a05e21fa8386cdf3665d01e7898f2d628fa68414ee。600保护文件（含旧564缓存/packaging文件）前后SHA不变由实际Tester证明；Governance另只读核对25产品文件及rootpackage/lock/README/runtime/CLI、冻结tgz和两配置SHA未变。新/旧tgz逐bytes一致，SHAa83a86499c4aaa7c997d94cabbb697efdc82f81475b622b85307ac682de4d8f0；本任务tmp已空。
+
+原断言/用例名/cleanup守卫保留，不放宽Core写权限，不把旧成绩冒充新GUI。Node旧junction两项在原受控metadata路径得到证明，仍有原生reparse/OS isolation限制；GUI自身实际junction测试是另组证据。Windows桌面交付尚须GUI全阶段真实原包启动/ZIP/独立验收。

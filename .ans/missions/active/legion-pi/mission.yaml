@@ -1,0 +1,8 @@
+schema_version: 1
+id: legion-pi
+status: IMPLEMENTATION_AUTHORIZED
+organization_version: v002
+project_manager: ProjectManager
+scheduler: Supervisor
+goal: full_Node_runtime_and_real_Pi_generic_agent_with_npm_local_distribution
+authorization: ../../../decisions/legion-pi-authorization.md

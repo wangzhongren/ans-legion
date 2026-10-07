@@ -1,0 +1,10 @@
+schema_version: 1
+id: governance-legion-desktop
+from: ANS_Governance
+to: Supervisor
+status: WORKBENCH_V2_READY_FOR_SUPERVISOR_ACCEPTANCE
+organization_version: v004
+config_sha256: 2546ebd0b8756eccb83bced6808c10d1c25c3bc175ca8f676a9f1d5172cb706b
+design_sha256: 715639b5dd278437059f29bde1e7c02ac90d94af18f9bf5a6b5367d16e9ab5d3
+authorization_sha256: 252ca93cd951947923cc22bc7ce52873a3696c6fe75683e509f52ceda96ce773
+previous_GUI_v1_handoff: .ans/decisions/legion-desktop-workbench-v2-role-baseline.json

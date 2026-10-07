@@ -1,0 +1,7 @@
+id: legion-permission
+status: COMPLETED
+authorization_status: AUTHORIZED
+owner: Human
+coordinator: Supervisor
+organization_version: v001
+goals: [core_models,PolicyDecision,MutationGate,EventLog,permission_demo]

@@ -1,0 +1,11 @@
+schema_version: 1
+status: COMPLETED
+verified_nodes: [deps, model, adapter, kernel-runtime, package, reviewer, tester]
+historical_verified_nodes: [deps, model, adapter, kernel-runtime, package, reviewer]
+active_workers: []
+extra_validation_owner: ProjectManager
+extra_validation: public_npm_test_15_modules_passed_141_tests
+latest_task: docs/scheduling/legion-pi-node-v3-close-repair.md
+previous_task: docs/scheduling/legion-pi-node-v3.md
+evidence_source: repair_task_ops_revision44_and_final_public_npm_test_json
+blocking_regression: none

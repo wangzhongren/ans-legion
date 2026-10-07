@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion Runtime",
+  "authorizationSource": "Direct customer GUI v1 开发; necessary strict Node test compatibility reviewed by original PM; .ans/decisions/legion-node-fixture-compat-v1-proposal.md",
+  "designFiles": [
+    "docs/design/2026-10-07_design_desktop-gui-v1.md",
+    ".ans/decisions/legion-node-fixture-compat-v1-proposal.md"
+  ],
+  "maxConcurrentWorkers": 2,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "ProjectManager": {
+      "autoDispatch": true,
+      "card": ".ans/roles/ProjectManager/node-compat-role-card.md",
+      "boundary": ".ans/roles/ProjectManager/node-compat-boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "tests/package/test_package.mjs"
+      ],
+      "checks": {
+        "package": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/package/test_package.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Supervisor": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Supervisor/role-card.md",
+      "boundary": ".ans/roles/Supervisor/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "docs/roles/Supervisor/feature-map.md",
+        "docs/roles/Supervisor/functional-description.md",
+        "docs/roles/Supervisor/api-spec.md",
+        "docs/roles/Supervisor/changelog.md",
+        "docs/roles/Supervisor/docs/design/2026-10-07_design_desktop-gui-v1.md",
+        "docs/roles/Supervisor/docs/architecture.md",
+        "docs/roles/Supervisor/docs/delivery-desktop-gui-v1.md"
+      ],
+      "checks": {}
+    },
+    "KernelEngineer": {
+      "autoDispatch": false,
+      "card": ".ans/roles/KernelEngineer/role-card.md",
+      "boundary": ".ans/roles/KernelEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [],
+      "checks": {}
+    },
+    "AgentAdapterEngineer": {
+      "autoDispatch": false,
+      "card": ".ans/roles/AgentAdapterEngineer/role-card.md",
+      "boundary": ".ans/roles/AgentAdapterEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [],
+      "checks": {}
+    },
+    "DesktopEngineer": {
+      "autoDispatch": false,
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [],
+      "checks": {}
+    },
+    "Reviewer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Reviewer/node-compat-role-card.md",
+      "boundary": ".ans/roles/Reviewer/node-compat-boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "tests/reviewer/test_structure.mjs"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/reviewer/test_structure.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "regression": {
+          "argv": [
+            "node",
+            "D:/soft/nodejs/node_modules/npm/bin/npm-cli.js",
+            "test",
+            "--ignore-scripts"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Tester": {
+      "autoDispatch": false,
+      "card": ".ans/roles/Tester/role-card.md",
+      "boundary": ".ans/roles/Tester/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [],
+      "checks": {}
+    }
+  }
+}

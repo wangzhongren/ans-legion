@@ -1,0 +1,19 @@
+schema_version: 1
+id: project-manager
+name: '项目管理与开发调度'
+responsibility: '本项目架构、集成设计、调度、证据汇总和共享基础支持；不代替产品运行时 ProjectManager'
+status: SUPERSEDED
+read_scope: ['project/**']
+write_scope: []
+deny_scope: [outside_accepted_boundary]
+authority_source: boundary.yaml
+tools: [read, propose]
+capabilities: ['无直接业务功能；架构和调度是角色职责']
+allowed_actions: [investigate, propose_within_role]
+forbidden_actions: [self_expand_authority, self_approve, bypass_kernel, mutate_peer_resources]
+delegation_scope: [dispatch_accepted_ready_stage_only]
+handoff_targets: ['organization-engine', 'supervisor-engine', 'kernel', 'agent-adapter', 'control-plane', 'reviewer', 'tester', 'assembly', 'ans-governance']
+required_approvals: [human_acceptance, task_implementation_authorization]
+reporting_line: human-project-owner
+memory_scope: '.ans/roles/project-manager/docs/'
+contracts: [policy-decision, control-plane-commit, organization-change, mission-handoff, agent-proposal]
