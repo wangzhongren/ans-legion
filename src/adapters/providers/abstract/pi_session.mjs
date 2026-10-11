@@ -1,4 +1,9 @@
-/** Infrastructure contract: own queue and deferred tools, never Kernel callbacks. */
+/** Project Shell: host-owned deferred request/review, final typed publication only.
+ * Both lifecycles support active budgets paused during host waits; cancel rejects pending.
+ * No execution permit, binary body, or SDK native Shell is exposed. */
+/** Own SDK queue, typed deferred results, bounded conversation budget and plain history restore.
+ * Conversation checkpoints restore while idle; one single_run checkpoint is allowed before its first run.
+ * Host waits pause conversation time; cancel/close settle pending. No host permission callbacks. */
 export class PiSessionProvider {
   constructor() {
     if (new.target === PiSessionProvider) throw new TypeError("abstract_pi_provider");

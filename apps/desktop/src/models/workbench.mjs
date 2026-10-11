@@ -1,8 +1,18 @@
+import { supervisionInput } from './memory.mjs';
+import { createHash } from 'node:crypto';
+import { CheckSpec, CheckResult } from 'legion-runtime/workbench-models';
+import { organizationDocument, roleProposalLedgerDocument, roleProposalDocument } from './organization.mjs';
+import { memoryChannel, customerTimelineInner, interactionQueueDocument, conversationTimeline, memberConversations, createMemberConversations, roleMemoriesDocument, createRoleMemories, roleMemoryDTO, ROLE_MEMORY_LIMITS, shellWorkflowDocument, createShellWorkflow, publicShellWorkflow, recoveryRetainedFact } from './interaction.mjs';
 /** Complete finite workbench contracts. Pure values; no SDK, IO, clocks or authority issuance. */
 import {
   digestValue,
   normalizeResource,
-  PiConversationHistory
+  normalizeProjectReadResource,
+  PiConversationHistory,
+  FileOwnershipError,
+  ProjectFileOwners,
+  FileOwnershipPlan,
+  FileOwnershipTransfer, shellEffects, shellArtifacts, FileBaseline, ShellRequest, ShellReview, ShellResult
 } from 'legion-runtime/workbench-models';
 import {
   exactObject,
@@ -35,26 +45,43 @@ export const WB_LIMITS = Object.freeze({
   refreshBytes: 67108864,
   contextFileBytes: 262144,
   contextFiles: 16,
-  contextBytes: 2097152
+  contextBytes: 2097152,
+  ownerFiles: 4096
 });
-export const WB_OPERATIONS = Object.freeze(['getState', 'chooseProject', 'refreshProject', 'setDefaultProfile', 'saveProfile', 'deleteProfile', 'assignProfile', 'sendMessage', 'selectContext', 'confirmPlan', 'cancelTurn', 'stopExecution', 'testConnection', 'cancelProbe']);
+export const WB_OPERATIONS = Object.freeze(['getState', 'chooseProject', 'refreshProject', 'setDefaultProfile', 'saveProfile', 'deleteProfile', 'assignProfile', 'sendMessage', 'selectContext', 'confirmPlan', 'answerInteraction', 'closeInteraction', 'cancelTurn', 'stopExecution', 'testConnection', 'cancelProbe']);
 export const WB_TASK_STATES = Object.freeze(['pending', 'running', 'completed', 'failed', 'blocked', 'cancelled', 'interrupted']);
 const OUTPUT_MESSAGES = Object.freeze({
-  task_outputs_missing: '模型运行结束，但授权目标文件尚未全部生成。',
-  task_write_failed: '模型运行结束，实际文件写入包含失败或拒绝。'
+  legacy_migration_requires_exit: '旧v1数据只读：尚无可信证据确认旧产品实例全部退出，迁移已停止。', owner_catalog_mismatch: '该物理项目已绑定另一份owner catalog，请使用已确认的数据目录。', lease_busy: '该项目已由另一实例持有执行租约。', lease_lost: '项目执行租约已失效。', lease_unavailable: '无法建立安全项目租约。', task_outputs_missing: 'change任务未产生本轮真实成功修改或核验恢复输出。',
+  task_write_failed: '模型运行结束，实际文件写入包含失败或拒绝。',
+  cross_role_claim: '不同角色申领了同一个文件。',
+  missing_task_dependency: '同一角色重复修改文件时，后续任务必须明确依赖前一任务。',
+  file_owned_by_other_role: '文件已有其他角色归属，需要在计划中明确转交。',
+  unowned_file: '该文件尚未归属当前执行角色。',
+  transfer_from_mismatch: '文件转交的原角色与已保存归属不符。',
+  transfer_without_owner: '转交文件尚无已保存归属。',
+  transfer_without_claim: '文件转交缺少新角色的任务申领。',
+  unnecessary_transfer: '文件归属没有改变，无需转交。',
+  stale_file_owners: '文件归属已改变，请重新讨论并确认计划。', sensitive_output:'内容包含当前已知模型密钥，已拒绝记录或执行。', preflight_incomplete:'Supervisor预检未完成，请由PM重试。', invalid_memory:'分类记忆请求无效。', invalid_memory_source:'记忆来源不可核对或已失效。', memory_source_kind:'记忆类别与可信来源不符。', memory_statement_not_observed:'记忆内容不是可信来源中的原文或结构化值。', sensitive_memory:'记忆含凭据或不安全内容，未保存。', memory_owner_mismatch:'只有原作者可修改此记忆。', stale_memory_revision:'记忆版本已改变，请刷新。', memory_budget:'分类记忆达到预算。', invalid_supervision:'监督建议结构无效。', stale_supervision:'监督建议所绑定计划或来源已改变。'
 });
 const MESSAGES = Object.freeze({
+  stale_cursor: '被查询日志的快照来源已改变，请刷新日志。',
+  role_log_budget: '行动日志单页超过固定预算。',
+  delegation_budget: '本轮PM委托已达到固定次数预算。',
+  organization_migration_required: '旧组织须先完成受信迁移，当前操作未执行。',
   invalid_plan: '计划结构或依赖无效，请与项目管理修改后重试。',
   plan_changed: '计划、连接或上下文已改变，请重新确认。',
-  manager_only: '需求只能发送给项目管理，执行成员仅可查看任务。',
+  manager_only: '客户消息只能发送给Supervisor（Su），后台成员不接受直接对话。',
   project_missing: '当前项目不存在或未选择。',
   project_unavailable: '无法访问项目目录或项目定义。',
+  project_busy: '项目目录正在由另一实例更新，请稍后重试。',
+  catalog_changed: '项目设置或文件归属已被另一实例更新，请刷新后重试。',
   project_corrupt: '保存的项目定义损坏。',
   data_overlap: '项目目录与应用数据目录重叠，请选择其他目录。',
   history_unavailable: '无法读写此项目的会话历史。',
   history_corrupt: '会话历史损坏或超出预算。',
   context_unavailable: '无法读取所选上下文文件。',
   context_changed: '上下文文件或项目身份已改变，请重新选择并确认。',
+  role_memory_budget: '角色工作记忆达到固定存储预算；旧记忆和原始对话保留。', stale_role_memory: '角色记忆来源或版本已改变；本次摘要未保存。', invalid_role_memory: '角色工作记忆校验失败。', role_memory_summary_failed: '本次自动摘要未完成；旧记忆和原始对话保留。', role_memory_summary_length: '自动摘要输出不完整或超长；旧记忆保留。', role_memory_summary_conflict: '自动摘要来源或保存版本已改变；旧记忆保留。',
   context_budget: '上下文超出16个文件、单文件256KiB或合计2MiB预算。',
   record_budget: '记录读取超出本轮预算。',
   conversation_busy: '当前项目管理仍在回复，请等待或停止本轮。',
@@ -74,17 +101,20 @@ const MESSAGES = Object.freeze({
   pi_run_cancelled: '本轮已停止。',
   audit_unavailable: '执行审计不可用，后续写入已停止。'
 });
+const GOVERNED_ERRORS = Object.freeze({
+  shell_scope_not_approved: '本条Shell生成范围未由Human确认，不能执行。', shell_review_failed: 'PM审核未正常完成或未提供有效结构化决定；命令未执行。', shell_recovery_required: 'Shell有部分发布或未完成发布记录；已暂停。请讨论包含当前基线的恢复计划，并由Human重新确认。', shell_recovery_version_changed: '恢复资源已改变，请重新查看当前基线并确认新的恢复计划。',
+  invalid_role_field: '角色方案字段类型不合法，请按字段提示修正。', invalid_role_resource: '角色方案边界必须是精确项目相对文件，不能写职责描述、通配或目录授权。',
+  architect_single_proposal_required: '本次架构师已提交一个完整候选；请结束并由项目管理审阅，不能继续分批提交。', member_conversation_budget: '成员对话记录达到固定预算，本轮不能继续保存；旧记录保留。',
+  prompt_budget: '本次消息、所选上下文或必要项目事实超过固定模型输入预算；未调用模型，请缩小本次输入。', conversation_start_refused: '模型拒绝启动本轮；该消息已记录为失败，草稿保留。', acceptance_scope_failed: '验收任务发生范围拒绝或写入失败，不能提交通过。', check_input_coverage_required: '检查输入未覆盖任务及依赖文件。', execution_confirmation_required: '请答复当前执行确认弹窗。', approved_organization_required: '组织版本尚未批准或已改变。', approved_role_required: '角色定义尚未批准或已改变。', task_checks_required: '任务需要明确的软件检查。', task_outside_role_boundary: '任务文件超出已批准职责边界。', independent_acceptance_required: '计划需要独立验收任务。', acceptance_coverage_required: '独立验收未覆盖开发任务。', check_not_passed: '当前检查没有真实通过证据。', check_evidence_stale: '检查输入已改变，须重新运行。', acceptance_not_passed: '独立验收尚未通过。', repair_limit_reached: '已到达确认的返修上限，请讨论下一步。', stale_interaction: '请求或绑定版本已改变，请查看当前请求。', interaction_already_answered: '此请求已经答复。', interaction_invalidated: '此请求已取消。', unknown_interaction: '找不到此请求。', organization_corrupt: '组织记录校验失败。', stale_organization: '另一个窗口已经更新组织，请重新读取。', organization_busy: '组织事务忙，请重试。', stale_history: '另一个窗口已经更新会话，请重新读取。', history_busy: '会话存储忙，请重试。', human_rejected: '你已拒绝此执行计划。', stale_action: '当前运行已取消或改变，此操作不再有效。', actor_forbidden: '当前实例不能执行此操作。', file_owned_by_other_role: '该文件已属于另一个角色。'
+});
 export class WorkbenchValidationError extends Error {
   constructor(code = 'invalid_input') {
     super(code);
     this.code = code;
   }
 } export function wbError(code, field = '') {
-  if (Object.hasOwn(OUTPUT_MESSAGES, code)) return immutable({
-    code,
-    message: OUTPUT_MESSAGES[code],
-    field: ''
-  });
+  if (Object.hasOwn(GOVERNED_ERRORS, code)) return immutable({ code, message: GOVERNED_ERRORS[code], field: '' });
+  if (Object.hasOwn(OUTPUT_MESSAGES, code)) { let detail = ''; let suffix = ''; if (field) { detail = displayText(field, 300); suffix = `（${detail}）`; } return immutable({ code, message: OUTPUT_MESSAGES[code] + suffix, field: detail }); }
   if (Object.hasOwn(MESSAGES, code)) return immutable({
     code,
     message: MESSAGES[code],
@@ -101,7 +131,31 @@ export class WorkbenchValidationError extends Error {
     ok: false,
     error: wbError(code, field)
   });
-} export function wbCaught(error, fallback = 'internal_error') {
+} /** Pure exact known-key guard. Trusted Host supplies keys; no environment or IO. */
+export function assertKnownKeyFree(value, secrets = []) {
+  const keys = [...secrets].filter(key => typeof key === 'string' && key.length);
+  const seen = new Set();
+  const visit = item => {
+    if (typeof item === 'string') { if (keys.some(key => item.includes(key))) throw new WorkbenchValidationError('sensitive_output'); return; }
+    if (!item || typeof item !== 'object' || seen.has(item)) return;
+    seen.add(item);
+    for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(item))) {
+      visit(name);
+      if (!('value' in descriptor)) throw new WorkbenchValidationError('invalid_input');
+      visit(descriptor.value);
+    }
+  };
+  visit(value); return value;
+}
+export function assertKnownTextMergeFree(observed, final, secrets = []) {
+  assertKnownKeyFree([observed, final], secrets);
+  // Matches timeline/member terminal reconciliation: prefix extension or two preserved segments.
+  const candidate = final.startsWith(observed) ? final : observed + final;
+  return assertKnownKeyFree(candidate, secrets);
+}
+export function wbCaught(error, fallback = 'internal_error') {
+  if (error instanceof FileOwnershipError) return wbFailure(error.reason, [error.resource, error.ownerRoleId].filter(Boolean).join(' · '));
+  if (Object.hasOwn(GOVERNED_ERRORS, error?.code)) return wbFailure(error.code);
   if (error instanceof WorkbenchValidationError || error instanceof DesktopValidationError) return wbFailure(error.code);
   return wbFailure(fallback);
 } export function conversationText(value, maximum = 65536) {
@@ -130,7 +184,9 @@ export class WorkbenchValidationError extends Error {
       selectContext: ['projectId',
       'resources'],
       confirmPlan: ['projectId',
-      'planDigest'],
+      'planDigest', 'requestId', 'version', 'requestDigest'],
+      answerInteraction: ['projectId', 'requestId', 'version', 'requestDigest', 'value'],
+      closeInteraction: ['projectId', 'requestId', 'version', 'requestDigest'],
       cancelTurn: ['projectId',
       'turnId'],
       stopExecution: ['projectId']
@@ -140,12 +196,18 @@ export class WorkbenchValidationError extends Error {
       projectId: projectIdentifier(input.projectId)
     };
     if (operation === 'sendMessage') {
-      if (input.roleId !== 'ProjectManager') reject('manager_only');
-      result.roleId = 'ProjectManager';
+      if (input.roleId !== 'Supervisor') reject('manager_only');
+      result.roleId = 'Supervisor';
       result.text = conversationText(input.text);
       if (!result.text.trim()) reject();
     } if (operation === 'selectContext') result.resources = exactResources(input.resources, WB_LIMITS.contextFiles);
     if (operation === 'confirmPlan') result.planDigest = sha(input.planDigest);
+    if (['confirmPlan', 'answerInteraction', 'closeInteraction'].includes(operation) && input.requestId !== undefined) {
+      result.requestId = identifier(input.requestId); result.requestDigest = sha(input.requestDigest);
+      if (!Number.isSafeInteger(input.version) || input.version < 1) reject(); result.version = input.version;
+    }
+    if (operation === 'answerInteraction') { if (!result.requestId) reject(); result.value = input.value; if (JSON.stringify(input.value).length > 20000) reject(); }
+    if (operation === 'closeInteraction' && !result.requestId) reject();
     if (operation === 'cancelTurn') result.turnId = identifier(input.turnId);
     return wbSuccess(result);
   } catch (error) {
@@ -205,19 +267,20 @@ export class WorkbenchValidationError extends Error {
     resource: file.resource.toLowerCase()
   })));
 } function role(value) {
-  exactObject(value, ['id', 'name', 'purpose', 'profileId']);
+  exactObject(value, ['id', 'name', 'purpose', 'profileId', 'revision', 'digest']);
   const id = identifier(value.id, 'roleId');
-  if (['Human', 'ProjectManager'].includes(id)) reject('invalid_plan');
+  if (['Human', 'ProjectManager','Supervisor'].includes(id)) reject('invalid_plan');
   return immutable({
     id,
     name: displayText(value.name, 100),
     purpose: displayText(value.purpose, 1000),
-    profileId: identifier(value.profileId, 'profileId')
+    profileId: identifier(value.profileId, 'profileId'),
+    ...optionalRoleVersion(value)
   });
-} function task(value) {
-  exactObject(value, ['id', 'title', 'roleId', 'profileId', 'dependsOn', 'writeSet', 'instruction']);
+} function legacyTask(value) {
+  exactObject(value, ['id', 'title', 'roleId', 'profileId', 'dependsOn', 'writeSet', 'instruction', 'checks', 'accepts', 'generatedEffects', 'artifactScopes']);
   const writeSet = exactResources(value.writeSet);
-  if (!writeSet.length) reject('invalid_plan');
+  if (!writeSet.length && !value.checks?.length) reject('invalid_plan');
   const dependsOn = array(value.dependsOn, WB_LIMITS.tasks).map((id) => identifier(id));
   if (new Set(dependsOn).size !== dependsOn.length) reject('invalid_plan');
   return immutable({
@@ -227,24 +290,52 @@ export class WorkbenchValidationError extends Error {
     profileId: identifier(value.profileId, 'profileId'),
     dependsOn: dependsOn.sort(),
     writeSet,
-    instruction: conversationText(value.instruction, 16384)
+    instruction: conversationText(value.instruction, 16384),
+    ...optionalChecks(value),
+    ...optionalAccepts(value), ...optionalShellEffects(value)
   });
-} export function planCandidate(value) {
+} export function legacyPlanCandidate(value) {
   try {
-    exactObject(value, ['goal', 'roles', 'tasks']);
+    exactObject(value, ['goal', 'roles', 'tasks', 'transfers', 'governance']);
     const roles = array(value.roles, WB_LIMITS.roles).map(role);
-    const tasks = array(value.tasks, WB_LIMITS.tasks).map(task);
+    const tasks = array(value.tasks, WB_LIMITS.tasks).map(legacyTask);
+    planArtifactScopes({ tasks });
     if (!roles.length || !tasks.length || new Set(roles.map((item) => item.id)).size !== roles.length || new Set(tasks.map((item) => item.id)).size !== tasks.length) reject('invalid_plan');
     const byRole = new Map(roles.map((item) => [item.id, item]));
     const ids = new Set(tasks.map((item) => item.id));
     for (const item of tasks) if (!byRole.has(item.roleId) || byRole.get(item.roleId).profileId !== item.profileId || item.dependsOn.some((id) => !ids.has(id) || id === item.id)) reject('invalid_plan');
-    topologicalTasks(tasks);
-    return immutable({
+    const ordered = topologicalTasks(tasks);
+    const previousByFile = new Map();
+    for (const item of ordered) {
+      for (const resource of item.writeSet) {
+        const key = resource.toLowerCase();
+        const previous = previousByFile.get(key);
+        if (previous && previous.roleId !== item.roleId) throw new FileOwnershipError('cross_role_claim', resource, previous.roleId);
+        if (previous && !item.dependsOn.includes(previous.id)) throw new FileOwnershipError('missing_task_dependency', resource, item.roleId);
+        previousByFile.set(key, item);
+      }
+    }
+    const transfers = array(value.transfers ?? [], WB_LIMITS.ownerFiles).map((item) => new FileOwnershipTransfer(item));
+    const transferKeys = new Set();
+    for (const transfer of transfers) {
+      const key = transfer.resource.toLowerCase();
+      if (transferKeys.has(key) || !byRole.has(transfer.toRoleId)) reject('invalid_plan');
+      transferKeys.add(key);
+    }
+    const result = {
       goal: displayText(value.goal, 1000),
       roles: roles.sort((a, b) => a.id.localeCompare(b.id, 'en')),
       tasks: tasks.sort((a, b) => a.id.localeCompare(b.id, 'en'))
-    });
-  } catch {
+    };
+    if (value.transfers !== undefined) result.transfers = transfers;
+    if (value.governance !== undefined) {
+      exactObject(value.governance, ['organizationRevision', 'organizationDigest', 'maxRepairRounds']);
+      if (!Number.isSafeInteger(value.governance.organizationRevision) || value.governance.organizationRevision < 0 || !Number.isSafeInteger(value.governance.maxRepairRounds) || value.governance.maxRepairRounds < 0 || value.governance.maxRepairRounds > 5) reject('invalid_plan');
+      result.governance = { ...value.governance, organizationDigest: sha(value.governance.organizationDigest) };
+    }
+    return immutable(result);
+  } catch (error) {
+    if (error instanceof FileOwnershipError) throw error;
     reject('invalid_plan');
   }
 } export function topologicalTasks(tasks) {
@@ -260,18 +351,35 @@ export class WorkbenchValidationError extends Error {
       remaining.splice(remaining.indexOf(item), 1);
     }
   } return Object.freeze(ordered);
+}
+/** Bounded Host scheduling. Whole role scopes conflict, never task file guesses. */
+export function readyTaskBatch(tasks, states, running, limit = 4) {
+  const busyRoles = new Set(tasks.filter(task => running.has(task.id)).map(task => task.roleId));
+  const batch = [];
+  for (const task of topologicalTasks(tasks)) {
+    if (states.find(state => state.id === task.id)?.status !== 'pending' || running.has(task.id) || busyRoles.has(task.roleId)) continue;
+    const ready = task.dependsOn.every(id => {
+      if (running.has(id)) return false;
+      const dependency = states.find(state => state.id === id);
+      return dependency?.status === 'completed' || (task.roleId === 'Acceptance' && dependency?.status === 'failed' && dependency.results.some(result => result.success && result.observedMutation && !result.auditFailed));
+    });
+    if (!ready || running.size + batch.length >= limit) continue;
+    batch.push(task); busyRoles.add(task.roleId);
+  }
+  return Object.freeze(batch);
 } export function extractPlan(text) {
   const matches = [...text.matchAll(/```legion-plan\s*\n([\s\S]*?)\n```/gu)];
   if (!matches.length) return null;
   if (matches.length !== 1) reject('invalid_plan');
   try {
     return planCandidate(JSON.parse(matches[0][1]));
-  } catch {
+  } catch (error) {
+    if (error instanceof FileOwnershipError) throw error;
     reject('invalid_plan');
   }
-} export function boundPlan(candidate, binding) {
-  const checked = planCandidate(candidate);
-  exactObject(binding, ['projectId', 'organizationVersion', 'revision', 'profileBindings', 'contextSnapshotDigest']);
+} export function legacyBoundPlan(candidate, binding) {
+  const checked = legacyPlanCandidate(candidate);
+  exactObject(binding, ['projectId', 'organizationVersion', 'revision', 'profileBindings', 'contextSnapshotDigest', 'fileOwnership']);
   if (!Number.isSafeInteger(binding.revision) || binding.revision < 1) reject();
   const profileBindings = array(binding.profileBindings, WB_LIMITS.roles + 1).map((item) => {
     exactObject(item, ['profileId', 'profileVersion', 'contextSnapshotDigest']); return {
@@ -282,54 +390,74 @@ export class WorkbenchValidationError extends Error {
   }).sort((a, b) => a.profileId.localeCompare(b.profileId, 'en'));
   const ids = new Set(profileBindings.map((item) => item.profileId));
   if (ids.size !== profileBindings.length || checked.roles.some((item) => !ids.has(item.profileId))) reject('invalid_plan');
+  const { transfers: candidateTransfers, ...withoutTransfers } = checked;
+  if (binding.fileOwnership === undefined && candidateTransfers !== undefined) reject('invalid_plan');
   const fields = {
-    ...checked,
+    ...withoutTransfers,
     projectId: projectIdentifier(binding.projectId),
     organizationVersion: identifier(binding.organizationVersion),
     revision: binding.revision,
     profileBindings,
     contextSnapshotDigest: sha(binding.contextSnapshotDigest)
   };
+  if (binding.fileOwnership !== undefined) {
+    const ownership = binding.fileOwnership;
+    exactObject(ownership, ['projectId', 'baseVersion', 'baseDigest', 'nextVersion', 'claims', 'transfers', 'nextDigest']);
+    const typed = new FileOwnershipPlan({ projectId: ownership.projectId,
+      baseVersion: ownership.baseVersion, baseDigest: ownership.baseDigest,
+      nextVersion: ownership.nextVersion, claims: ownership.claims, transfers: ownership.transfers });
+    if (typed.projectId !== fields.projectId) reject('invalid_plan');
+    fields.fileOwnership = immutable({ projectId: typed.projectId, baseVersion: typed.baseVersion,
+      baseDigest: typed.baseDigest, nextVersion: typed.nextVersion, claims: typed.claims,
+      transfers: typed.transfers, nextDigest: sha(ownership.nextDigest) });
+    fields.transfers = typed.transfers;
+  }
   return immutable({
     ...fields,
     planDigest: digestValue(fields),
     status: 'draft'
   });
-} export function planDocument(value) {
-  exactObject(value, ['goal', 'roles', 'tasks', 'projectId', 'organizationVersion', 'revision', 'profileBindings', 'contextSnapshotDigest', 'planDigest', 'status']);
-  const result = boundPlan({
+} export function legacyPlanDocument(value) {
+  exactObject(value, ['goal', 'roles', 'tasks', 'transfers', 'fileOwnership', 'projectId', 'organizationVersion', 'revision', 'profileBindings', 'contextSnapshotDigest', 'planDigest', 'status', 'governance']);
+  const candidate = {
     goal: value.goal,
     roles: value.roles,
     tasks: value.tasks
-  }, {
+  };
+  if (value.transfers !== undefined) candidate.transfers = value.transfers;
+  if (value.governance !== undefined) candidate.governance = value.governance;
+  const result = legacyBoundPlan(candidate, {
     projectId: value.projectId,
     organizationVersion: value.organizationVersion,
     revision: value.revision,
     profileBindings: value.profileBindings,
-    contextSnapshotDigest: value.contextSnapshotDigest
+    contextSnapshotDigest: value.contextSnapshotDigest,
+    fileOwnership: value.fileOwnership
   });
   if (value.planDigest !== result.planDigest || !['draft', 'confirmed', 'running', 'completed', 'failed', 'cancelled', 'invalidated'].includes(value.status)) reject('invalid_plan');
   return immutable({
     ...result,
     status: value.status
   });
-} export function taskState(value) {
-  exactObject(value, ['id', 'title', 'roleId', 'dependsOn', 'writeSet', 'status', 'runId', 'results', 'error', 'updatedAt', 'checkStatus']);
-  if (!WB_TASK_STATES.includes(value.status) || value.checkStatus !== 'not_executed') reject();
+} export function legacyTaskState(value) {
+  exactObject(value, ['id', 'title', 'roleId', 'dependsOn', 'writeSet', 'status', 'runId', 'results', 'error', 'updatedAt', 'checkStatus', 'evidenceIds', 'acceptanceStatus', 'shellPhase', 'retainedOutputs']);
+  if (!WB_TASK_STATES.includes(value.status) || !['not_executed', 'passed', 'failed', 'cancelled', 'unsupported', 'stale', 'error'].includes(value.checkStatus)) reject();
   let runId = null;
   if (value.runId) runId = identifier(value.runId);
   const results = array(value.results ?? [], 256).map((item) => {
-    exactObject(item, ['resource', 'status', 'success', 'observedMutation', 'auditFailed', 'reason']); if (!['written', 'denied', 'failed', 'audit_failed'].includes(item.status) || [item.success, item.observedMutation, item.auditFailed].some((flag) => typeof flag !== 'boolean')) reject(); let resource = ''; if (item.resource) resource = normalizeResource(item.resource); return {
+    exactObject(item, ['resource', 'status', 'success', 'observedMutation', 'auditFailed', 'reason', 'action', 'contentDigest', 'missing', 'tombstone', 'byteLength']); if (!['written', 'deleted', 'denied', 'failed', 'audit_failed'].includes(item.status) || [item.success, item.observedMutation, item.auditFailed].some((flag) => typeof flag !== 'boolean') || (item.action !== undefined && !['write_file', 'edit_file', 'delete_file'].includes(item.action))) reject(); let resource = ''; if (item.resource) resource = normalizeResource(item.resource); return {
       resource,
       status: item.status,
       success: item.success,
       observedMutation: item.observedMutation,
       auditFailed: item.auditFailed,
-      reason: displayText(item.reason ?? '', 300)
+      reason: displayText(item.reason ?? '', 300),
+      action: mutationAction(item.action),
+      contentDigest: mutationContentDigest(item.contentDigest), ...optionalTombstone(item)
     };
   });
   let error = null;
-  if (value.error) error = wbError(value.error.code);
+  if (value.error) error = wbError(value.error.code, value.error.field);
   return immutable({
     id: identifier(value.id),
     title: displayText(value.title, 200),
@@ -341,14 +469,18 @@ export class WorkbenchValidationError extends Error {
     results,
     error,
     updatedAt: timestamp(value.updatedAt),
-    checkStatus: 'not_executed'
+    checkStatus: value.checkStatus,
+    ...optionalEvidence(value),
+    ...optionalAcceptance(value), ...optionalShellPhase(value), ...(value.retainedOutputs === undefined ? {} : { retainedOutputs: array(value.retainedOutputs, 64).map(recoveryRetainedFact) })
   });
-} export function projectDocument(value) {
-  exactObject(value, ['schemaVersion', 'id', 'name', 'workspaceIdentity', 'organizationVersion', 'manager', 'planRevision', 'plan', 'context', 'tasks']);
+} export function legacyProjectDocument(value) {
+  exactObject(value, ['schemaVersion', 'id', 'name', 'workspaceIdentity', 'organizationVersion', 'manager', 'planRevision', 'plan', 'context', 'tasks', 'fileOwners']);
   if (value.schemaVersion !== 1 || !Number.isSafeInteger(value.planRevision) || value.planRevision < 0) reject();
   const id = projectIdentifier(value.id);
   const root = workspaceIdentity(value.workspaceIdentity);
   if (identityKey(root) !== id) reject();
+  const fileOwners = new ProjectFileOwners(value.fileOwners ?? { projectId: id, version: 'owners-v0', owners: [] });
+  if (fileOwners.projectId !== id || fileOwners.owners.length > WB_LIMITS.ownerFiles) reject('project_corrupt');
   let manager = null;
   if (value.manager) {
     exactObject(value.manager, ['instanceId', 'sessionId', 'profileId', 'profileVersion']);
@@ -360,7 +492,7 @@ export class WorkbenchValidationError extends Error {
     };
   } let plan = null;
   if (value.plan) {
-    plan = planDocument(value.plan);
+    plan = legacyPlanDocument(value.plan);
     if (plan.projectId !== id || plan.organizationVersion !== value.organizationVersion || plan.revision !== value.planRevision) reject();
   } return immutable({
     schemaVersion: 1,
@@ -370,9 +502,10 @@ export class WorkbenchValidationError extends Error {
     organizationVersion: identifier(value.organizationVersion),
     manager,
     planRevision: value.planRevision,
+    fileOwners,
     plan,
     context: contextDescriptor(value.context),
-    tasks: array(value.tasks, WB_LIMITS.tasks).map(taskState)
+    tasks: array(value.tasks, WB_LIMITS.tasks).map(legacyTaskState)
   });
 } export function projectSummary(value) {
   const checked = projectDocument(value);
@@ -382,12 +515,12 @@ export class WorkbenchValidationError extends Error {
     organizationVersion: checked.organizationVersion,
     hasManager: checked.manager !== null
   });
-} export function catalogDocument(value) {
+} export function legacyCatalogDocument(value) {
   exactObject(value, ['schemaVersion', 'defaultProfileId', 'projects']);
   if (value.schemaVersion !== 1) reject();
   let defaultProfileId = null;
   if (value.defaultProfileId) defaultProfileId = identifier(value.defaultProfileId);
-  const projects = array(value.projects, WB_LIMITS.projects).map(projectDocument);
+  const projects = array(value.projects, WB_LIMITS.projects).map(legacyProjectDocument);
   if (new Set(projects.map((item) => item.id)).size !== projects.length) reject();
   return immutable({
     schemaVersion: 1,
@@ -467,12 +600,14 @@ export class WorkbenchValidationError extends Error {
   });
   let tasks = [];
   let roles = [];
+  let fileOwners = null;
   if (value.project) {
     const project = projectDocument(value.project);
     currentProject = projectSummary(project);
     plan = project.plan;
     context = project.context;
     tasks = project.tasks;
+    fileOwners = project.fileOwners;
     if (project.manager) roles.push({
       id: 'ProjectManager',
       name: '项目管理',
@@ -483,7 +618,7 @@ export class WorkbenchValidationError extends Error {
   } let turn = null;
   if (value.turn) {
     exactObject(value.turn, ['id', 'projectId', 'status', 'text', 'error']);
-    if (!['running', 'completed', 'failed', 'cancelled'].includes(value.turn.status)) reject();
+    if (!['running', 'waiting', 'completed', 'failed', 'cancelled'].includes(value.turn.status)) reject();
     turn = {
       id: identifier(value.turn.id),
       projectId: projectIdentifier(value.turn.projectId),
@@ -491,12 +626,12 @@ export class WorkbenchValidationError extends Error {
       text: conversationText(value.turn.text),
       error: null
     };
-    if (value.turn.error) turn.error = wbError(value.turn.error.code);
+    if (value.turn.error) turn.error = wbError(value.turn.error.code, value.turn.error.field);
   } const history = new PiConversationHistory(value.history ?? {
     messages: []
   });
   let error = null;
-  if (value.error) error = wbError(value.error.code);
+  if (value.error) error = wbError(value.error.code, value.error.field);
   let defaultProfileId = null;
   if (value.defaultProfileId) defaultProfileId = identifier(value.defaultProfileId);
   return immutable({
@@ -504,6 +639,7 @@ export class WorkbenchValidationError extends Error {
     defaultProfileId,
     projects,
     currentProject,
+    fileOwners,
     roles,
     history,
     turn,
@@ -519,3 +655,376 @@ export class WorkbenchValidationError extends Error {
     error
   });
 }
+
+function supervisionStates(value,project) {
+  const plan=project.plan, tasks=(project.tasks??[]).filter(task=>plan.tasks.some(item=>item.id===task.id));
+  const checks=(value.evidence??[]).filter(entry=>entry.authorization.planDigest===plan.planDigest&&entry.authorization.workspaceIdentity?.deviceId===project.workspaceIdentity?.deviceId&&entry.authorization.workspaceIdentity?.fileId===project.workspaceIdentity?.fileId&&tasks.some(task=>task.id===entry.authorization.taskId&&task.runId===entry.result.runId));
+  const accepts=(value.acceptances??[]).filter(entry=>entry.planDigest===plan.planDigest&&tasks.some(task=>task.id===entry.taskId&&(value.memberConversations?.runs??[]).some(run=>run.id===task.runId&&run.instanceId===entry.instanceId)));
+  return {tasks:tasks.map(({id,status,checkStatus,acceptanceStatus})=>({id,status,checkStatus:checkStatus??'not_executed',acceptanceStatus:acceptanceStatus??'pending'})),checks:checks.map(entry=>({id:entry.id,taskId:entry.authorization.taskId,checkId:entry.result.checkId,status:entry.result.status})),acceptances:accepts.map(({id,taskId,decision})=>({id,taskId,decision}))};
+}
+export function currentSupervisionDTO(value,project,pending=[]) {
+  if(!value||!project?.plan||project.plan.schemaVersion!==2||value.organization.projectId!==project.id)return [];
+  const planDigest=project.plan.planDigest, resultStates=supervisionStates(value,project),latest=new Map();
+  for(const record of value.supervisions??[]){
+    if(record.projectId!==project.id||record.planDigest!==planDigest)continue;
+    if(!['preflight','monitor'].includes(record.phase)||!['completed','not_completed'].includes(record.status))reject('invalid_supervision');
+    let advice=null;
+    if(record.status==='completed'){const input=supervisionInput(record.advice);if(input.planDigest!==planDigest||input.phase!==record.phase)reject('invalid_supervision');advice={recommendation:input.recommendation,findings:input.findings.map(({severity,taskIds,sourceRefs,reason})=>({severity,taskIds,sourceRefs,reason}))};}
+    latest.set(record.phase,{planDigest,phase:record.phase,status:record.status==='completed'?'completed':'failed',advice,resultStates});
+  }
+  for(const entry of pending)if(entry.projectId===project.id&&entry.planDigest===planDigest&&['preflight','monitor'].includes(entry.phase))latest.set(entry.phase,{planDigest,phase:entry.phase,status:'pending',advice:null,resultStates});
+  return ['preflight','monitor'].filter(phase=>latest.has(phase)).map(phase=>latest.get(phase));
+}
+function supervisionWire(values,planDigest) {
+  if(!planDigest)return [];
+  const rows=array(values??[],2);if(new Set(rows.map(entry=>entry.phase)).size!==rows.length)reject('invalid_supervision');return rows.map(entry=>{
+    exactObject(entry,['planDigest','phase','status','advice','resultStates']);
+    if(entry.planDigest!==planDigest||!['preflight','monitor'].includes(entry.phase)||!['pending','completed','failed'].includes(entry.status))reject('invalid_supervision');
+    let advice=null;
+    if(entry.status==='completed'){exactObject(entry.advice,['recommendation','findings']);const input=supervisionInput({phase:entry.phase,planDigest,...entry.advice});advice={recommendation:input.recommendation,findings:input.findings};}
+    else if(entry.advice!==null)reject('invalid_supervision');
+    exactObject(entry.resultStates,['tasks','checks','acceptances']);
+    const tasks=array(entry.resultStates.tasks,WB_LIMITS.tasks).map(item=>{exactObject(item,['id','status','checkStatus','acceptanceStatus']);if(!['pending','running','completed','failed','cancelled','blocked','interrupted'].includes(item.status)||!['not_executed','passed','failed','cancelled','unsupported','stale','error'].includes(item.checkStatus)||!['pending','pass','fail'].includes(item.acceptanceStatus))reject('invalid_supervision');return {id:identifier(item.id),status:displayText(item.status,50),checkStatus:displayText(item.checkStatus,50),acceptanceStatus:displayText(item.acceptanceStatus,50)};});
+    const checks=array(entry.resultStates.checks,512).map(item=>{exactObject(item,['id','taskId','checkId','status']);if(!['passed','failed','cancelled','unsupported','stale','error'].includes(item.status))reject('invalid_supervision');return {id:identifier(item.id),taskId:identifier(item.taskId),checkId:identifier(item.checkId),status:item.status};});
+    const acceptances=array(entry.resultStates.acceptances,512).map(item=>{exactObject(item,['id','taskId','decision']);return {id:identifier(item.id),taskId:identifier(item.taskId),decision:acceptanceDecision(item.decision)};});
+    return {planDigest,phase:entry.phase,status:entry.status,advice,resultStates:{tasks,checks,acceptances}};
+  });
+}
+
+/** Finite governed projection, with no workspace path, credentials or executable authority. */
+export function governedDTO(value,project=null,pending=[]) {
+  if (!value) return immutable({ organization: null, proposals: [], interactions: [], evidence: [], acceptances: [], repairs: [], timeline: null, memberConversations: null, roleMemory: null, memoryNotices: [], shellRequests: [], supervisions: [] });
+  const organization = organizationDocument(value.organization);
+  const ledger = roleProposalLedgerDocument(value.ledger);
+  const queue = interactionQueueDocument(value.queue);
+  return immutable({supervisions:currentSupervisionDTO(value,project,pending), organization, proposals: ledger.proposals, interactions: queue.requests,
+    evidence: value.evidence.map((entry) => ({ id: entry.id, roleId: entry.authorization.roleId, taskId: entry.authorization.taskId,
+      planDigest: entry.authorization.planDigest, result: { ...new CheckResult(entry.result), actualArgv: [], environment: entry.result.environment,
+        stdout: checkLog(entry.result.stdout), stderr: checkLog(entry.result.stderr) } })), acceptances: value.acceptances, repairs: value.repairs, timeline: conversationTimeline(value.customerTimeline?customerTimelineInner(value.customerTimeline):value.timeline), memberConversations: publicMemberJournal(value.memberConversations ?? createMemberConversations(value.organization.projectId)), roleMemory: roleMemoryDTO(value.roleMemories ?? createRoleMemories(value.organization.projectId)), memoryNotices: memoryNoticeDTO(value.memoryNotices), shellRequests: publicShellWorkflow(value.shellWorkflow ?? createShellWorkflow(value.organization.projectId)) });
+}
+
+function optionalShellEffects(value) {
+  if (value.generatedEffects === undefined && value.artifactScopes === undefined) return {};
+  const generatedEffects = shellEffects(value.generatedEffects), artifactScopes = shellArtifacts(value.artifactScopes); if (generatedEffects.some((scope) => !artifactScopes.some((artifact) => artifact.scope === scope))) reject('invalid_plan'); return { generatedEffects, artifactScopes };
+}
+export function planArtifactScopes(plan) { const artifacts = (plan?.tasks ?? []).flatMap((task) => task.artifactScopes ?? []); if (artifacts.some((item) => artifacts.some((other) => other.scope === item.scope && other.kind !== item.kind))) reject('invalid_plan'); return shellArtifacts(artifacts.filter((item, index) => artifacts.findIndex((other) => other.scope === item.scope) === index)); }
+function optionalRoleVersion(value) { if (value.revision === undefined) return {}; if (!Number.isSafeInteger(value.revision) || value.revision < 1) reject('invalid_plan'); return { revision: value.revision, digest: sha(value.digest) }; }
+function optionalChecks(value) { if (value.checks === undefined) return {}; return { checks: array(value.checks, 64).map((item) => { const spec = new CheckSpec(item); identifier(spec.checkId, 'checkId'); return spec; }) }; }
+function optionalAccepts(value) { if (value.accepts === undefined) return {}; return { accepts: array(value.accepts, WB_LIMITS.tasks).map((id) => identifier(id)) }; }
+function optionalEvidence(value) { if (value.evidenceIds === undefined) return {}; return { evidenceIds: array(value.evidenceIds, 64).map((id) => identifier(id)) }; }
+function optionalAcceptance(value) { if (value.acceptanceStatus === undefined) return {}; return { acceptanceStatus: displayText(value.acceptanceStatus, 50) }; }
+
+export function contentSha256(value) { return createHash('sha256').update(value, 'utf8').digest('hex'); }
+
+function wireCheckInput(input) {
+  exactObject(input, ['resource','state','sha256','byteLength','executable']); const resource = normalizeResource(input.resource);
+  if (input.state === 'absent') { if (input.sha256 !== null || input.byteLength !== 0 || input.executable !== undefined) reject('invalid_input'); return {resource,state:'absent',sha256:null,byteLength:0}; }
+  if (input.state !== undefined && input.state !== 'present') reject('invalid_input');
+  const value = {resource,sha256:sha(input.sha256)};
+  if (input.byteLength !== undefined) { if (!Number.isSafeInteger(input.byteLength) || input.byteLength < 0) reject('invalid_input'); value.byteLength = input.byteLength; }
+  if (input.state !== undefined) value.state = 'present';
+  if (input.executable !== undefined) { if (typeof input.executable !== 'boolean') reject('invalid_input'); value.executable = input.executable; } return value;
+}
+/** Validate the already public projection again at IPC, and drop any extra fields. */
+export function governedWireDTO(value) {
+  if (!value.organization) return { organization: null, proposals: [], interactions: [], evidence: [], acceptances: [], repairs: [], timeline: null, memberConversations: null, roleMemory: null, memoryNotices: memoryNoticeDTO(value.memoryNotices), shellRequests: [], supervisions: [] };
+  const organization = organizationDocument(value.organization);
+  const proposals = array(value.proposals ?? [], 256).map(roleProposalDocument);
+  const interactions = interactionQueueDocument({ schemaVersion: 1, projectId: organization.projectId, revision: 0, requests: value.interactions ?? [] }).requests;
+  const evidence = array(value.evidence ?? [], 512).map((entry) => {
+    exactObject(entry, ['id', 'roleId', 'taskId', 'planDigest', 'result']);
+    const result = entry.result;
+    if (!['passed', 'failed', 'cancelled', 'unsupported', 'stale', 'error'].includes(result.status) || typeof result.executed !== 'boolean' || !Number.isSafeInteger(result.testCount)) reject();
+    return { id: identifier(entry.id), roleId: identifier(entry.roleId), taskId: identifier(entry.taskId), planDigest: sha(entry.planDigest), result: {
+      checkId: checkLog(result.checkId).slice(0, 256), status: result.status, reason: displayText(result.reason, 300), executed: result.executed, testCount: result.testCount,
+      exitCode: result.exitCode, inputVersions: array(result.inputVersions, 1024).map(wireCheckInput),
+      stdout: checkLog(result.stdout), stderr: checkLog(result.stderr), startedAt: timestamp(result.startedAt), finishedAt: timestamp(result.finishedAt), logsTruncated: result.logsTruncated,
+      environment: publicEnvironment(result.environment) } };
+  });
+  // Acceptance and repairs contain only domain data; schema validation lives at their owning Service boundary.
+  const acceptances = array(value.acceptances ?? [], 512).map((item) => ({id: identifier(item.id), taskId: identifier(item.taskId), planDigest: sha(item.planDigest), decision: acceptanceDecision(item.decision), evidenceIds: array(item.evidenceIds, 64).map((id) => identifier(id)), issues: publicIssues(item.issues)}));
+  const repairs = array(value.repairs ?? [], 512).map((item) => ({id: identifier(item.id), taskId: identifier(item.taskId), roleId: identifier(item.roleId), planDigest: sha(item.planDigest), round: item.round, checks: item.checks.map((spec) => new CheckSpec(spec)), reason: displayText(item.reason, 4000)}));
+  let timeline = null; if (value.timeline) { timeline = conversationTimeline(value.customerTimeline?customerTimelineInner(value.customerTimeline):value.timeline); if (timeline.projectId !== organization.projectId) reject(); }
+  const members = memberConversations(value.memberConversations ?? createMemberConversations(organization.projectId)); if (members.projectId !== organization.projectId) reject();
+  return immutable({supervisions:supervisionWire(value.supervisions,value.plan?.planDigest), organization, proposals, interactions, evidence, acceptances, repairs, timeline, memberConversations: members, roleMemory: publicRoleMemory(value.roleMemory ?? roleMemoryDTO(createRoleMemories(organization.projectId))), memoryNotices: memoryNoticeDTO(value.memoryNotices), shellRequests: shellWireFacts(value.shellRequests ?? []) });
+}
+
+function publicRoleMemory(value) {
+  exactObject(value, ['revision', 'localCharsLimit', 'modelWindow', 'cost', 'entries']); if (!Number.isSafeInteger(value.revision) || value.revision < 0 || value.localCharsLimit !== 65536 || value.modelWindow !== null || value.cost !== null) reject('invalid_role_memory');
+  const entries = array(value.entries, 256).map((entry) => { exactObject(entry, ['roleId', 'channel', 'revision', 'hasSummary', 'summaryChars', 'recentMessages', 'coveredMessages', 'updatedAt']); if (typeof entry.hasSummary !== 'boolean' || !Number.isSafeInteger(entry.revision) || entry.revision < 0 || !Number.isSafeInteger(entry.summaryChars) || entry.summaryChars < 0 || entry.summaryChars > 8192 || !Number.isSafeInteger(entry.recentMessages) || entry.recentMessages < 0 || entry.recentMessages > 128 || !Number.isSafeInteger(entry.coveredMessages) || entry.coveredMessages < 0 || entry.coveredMessages > 4096) reject('invalid_role_memory'); return { roleId: identifier(entry.roleId), channel:memoryChannel(entry.roleId,entry.channel), revision: entry.revision, hasSummary: entry.hasSummary, summaryChars: entry.summaryChars, recentMessages: entry.recentMessages, coveredMessages: entry.coveredMessages, updatedAt: timestamp(entry.updatedAt) }; });
+  return { revision: value.revision, localCharsLimit: 65536, modelWindow: null, cost: null, entries };
+}
+function memoryNoticeDTO(value = []) { return array(value, 256).map((notice) => { if (!['role_memory_summary_failed', 'role_memory_summary_length', 'role_memory_summary_conflict', 'role_memory_budget'].includes(notice.code)) reject('invalid_role_memory'); return { roleId: identifier(notice.roleId),...(notice.channel===undefined?{}:{channel:memoryChannel(notice.roleId,notice.channel)}), code: notice.code, message: wbError(notice.code).message }; }); }
+function publicEnvironment(value) {
+  if (value === null) return null;
+  exactObject(value, ['platform', 'runtime', 'runtimeVersion', 'isolation', 'network']);
+  return { platform: displayText(value.platform, 100), runtime: displayText(value.runtime, 100), runtimeVersion: displayText(value.runtimeVersion, 100), isolation: displayText(value.isolation, 100), network: displayText(value.network, 100) };
+}
+function acceptanceDecision(value) { if (!['pass', 'fail'].includes(value)) reject(); return value; }
+function publicIssues(values) { return array(values, 64).map((value) => { exactObject(value, ['taskId', 'resource', 'roleId', 'expected', 'actual', 'reproduction']); return { taskId: identifier(value.taskId), resource: normalizeResource(value.resource), roleId: identifier(value.roleId), expected: displayText(value.expected, 4000), actual: displayText(value.actual, 4000), reproduction: displayText(value.reproduction, 4000) }; }); }
+
+export function controlData(value) { return JSON.parse(JSON.stringify(value)); }
+
+function checkLog(value) { if (typeof value !== 'string') reject(); return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, '�').slice(0, 16000); }
+
+function mutationAction(value) { if (value === 'delete_file') return 'delete_file'; if (value === 'edit_file') return 'edit_file'; return 'write_file'; }
+function mutationContentDigest(value) { if (value) return sha(value); return null; }
+
+export function roleActivity(value) { if (value.activity === undefined) return {}; if (!['working', 'waiting', 'waiting_answer', 'failed', 'waiting_dependency', 'waiting_pm_approval', 'executing_shell', 'publishing', 'inactive'].includes(value.activity)) reject(); return { activity: value.activity }; }
+
+/** Current host facts for a model prompt. Full presentation history remains in governedDTO. */
+export function governedPromptDTO(value, plan = null) {
+  const organization=organizationDocument(value.organization),ledger=roleProposalLedgerDocument(value.ledger),queue=interactionQueueDocument(value.queue);
+  let planDigest=null;if(plan)planDigest=sha(plan.planDigest);
+  const proposals=ledger.proposals.filter((proposal)=>proposal.status==='pending'&&proposal.baseDigest===organization.digest);
+  const approvedDocuments=ledger.proposals.filter((proposal)=>proposal.status==='approved'&&proposal.members.some((member)=>member.documents.length&&organization.members.some((current)=>current.id===member.id&&current.digest===member.digest))).map((proposal)=>({id:proposal.id,version:proposal.version,digest:proposal.digest,members:proposal.members.filter((member)=>member.documents.length).map((member)=>({id:member.id,revision:member.revision,digest:member.digest,documents:member.documents}))}));
+  const latestChecks=new Map();for(const entry of value.evidence)if(planDigest!==null&&entry.authorization.planDigest===planDigest)latestChecks.set(entry.authorization.roleId+'|'+entry.authorization.taskId+'|'+entry.result.checkId,entry);
+  const evidence=[...latestChecks.values()].map((entry)=>({id:entry.id,roleId:entry.authorization.roleId,taskId:entry.authorization.taskId,planDigest:entry.authorization.planDigest,result:{requestId:entry.result.requestId,runId:entry.result.runId,checkId:entry.result.checkId,status:entry.result.status,reason:entry.result.reason,executed:entry.result.executed,exitCode:entry.result.exitCode,testCount:entry.result.testCount,inputVersions:entry.result.inputVersions,environment:entry.result.environment,startedAt:entry.result.startedAt,finishedAt:entry.result.finishedAt,stdout:checkLog(entry.result.stdout).slice(-2000),stderr:checkLog(entry.result.stderr).slice(-2000),logsTruncated:entry.result.logsTruncated,summaryTruncated:entry.result.stdout.length>2000||entry.result.stderr.length>2000}}));
+  const latestAcceptance=new Map();for(const acceptance of value.acceptances)if(acceptance.planDigest===planDigest)latestAcceptance.set(acceptance.taskId,acceptance);
+  const acceptances=[...latestAcceptance.values()].map((item)=>({id:item.id,planDigest:item.planDigest,taskId:item.taskId,decision:item.decision,evidenceIds:item.evidenceIds,issues:item.issues}));
+  const repairs=value.repairs.filter((repair)=>repair.planDigest===planDigest).map((repair)=>({id:repair.id,acceptanceId:repair.acceptanceId,taskId:repair.taskId,roleId:repair.roleId,round:repair.round,reason:repair.reason}));
+  return immutable({supervisions:(value.supervisions??[]).filter(item=>item.planDigest===planDigest).map(({phase,status,advice})=>({phase,status,advice})),organization,proposals,approvedDocuments,interactions:queue.requests.filter((request)=>request.status==='pending'),evidence,acceptances,repairs,historyOmitted:{timelineMessages:value.timeline?.messages.length??0,legacyMessages:value.timeline?.legacyMessages.length??0,answeredInteractions:queue.requests.filter((request)=>request.status!=='pending').length,checks:value.evidence.length-evidence.length,proposals:ledger.proposals.length-proposals.length}});
+}
+export function boundedModelPrompt(parts) {
+  if(!Array.isArray(parts)||parts.some((part)=>typeof part!=='string'))reject('invalid_input');
+  const prompt=parts.join('\n');if(prompt.length>65536)reject('prompt_budget');return prompt;
+}
+
+export function modelConversationHistory(value) { const history = new PiConversationHistory({messages:value.messages}); const messages=history.messages.slice(-128); return immutable({history:new PiConversationHistory({messages}),omittedMessages:history.messages.length-messages.length}); }
+
+
+/** SDK text and delegated Human facts derive from verified PM timeline/queue only. */
+export function projectConversationContext(domain) {
+  const timeline = conversationTimeline(domain.customerTimeline?customerTimelineInner(domain.customerTimeline):domain.timeline); const queue = interactionQueueDocument(domain.queue); if (timeline.projectId !== queue.projectId) reject();
+  const messages = timeline.legacyMessages.map((message) => ({ role: message.role, text: message.text })); const humanFacts = timeline.legacyMessages.filter((message) => message.role === 'user').map((message) => ({ kind: 'legacy_human', sourceIndex: message.sourceIndex, orderKnown: false, text: message.text }));
+  for (const message of timeline.messages) {
+    if (message.kind === 'human') { messages.push({ role: 'user', text: message.text }); humanFacts.push({ id: message.id, kind: 'human', text: message.text }); continue; }
+    if (['question', 'answer'].includes(message.kind)) {
+      const request = queue.requests.find((request) => request.requestId === message.requestId);
+      if (!request || request.purpose !== 'discussion') continue;
+      if (message.kind === 'question') messages.push({ role: 'assistant', text: message.text });
+      else { if (!request.answer || request.answer.answerId !== message.answerId) reject(); messages.push({ role: 'user', text: message.text }); humanFacts.push({ id: message.id, kind: 'answer', requestId: request.requestId, text: message.text, value: request.answer.value, question: { kind: request.kind, title: request.title, text: request.text, options: request.options } }); }
+      continue;
+    }
+    if (message.kind === 'assistant' && message.text) {
+      const turn = timeline.turns.find((turn) => turn.id === message.turnId);
+      // Partial/failed output stays complete in the journal/UI, not a finished SDK reply.
+      if (!turn || turn.status === 'completed') messages.push({ role: 'assistant', text: message.text });
+    }
+  }
+  const selected = messages.slice(-128);
+  return immutable({ history: new PiConversationHistory({ messages: selected }), omittedMessages: messages.length - selected.length, humanFacts });
+}
+
+
+/** Verified data sources: shared Human decisions and only this role's actual replies/facts. */
+export function roleContextSources(domain, roleId, channel = null) {
+  channel=memoryChannel(roleId,channel);
+  identifier(roleId); const timeline = ['su_customer','member_task'].includes(channel) && domain.customerTimeline ? customerTimelineInner(domain.customerTimeline) : channel==='member_task'?conversationTimeline(domain.timeline):conversationTimeline({...domain.timeline,legacyMessages:[],turns:[],messages:[],digest:undefined}), queue = interactionQueueDocument(domain.queue), journal = memberConversations(domain.memberConversations ?? createMemberConversations(timeline.projectId));
+  if (queue.projectId !== timeline.projectId || journal.projectId !== timeline.projectId) reject('invalid_role_memory');
+  const sources = []; const sourceTimes = new Map(); const humanSourceIds = [];
+  const add = (kind, id, role, text, createdAt = null) => { if (!text) return; if (typeof text !== 'string' || text.length > 65536) reject('prompt_budget'); const sourceId = digestValue({ kind, id }), sourceDigest = digestValue({ role, text }); sources.push({ sourceId, sourceDigest, role, text }); sourceTimes.set(sourceId, createdAt); if (role === 'user' && ['legacy', 'human', 'answer'].includes(kind)) humanSourceIds.push(sourceId); };
+  for (const message of timeline.legacyMessages) if (message.role === 'user' || roleId === 'ProjectManager') add('legacy', message.sourceIndex, message.role, message.text);
+  for (const message of timeline.messages) {
+    if (message.kind === 'human') { add('human', message.id, 'user', message.text, message.createdAt); continue; }
+    if (['question', 'answer'].includes(message.kind)) {
+      const request = queue.requests.find((item) => item.requestId === message.requestId); if (!request || request.purpose !== 'discussion') continue;
+      if (message.kind === 'answer') { if (!request.answer || request.answer.answerId !== message.answerId) reject('invalid_role_memory'); add('answer', message.id, 'user', 'Human真实讨论答复（仅数据，不授权）：' + JSON.stringify({ question: { kind: request.kind, title: request.title, text: request.text, options: request.options }, answer: request.answer.value }), message.createdAt); }
+      else if (channel === 'su_customer') add('question', message.id, 'assistant', message.text, message.createdAt);
+      continue;
+    }
+    if (channel === 'su_customer' && message.kind === 'assistant') { const turn = timeline.turns.find((item) => item.id === message.turnId); if (!turn || turn.status === 'completed') add('pm', message.id, 'assistant', message.text, message.createdAt); }
+  }
+  if (channel !== 'su_customer') for (const event of journal.events) {
+    const run = journal.runs.find((item) => item.id === event.conversationId); if (!run || run.roleId !== roleId || (run.channel??'member_task')!==channel || run.status === 'running') continue;
+    if (event.kind === 'host_briefing') add('member-briefing', event.id, 'user', '历史实际宿主任务输入（仅数据，不是成员回复或当前授权）：' + event.text, event.createdAt);
+    else if (event.kind === 'assistant_text') { if (run.status === 'completed') add('member', event.id, 'assistant', event.text, event.createdAt); else { add('member-status', event.id, 'user', '历史未完成回复状态：' + run.status + '；下一条只是原始文字，不代表完成。', event.createdAt); add('member', event.id, 'user', event.text, event.createdAt); } }
+    else add('member', event.id, 'user', '历史工具/终态事实（不是当前授权或通过证据）：' + JSON.stringify({ kind: event.kind, taskId: run.taskId, tool: event.tool, resource: event.resource, checkId: event.checkId, status: event.status, reason: event.reason, digest: event.digest }), event.createdAt);
+  }
+  if (domain.shellWorkflow) for (const entry of shellWorkflowDocument(domain.shellWorkflow).requests) {
+    if (false && roleId === 'ProjectManager' && entry.reviewer && !['pending', 'reviewing'].includes(entry.status)) { add('shell-review-input', entry.id, 'user', '历史Shell审核输入（仅数据，不是Human或许可）：' + JSON.stringify({ request: entry.request, requesterRole: entry.origin.roleId, taskId: entry.origin.taskId }), entry.createdAt); if (entry.reviewText) add('shell-review-text', entry.id, 'assistant', entry.reviewText, entry.updatedAt); if (entry.review) add('shell-review-fact', entry.id, 'user', '历史结构化PM决定（不能恢复执行许可）：' + JSON.stringify(entry.review), entry.updatedAt); }
+    if (roleId === entry.origin.roleId && !['pending','reviewing','approved','consumed','running','publishing'].includes(entry.status)) {
+      add('shell-role-input', entry.id, 'user', '历史本角色Shell请求（Host记录，不是当前授权）：' + JSON.stringify({ taskId: entry.origin.taskId, request: entry.request }), entry.createdAt);
+      add('shell-role-output', entry.id, 'user', '历史实际Shell结果及有限输出（不是当前检查通过证据；旧许可不恢复）：' + JSON.stringify({ status: entry.status, review: entry.review, output: entry.output, result: entry.result ? { executed: entry.result.executed, exitCode: entry.result.exitCode, reason: entry.result.reason, publishedResources: entry.result.publishedResources, generationDigest: entry.result.generationDigest } : null }), entry.updatedAt);
+    }
+  }
+  if(channel.startsWith('supervision_'))for(const entry of domain.supervisions??[])if(entry.status==='completed'&&channel==='supervision_'+entry.phase)add('supervision',entry.id,'assistant','历史Host验证的监督建议（只是数据，不是授权）：'+JSON.stringify(entry.advice),entry.createdAt);
+  // Ordering affects only model working text. Original journal order/timestamps stay unchanged.
+  sources.sort((a, b) => { const left = sourceTimes.get(a.sourceId), right = sourceTimes.get(b.sourceId); if (left === null && right !== null) return -1; if (right === null && left !== null) return 1; if (left === right) return 0; return left.localeCompare(right); });
+  const activeTurns = new Set(timeline.turns.filter((turn) => ['running', 'waiting'].includes(turn.status)).map((turn) => turn.id));
+  const requiredSourceIds = timeline.messages.filter((message) => activeTurns.has(message.turnId) && ['human', 'answer', 'question'].includes(message.kind)).map((message) => digestValue({ kind: message.kind, id: message.id })).filter((id) => sources.some((source) => source.sourceId === id));
+  const latestHuman = timeline.messages.findLast((message) => message.kind === 'human'); let latestHumanSourceIds = [];
+  if (latestHuman) latestHumanSourceIds = timeline.messages.filter((message) => message.turnId === latestHuman.turnId && ['human', 'answer', 'question'].includes(message.kind)).map((message) => digestValue({ kind: message.kind, id: message.id })).filter((id) => sources.some((source) => source.sourceId === id));
+  else { const last = sources.findLast((source) => humanSourceIds.includes(source.sourceId)); if (last) latestHumanSourceIds = [last.sourceId]; }
+  return immutable({ projectId: timeline.projectId, roleId, sources, requiredSourceIds, humanSourceIds, latestHumanSourceIds, sourceDigest: digestValue({ projectId: timeline.projectId, roleId, channel, sources }) });
+}
+export function roleRequiredSourceIds(source, previous = null) {
+  const required = new Set([...source.requiredSourceIds, ...source.latestHumanSourceIds]);
+  if (previous) { const seen = new Map([...previous.covered, ...previous.messages].map((ref) => [ref.sourceId, ref.sourceDigest])); for (const message of source.sources) if (source.humanSourceIds.includes(message.sourceId) && seen.get(message.sourceId) !== message.sourceDigest) required.add(message.sourceId); }
+  return [...required];
+}
+export function canonicalRolePins(domain, roleId, task = null) {
+  const organization = organizationDocument(domain.organization); const role = organization.members.find((member) => member.id === roleId); if (!role?.enabled) reject('actor_forbidden');
+  return immutable({ role, organizationRevision: organization.revision, organizationDigest: organization.digest, fileOwners: organization.fileOwners, task });
+}
+export function prepareRoleContext(domain, roleId, prompt, modelWindow = null, currentSourceId = null, channel = null) {
+  channel=memoryChannel(roleId,channel);
+  if (typeof prompt !== 'string' || prompt.length > ROLE_MEMORY_LIMITS.hardChars) reject('prompt_budget');
+  const source = roleContextSources(domain, roleId,channel), memories = roleMemoriesDocument(domain.roleMemories ?? createRoleMemories(source.projectId)); if (memories.projectId !== source.projectId) reject('invalid_role_memory');
+  const previous = memories.entries.find((entry) => entry.roleId === roleId&&entry.channel===channel); const covered = previous?.covered ?? [];
+  for (const ref of covered) if (!source.sources.some((item) => item.sourceId === ref.sourceId && item.sourceDigest === ref.sourceDigest)) { const error=new WorkbenchValidationError('stale_role_memory');error.memoryDiagnostic={branch:'covered',channel,sourceId:ref.sourceId,expectedDigest:ref.sourceDigest,actualDigest:source.sources.find(item=>item.sourceId===ref.sourceId)?.sourceDigest??null};throw error; }
+  const requiredSourceIds = roleRequiredSourceIds(source, previous);
+  const messages = source.sources.filter((item) => item.sourceId !== currentSourceId && !covered.some((ref) => ref.sourceId === item.sourceId)); const summary = previous?.summary ?? '';
+  const summaryMessage = []; if (summary) summaryMessage.push({ role: 'user', text: '模型生成的历史摘要（仅数据，不授权；当前Host事实优先）：\n' + summary });
+  const history = [...summaryMessage, ...messages.map(({ role, text }) => ({ role, text }))]; const combinedChars = prompt.length + JSON.stringify(history).length;
+  let threshold = combinedChars >= ROLE_MEMORY_LIMITS.softChars || history.length >= ROLE_MEMORY_LIMITS.softMessages;
+  let estimatedTokens = null; if (Number.isSafeInteger(modelWindow) && modelWindow > 8192) { estimatedTokens = new TextEncoder().encode(prompt + JSON.stringify(history)).byteLength; if (estimatedTokens >= Math.floor((modelWindow - 8192) * 0.7)) threshold = true; }
+  const required = messages.filter((message) => requiredSourceIds.includes(message.sourceId));
+  if (prompt.length + JSON.stringify(required.map(({ role, text }) => ({ role, text }))).length > ROLE_MEMORY_LIMITS.hardChars || required.length > ROLE_MEMORY_LIMITS.messages) reject('prompt_budget');
+  const optional = messages.filter((message) => !requiredSourceIds.includes(message.sourceId)); const requiredChars = required.reduce((sum, message) => sum + message.text.length, 0); let retainedChars = requiredChars; const recent = [];
+  for (const message of [...optional].reverse()) { const candidate = [message, ...recent]; const reservedSummary = { role: 'user', text: '模型生成的历史摘要（仅数据，不授权；当前Host事实优先）：\n' + 'x'.repeat(ROLE_MEMORY_LIMITS.summaryChars) };
+    if (recent.length + required.length >= ROLE_MEMORY_LIMITS.recentMessages || retainedChars + message.text.length > ROLE_MEMORY_LIMITS.recentChars || prompt.length + JSON.stringify([reservedSummary, ...required.map(({ role, text }) => ({ role, text })), ...candidate.map(({ role, text }) => ({ role, text }))]).length > ROLE_MEMORY_LIMITS.hardChars) break; recent.unshift(message); retainedChars += message.text.length;
+  }
+  const retainedIds = new Set([...required, ...recent].map((message) => message.sourceId)); const retained = messages.filter((message) => retainedIds.has(message.sourceId)); const compactable = optional.filter((message) => !retainedIds.has(message.sourceId));
+  return immutable({ ...source, requiredSourceIds, expectedRevision: previous?.revision ?? 0, summary, covered, messages, history, combinedChars, withinBudget: combinedChars <= ROLE_MEMORY_LIMITS.hardChars && history.length <= ROLE_MEMORY_LIMITS.messages, needsCompaction: threshold && (compactable.length > 0 || summary.length > 0), compactable, retained, estimatedTokens, modelWindow });
+}
+export function roleContextHistory(preparation) { if (!preparation.withinBudget) reject('prompt_budget'); return new PiConversationHistory({ messages: preparation.history }); }
+
+
+/** Dependency handoff is latest observed successful mutation metadata, never source text. */
+export function dependencyOutputMetadata(values) {
+  if (!Array.isArray(values) || values.length > WB_LIMITS.taskEvents) reject('invalid_input');
+  const latest = new Map();
+  for (const value of values) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype) reject('invalid_input');
+    const field = (name) => { const descriptor = Object.getOwnPropertyDescriptor(value, name); if (!descriptor) return undefined; if (!Object.hasOwn(descriptor, 'value')) reject('invalid_input'); return descriptor.value; };
+    const resource = normalizeProjectReadResource(normalizeResource(field('resource'))); if (!resource) reject('invalid_input');
+    const action = field('action'); if (!['write_file', 'edit_file', 'delete_file', 'generated', 'retain_file'].includes(action)) reject('invalid_input');
+    let contentDigest = null; let content; if (action === 'write_file') content = field('content'); const observed = field('contentDigest');
+    if (content !== undefined) { if (typeof content !== 'string') reject('invalid_input'); contentDigest = contentSha256(content); }
+    else if (observed !== undefined && observed !== null) contentDigest = sha(observed);
+    let proposalDigest = null; const proposal = field('proposalDigest'); if (proposal !== undefined && proposal !== null) proposalDigest = sha(proposal);
+    const output = { resource, taskId: identifier(field('taskId')), roleId: identifier(field('roleId')), action, contentDigest, proposalDigest }; if (field('byteLength') !== undefined) { const bytes = field('byteLength'); if (!Number.isSafeInteger(bytes) || bytes < 0) reject('invalid_input'); output.byteLength = bytes; } if (field('generationDigest') !== undefined) output.generationDigest = sha(field('generationDigest')); if (field('retainedSourceRequestId') !== undefined) { if (action !== 'retain_file') reject('invalid_input'); output.retainedSourceRequestId = identifier(field('retainedSourceRequestId')); }  if (action === 'retain_file') { if (!['present','absent'].includes(field('state')) || typeof field('missing') !== 'boolean' || field('missing') !== (field('state')==='absent') || !output.retainedSourceRequestId) reject('invalid_input'); output.state=field('state'); output.missing=field('missing'); output.retainedSourceProposalDigest=sha(field('retainedSourceProposalDigest')); if (output.state==='absent') { if (contentDigest!==null || field('byteLength')!==0) reject('invalid_input'); output.tombstone=optionalTombstone({tombstone:field('tombstone')}).tombstone; if (output.tombstone.resource!==resource || output.tombstone.proposalDigest!==output.retainedSourceProposalDigest) reject('invalid_input'); } else if (contentDigest===null || field('tombstone')!==undefined) reject('invalid_input'); } if (action === 'delete_file') { output.missing = true; output.contentDigest = null; }
+    latest.set(resource.toLowerCase(), output);
+  }
+  return immutable([...latest.values()]);
+}
+
+function optionalShellPhase(value) { if (value.shellPhase === undefined || value.shellPhase === null) return {}; exactObject(value.shellPhase, ['requestId', 'status']); if (!['waiting_pm_approval', 'executing_shell', 'publishing', 'idle', 'recovery_required'].includes(value.shellPhase.status)) reject('invalid_input'); return { shellPhase: { requestId: identifier(value.shellPhase.requestId), status: value.shellPhase.status } }; }
+function optionalTombstone(value) { const out = {}; if (value.missing !== undefined) { if (typeof value.missing !== 'boolean') reject('invalid_input'); out.missing = value.missing; } if (value.tombstone !== undefined) { exactObject(value.tombstone, ['resource', 'priorSha256', 'proposalDigest']); out.tombstone = { resource: normalizeResource(value.tombstone.resource), priorSha256: sha(value.tombstone.priorSha256), proposalDigest: sha(value.tombstone.proposalDigest) }; } if (value.byteLength !== undefined) { if (!Number.isSafeInteger(value.byteLength) || value.byteLength < 0) reject('invalid_input'); out.byteLength = value.byteLength; } return out; }
+function shellWireFacts(values) {
+  return array(values, 256).map((entry) => {
+    exactObject(entry, ['id', 'revision', 'roleId', 'taskId', 'instanceId', 'runId', 'command', 'cwd', 'reason', 'network', 'generatedEffects', 'timeoutSeconds', 'requestDigest', 'status', 'review', 'reviewer', 'reviewStatus', 'reviewText', 'output', 'result', 'recovery', 'createdAt', 'expiresAt', 'updatedAt']);
+    const request = new ShellRequest({ requestId: entry.id, runId: entry.runId, command: entry.command, cwd: entry.cwd, reason: entry.reason, network: entry.network, generatedEffects: entry.generatedEffects, timeoutSeconds: entry.timeoutSeconds });
+    if (request.digest !== entry.requestDigest || !Number.isSafeInteger(entry.revision) || entry.revision < 1 || !['pending','reviewing','approved','denied','consumed','running','publishing','published','partial_published','failed','cancelled','expired','stale','unsupported','error','interrupted','recovery_required','recovered'].includes(entry.status)) reject('invalid_input');
+    const out = { ...entry, id: identifier(entry.id), roleId: identifier(entry.roleId), taskId: identifier(entry.taskId), instanceId: identifier(entry.instanceId), runId: identifier(entry.runId), reviewText: conversationText(entry.reviewText), command: request.command, createdAt: timestamp(entry.createdAt), expiresAt: timestamp(entry.expiresAt), updatedAt: timestamp(entry.updatedAt) };
+    if (entry.review) { out.review = new ShellReview(entry.review); if (out.review.requestId !== entry.id || out.review.requestDigest !== request.digest || out.review.revision !== entry.revision) reject('invalid_input'); }
+    if (entry.result) { out.result = new ShellResult(entry.result); if (out.result.requestId !== entry.id || out.result.runId !== entry.runId || out.result.requestDigest !== request.digest || out.result.status === 'ready_for_publication') reject('invalid_input'); }
+    if (entry.reviewer) { exactObject(entry.reviewer, ['instanceId','sessionId','runId','profileVersion']); out.reviewer = { instanceId: identifier(entry.reviewer.instanceId), sessionId: identifier(entry.reviewer.sessionId), runId: identifier(entry.reviewer.runId), profileVersion: sha(entry.reviewer.profileVersion) }; }
+    if (entry.reviewStatus !== undefined && !['running','completed','failed','cancelled','interrupted'].includes(entry.reviewStatus)) reject('invalid_input');
+    if (entry.recovery) { exactObject(entry.recovery, ['planDigest','resources','evidenceIds','recoveredAt','retainedOutputs']); out.recovery = { planDigest: sha(entry.recovery.planDigest), resources: array(entry.recovery.resources, 10000).map((file) => new FileBaseline(file)), evidenceIds: array(entry.recovery.evidenceIds, 4096).map((id) => identifier(id)), recoveredAt: timestamp(entry.recovery.recoveredAt), ...(entry.recovery.retainedOutputs === undefined ? {} : { retainedOutputs: array(entry.recovery.retainedOutputs, 64).map(recoveryRetainedFact) }) }; if (entry.status !== 'recovered') reject('invalid_input'); }
+    exactObject(entry.output, ['stdout','stderr','truncated']); if (typeof entry.output.truncated !== 'boolean') reject('invalid_input'); out.output = { stdout: conversationText(entry.output.stdout), stderr: conversationText(entry.output.stderr), truncated: entry.output.truncated }; return out;
+  });
+}
+
+export { recoveryRetainedFact };
+
+/** Current schema has no task file permission lists. Legacy validators above only read history. */
+export function roleOwnedResources(owners, roleId) {
+  if (!(owners instanceof ProjectFileOwners)) reject('stale_file_owners');
+  return immutable(owners.owners.filter((item) => item.roleId === roleId).map((item) => item.resource));
+}
+function v2Task(value) {
+  exactObject(value, ['id','title','roleId','profileId','dependsOn','intent','instruction','checks','accepts','generatedEffects','artifactScopes']);
+  if (!['change','verify'].includes(value.intent)) reject('invalid_plan');
+  const dependsOn = array(value.dependsOn, WB_LIMITS.tasks).map((id) => identifier(id));
+  if (new Set(dependsOn).size !== dependsOn.length) reject('invalid_plan');
+  return immutable({ id:identifier(value.id),title:displayText(value.title,200),roleId:identifier(value.roleId),profileId:identifier(value.profileId),dependsOn:dependsOn.sort(),intent:value.intent,instruction:conversationText(value.instruction,16384),...optionalChecks(value),...optionalAccepts(value),...optionalShellEffects(value) });
+}
+export function planCandidate(value) {
+  try {
+    exactObject(value,['schemaVersion','goal','roles','tasks','transfers','governance']);
+    if (value.schemaVersion !== 2) reject('invalid_plan');
+    const roles=array(value.roles,WB_LIMITS.roles).map(role), tasks=array(value.tasks,WB_LIMITS.tasks).map(v2Task);
+    if (!roles.length || !tasks.length || new Set(roles.map(item=>item.id)).size!==roles.length || new Set(tasks.map(item=>item.id)).size!==tasks.length) reject('invalid_plan');
+    const byRole=new Map(roles.map(item=>[item.id,item])), ids=new Set(tasks.map(item=>item.id));
+    for (const item of tasks) if (!byRole.has(item.roleId) || byRole.get(item.roleId).profileId!==item.profileId || item.dependsOn.some(id=>!ids.has(id)||id===item.id)) reject('invalid_plan');
+    topologicalTasks(tasks); planArtifactScopes({tasks});
+    const transfers=array(value.transfers??[],WB_LIMITS.ownerFiles).map(item=>new FileOwnershipTransfer(item));
+    if(new Set(transfers.map(item=>item.resource.toLowerCase())).size!==transfers.length || transfers.some(item=>!byRole.has(item.toRoleId))) reject('invalid_plan');
+    const result={schemaVersion:2,goal:displayText(value.goal,1000),roles:roles.sort((a,b)=>a.id.localeCompare(b.id,'en')),tasks:tasks.sort((a,b)=>a.id.localeCompare(b.id,'en'))};
+    if(value.transfers!==undefined)result.transfers=transfers;
+    if(value.governance!==undefined){ exactObject(value.governance,['organizationRevision','organizationDigest','maxRepairRounds']); if(!Number.isSafeInteger(value.governance.organizationRevision)||value.governance.organizationRevision<0||!Number.isSafeInteger(value.governance.maxRepairRounds)||value.governance.maxRepairRounds<0||value.governance.maxRepairRounds>5)reject('invalid_plan');result.governance={...value.governance,organizationDigest:sha(value.governance.organizationDigest)}; }
+    return immutable(result);
+  } catch(error){if(error instanceof FileOwnershipError)throw error;reject('invalid_plan');}
+}
+export function boundPlan(candidate,binding) {
+ const checked=planCandidate(candidate); exactObject(binding,['projectId','organizationVersion','revision','profileBindings','contextSnapshotDigest','fileOwnership','ownerSource']);
+ if(!Number.isSafeInteger(binding.revision)||binding.revision<1)reject();
+ const profiles=array(binding.profileBindings,WB_LIMITS.roles+1).map(item=>{exactObject(item,['profileId','profileVersion','contextSnapshotDigest']);return {profileId:identifier(item.profileId),profileVersion:sha(item.profileVersion),contextSnapshotDigest:sha(item.contextSnapshotDigest)};}).sort((a,b)=>a.profileId.localeCompare(b.profileId,'en'));
+ if(new Set(profiles.map(item=>item.profileId)).size!==profiles.length||checked.roles.some(item=>!profiles.some(p=>p.profileId===item.profileId)))reject('invalid_plan');
+ const ownership=binding.fileOwnership;
+ exactObject(ownership,['projectId','baseVersion','baseDigest','nextVersion','claims','transfers','nextDigest']);
+ if(ownership.projectId!==binding.projectId)reject('invalid_plan');
+ if(ownership.baseVersion===ownership.nextVersion){if(ownership.claims.length||ownership.transfers.length||ownership.baseDigest!==ownership.nextDigest)reject('invalid_plan');}
+ else new FileOwnershipPlan(ownershipWithoutNextDigest(ownership));
+ const fields={...checked,projectId:projectIdentifier(binding.projectId),organizationVersion:identifier(binding.organizationVersion),revision:binding.revision,profileBindings:profiles,contextSnapshotDigest:sha(binding.contextSnapshotDigest),fileOwnership:{...ownership,baseDigest:sha(ownership.baseDigest),nextDigest:sha(ownership.nextDigest)},ownerSource:textValue(binding.ownerSource,'',4096)};
+ return immutable({...fields,planDigest:digestValue(fields),status:'draft'});
+}
+function ownershipWithoutNextDigest(value){const {nextDigest,...rest}=value;return rest;}
+export function planDocument(value){
+ exactObject(value,['schemaVersion','goal','roles','tasks','transfers','governance','projectId','organizationVersion','revision','profileBindings','contextSnapshotDigest','fileOwnership','ownerSource','planDigest','status']);
+ const candidate={schemaVersion:value.schemaVersion,goal:value.goal,roles:value.roles,tasks:value.tasks};if(value.transfers!==undefined)candidate.transfers=value.transfers;if(value.governance!==undefined)candidate.governance=value.governance;const result=boundPlan(candidate,{projectId:value.projectId,organizationVersion:value.organizationVersion,revision:value.revision,profileBindings:value.profileBindings,contextSnapshotDigest:value.contextSnapshotDigest,fileOwnership:value.fileOwnership,ownerSource:value.ownerSource});
+ if(result.planDigest!==value.planDigest||!['draft','confirmed','running','completed','failed','invalidated','cancelled'].includes(value.status))reject('invalid_plan');return immutable({...result,status:value.status});
+}
+export function taskState(value){
+ exactObject(value,['id','title','roleId','dependsOn','intent','status','runId','results','error','updatedAt','checkStatus','evidenceIds','acceptanceStatus','shellPhase','retainedOutputs','generatedOutputs']);
+ if(!['change','verify'].includes(value.intent))reject('invalid_plan');
+ const {intent,generatedOutputs,...rest}=value;
+ const {writeSet,...checked}=legacyTaskState({...rest,writeSet:[]});
+ return immutable({...checked,intent,generatedOutputs:array(generatedOutputs??[],256).map(item=>{exactObject(item,['resource','generationDigest']);return {resource:normalizeProjectReadResource(item.resource),generationDigest:sha(item.generationDigest)};})});
+}
+export function projectDocument(value){
+ if(value.schemaVersion===1)return legacyProjectDocument(value);
+ exactObject(value,['schemaVersion','id','name','workspaceIdentity','organizationVersion','manager','planRevision','plan','context','tasks','fileOwners','legacyHistory']);
+ if(value.schemaVersion!==2)reject('project_corrupt');
+ const {legacyHistory,...base}=value; const legacy=legacyProjectDocument({...base,schemaVersion:1,plan:null,tasks:[]});
+ let plan=null;if(value.plan!==null)plan=planDocument(value.plan);
+ if(plan&&(plan.projectId!==value.id||plan.organizationVersion!==value.organizationVersion||plan.revision!==value.planRevision))reject('project_corrupt');
+ return immutable({...legacy,schemaVersion:2,plan,tasks:array(value.tasks,WB_LIMITS.tasks).map(taskState),legacyHistory:array(value.legacyHistory??[],64).map(legacyProjectDocument)});
+}
+export function migrateLegacyProject(value){
+ const old=legacyProjectDocument(value);return projectDocument({...old,schemaVersion:2,plan:null,tasks:[],legacyHistory:[old]});
+}
+export function catalogDocument(value){
+ if(value.schemaVersion===1)return legacyCatalogDocument(value);
+ exactObject(value,['schemaVersion','defaultProfileId','projects']);if(value.schemaVersion!==2)reject('project_corrupt');
+ const projects=array(value.projects,WB_LIMITS.projects).map(projectDocument);if(new Set(projects.map(item=>item.id)).size!==projects.length)reject();
+ let defaultProfileId=null;if(value.defaultProfileId!==null)defaultProfileId=identifier(value.defaultProfileId);return immutable({schemaVersion:2,defaultProfileId,projects});
+}
+
+export function roleLogPage(domain,project,input){
+ exactObject(input,['roleId','taskId','planDigest','cursor','limit']);identifier(input.roleId);const filters={roleId:input.roleId,taskId:input.taskId??null,planDigest:input.planDigest??project.plan?.planDigest??null};if(filters.taskId!==null)identifier(filters.taskId);if(filters.planDigest!==null)sha(filters.planDigest);
+ const journal=memberConversations(domain.memberConversations);let boundary=journal.events.reduce((max,event)=>Math.max(max,event.order),0),offset=0,pinned=null;
+ if(input.cursor!==undefined){if(typeof input.cursor!=='string'||new TextEncoder().encode(input.cursor).byteLength>4096)reject('stale_cursor');try{pinned=JSON.parse(input.cursor);exactObject(pinned,['schemaVersion','projectId','filters','boundary','sourceDigest','offset']);}catch{reject('stale_cursor');}if(pinned.schemaVersion!==1||pinned.projectId!==project.id||JSON.stringify(pinned.filters)!==JSON.stringify(filters)||!Number.isSafeInteger(pinned.boundary)||!Number.isSafeInteger(pinned.offset)||pinned.offset<0)reject('stale_cursor');boundary=pinned.boundary;offset=pinned.offset;}
+ const events=journal.events.filter(event=>event.order<=boundary&&!['assistant_text','host_briefing'].includes(event.kind)).flatMap(event=>{const run=journal.runs.find(item=>item.id===event.conversationId);if(!run||run.roleId!==filters.roleId||filters.taskId!==null&&run.taskId!==filters.taskId||filters.planDigest!==null&&run.planDigest!==filters.planDigest)return [];return [{id:event.id,sourceRef:'journal:'+event.id,roleId:run.roleId,taskId:run.taskId,planDigest:run.planDigest,kind:event.kind,tool:event.tool,status:event.status,reason:event.reason,resource:event.resource,checkId:event.checkId,createdAt:event.createdAt,order:event.order,sourceDigest:digestValue({event,identity:{roleId:run.roleId,taskId:run.taskId,planDigest:run.planDigest}})}];});
+ const sourceDigest=digestValue(events);if(pinned&&(pinned.sourceDigest!==sourceDigest||offset>events.length))reject('stale_cursor');const limit=input.limit??20;if(!Number.isSafeInteger(limit)||limit<1||limit>50)reject('invalid_input');const selected=[];
+ const cursor=position=>JSON.stringify({schemaVersion:1,projectId:project.id,filters,boundary,sourceDigest,offset:position});
+ for(const event of events.slice(offset,offset+limit)){const candidate=[...selected,event];if(new TextEncoder().encode(JSON.stringify({events:candidate,nextCursor:cursor(offset+candidate.length),filters,sourceDigest})).byteLength>32768)break;selected.push(event);}
+ if(offset<events.length&&!selected.length)reject('role_log_budget');return immutable({filters,events:selected,nextCursor:offset+selected.length<events.length?cursor(offset+selected.length):null,sourceDigest});
+}
+export function roleActivityFacts(domain,project,input={}) {
+ exactObject(input,['roleId','taskId','planDigest']);if(input.roleId!==undefined)identifier(input.roleId);if(input.taskId!==undefined)identifier(input.taskId);
+ const currentPlan=project.plan?.planDigest??null,planDigest=input.planDigest??currentPlan;if(planDigest!==null)sha(planDigest);const history=planDigest!==currentPlan;
+ const tasks=history?[]:project.tasks.filter(task=>(!input.roleId||task.roleId===input.roleId)&&(!input.taskId||task.id===input.taskId));
+ const roles=history?[]:domain.organization.members.filter(role=>!input.roleId||role.id===input.roleId).map(role=>{
+  const own=project.tasks.filter(task=>task.roleId===role.id),running=domain.memberConversations.runs.some(run=>run.roleId===role.id&&run.status==='running');
+  const waiting=role.id==='ProjectManager'&&domain.delegations?.entries.some(entry=>entry.status==='awaiting_human')||role.id==='Supervisor'&&domain.customerTimeline?.turns.some(turn=>turn.status==='waiting');
+  const shell=own.find(task=>task.status==='running'&&['waiting_pm_approval','executing_shell','publishing'].includes(task.shellPhase?.status))?.shellPhase?.status;
+  const activity=!role.enabled?'inactive':waiting?'waiting_answer':shell??(running||own.some(task=>task.status==='running')?'working':own.some(task=>task.status==='failed')?'failed':own.some(task=>['pending','blocked'].includes(task.status))?'waiting_dependency':'waiting');
+  return {id:role.id,activity,phase:shell??(waiting?'awaiting_human':running?'reasoning':'not_recorded'),sourceRef:'organization:'+domain.organization.digest};
+ });
+ return immutable({planDigest,history,roles,tasks:tasks.map(task=>({id:task.id,roleId:task.roleId,status:task.status,phase:task.shellPhase?.status??task.status,checkStatus:task.checkStatus,acceptanceStatus:task.acceptanceStatus,blockingTaskIds:(project.plan?.tasks.find(item=>item.id===task.id)?.dependsOn??[]).filter(id=>project.tasks.find(item=>item.id===id)?.status!=='completed'),observedChanges:task.results.filter(result=>result.success&&result.observedMutation).length,checks:domain.evidence.filter(entry=>entry.authorization.planDigest===currentPlan&&entry.authorization.taskId===task.id&&entry.result.runId===task.runId).length,acceptances:domain.acceptances.filter(entry=>entry.planDigest===currentPlan&&entry.taskId===task.id).length,sourceRef:'task:'+digestValue({planDigest:currentPlan,id:task.id,runId:task.runId})}))});
+}
+
+export function publicMemberJournal(value){const journal=memberConversations(value);return memberConversations({...journal,events:journal.events.filter(event=>{const run=journal.runs.find(item=>item.id===event.conversationId);return (run.channel??'member_task')==='member_task'||!['assistant_text','host_briefing'].includes(event.kind);}),digest:undefined});}

@@ -1,3 +1,6 @@
+import { assertKnownKeyFree } from '../../models/workbench.mjs';
+import { homedir } from 'node:os';
+import { constants } from 'node:fs';
 import {
   lstat,
   realpath,
@@ -18,8 +21,11 @@ import {
   randomUUID,
   createHash
 } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
+import { performance } from 'node:perf_hooks';
 import {
-  ContextReadConfirmation
+  ContextReadConfirmation,
+  digestValue
 } from 'legion-runtime/workbench-models';
 import { exactObject } from '../../models/desktop.mjs';
 import {
@@ -127,12 +133,12 @@ function fail(code) {
   if (failure) throw failure;
   return result;
 } export class ProjectProviderImpl {
-  #data;
+  #data; #leaseRoot;
   #closed = false;
   constructor(options) {
     const checked = projectProviderOptions(options);
     if (!isAbsolute(checked.userDataDir)) fail('unsafe_path');
-    this.#data = resolve(checked.userDataDir);
+    this.#data = resolve(checked.userDataDir); this.#leaseRoot = checked.leaseRoot ?? join(homedir(), '.legion-project-leases');
   }
   newId() {
     return randomUUID();
@@ -162,7 +168,7 @@ function fail(code) {
       return wbCaught(error, 'project_unavailable');
     }
   }
-  async read() {
+  async read(knownSecrets = []) {
     try {
       if (this.#closed) fail('closed');
       const data = await canonicalDirectory(this.#data);
@@ -172,7 +178,7 @@ function fail(code) {
         bytes = await boundedFile(path, WB_LIMITS.projectBytes);
       } catch (error) {
         if (error.code === 'ENOENT') return wbSuccess(catalogDocument({
-          schemaVersion: 1,
+          schemaVersion: 2,
           defaultProfileId: null,
           projects: []
         }));
@@ -181,59 +187,144 @@ function fail(code) {
   const catalog = catalogDocument(JSON.parse(new TextDecoder('utf-8', {
         fatal: true
       }).decode(bytes)));
+      assertKnownKeyFree(catalog, knownSecrets);
       for (const project of catalog.projects) await this.#isolate(project.workspaceIdentity, false);
       return wbSuccess(catalog);
     } catch (error) {
       return wbCaught(error, 'project_corrupt');
     }
   }
-  async write(raw, activeRoot = null) {
-    let temp = null;
+  async #acquireCatalogLock(data) {
+    const path = join(data, 'workbench-projects.lock');
+    const deadline = performance.now() + 2000;
+    for (;;) {
+      try { return { path, handle: await open(path, 'wx', 0o600) }; }
+      catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+        let present;
+        try { present = await lstat(path); }
+        catch (lookup) { if (lookup.code !== 'ENOENT') throw lookup; }
+        if (present && (!present.isFile() || present.isSymbolicLink())) fail('unsafe_path');
+        if (performance.now() >= deadline) fail('project_busy');
+        await delay(20);
+      }
+    }
+  }
+  async #releaseCatalogLock(lock) {
+    let held; let failure = null;
+    try { held = await lock.handle.stat({ bigint: true }); }
+    catch (error) { failure = error; }
+    try { await lock.handle.close(); }
+    catch (error) { failure = error; }
+    if (failure) throw failure;
+    const current = await lstat(lock.path, { bigint: true });
+    if (current.isSymbolicLink() || !current.isFile() ||
+        current.dev !== held.dev || current.ino !== held.ino) fail('unsafe_path');
+    await unlink(lock.path);
+  }
+  async ownerSource(project) {
+    const data=await canonicalDirectory(this.#data,true); const info=await lstat(data,{bigint:true});
+    return {schemaVersion:1,workspace:project.workspaceIdentity,source:{catalogDirCanonicalPath:data,dirDeviceId:String(info.dev),dirFileId:String(info.ino),filename:'workbench-projects.json',projectId:project.id}};
+  }
+  #key(root){return createHash('sha256').update(root.deviceId+':'+root.fileId).digest('hex');}
+  async executionContext(root) {
+    try {
+      const actual=await identity(root.canonicalPath);if(!same(actual,root))fail('lease_lost');
+      const leaseRoot=await canonicalDirectory(this.#leaseRoot); const rootInfo=await lstat(leaseRoot);
+      if(process.platform!=='win32'&&(rootInfo.uid!==process.getuid()||(rootInfo.mode&0o077)!==0))fail('lease_lost');
+      const path=join(leaseRoot,this.#key(actual));const lease=await lstat(path,{bigint:true});
+      if(!lease.isDirectory()||lease.isSymbolicLink())fail('lease_lost');
+      const holderPath=join(path,'holder');const holder=await lstat(holderPath,{bigint:true});
+      if(!holder.isFile()||holder.isSymbolicLink()||holder.size>100n||(process.platform!=='win32'&&(holder.mode&0o777n)!==0o600n))fail('lease_lost');
+      const nonce=new TextDecoder('utf-8',{fatal:true}).decode(await boundedFile(holderPath,100));
+      return wbSuccess({leaseRoot,nonce,leaseIdentity:{deviceId:String(lease.dev),fileId:String(lease.ino)},holderIdentity:{deviceId:String(holder.dev),fileId:String(holder.ino)}});
+    }catch(error){return wbCaught(error,'lease_lost');}
+  }
+  async assertOwnerSource(project, bind=false) {
+    try {
+      const marker=await this.ownerSource(project); const root=await canonicalDirectory(this.#leaseRoot); const path=join(root,this.#key(project.workspaceIdentity)+'.owner-source.json');
+      if(bind){
+        let handle;
+        try {handle=await open(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);}
+        catch(error){if(error.code!=='EEXIST')throw error;}
+        if(handle){try{await handle.writeFile(JSON.stringify(marker));await handle.sync();}finally{await handle.close();}}
+      }
+      const info=await lstat(path);
+      if(!info.isFile()||info.isSymbolicLink()||(process.platform!=='win32'&&(info.uid!==process.getuid()||(info.mode&0o777)!==0o600)))fail('owner_catalog_mismatch');
+      const current=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(await boundedFile(path,16384)));
+      if(digestValue(current)!==digestValue(marker))fail('owner_catalog_mismatch');
+      return wbSuccess(marker);
+    }catch(error){if(!bind&&error.code==='ENOENT')return wbSuccess(null);return wbCaught(error,'owner_catalog_mismatch');}
+  }
+  async #commitMutex(root){
+    const context=await this.executionContext(root);if(!context.ok)fail(context.error.code);
+    const path=join(context.value.leaseRoot,this.#key(root),'commit.lock');const deadline=performance.now()+2000;
+    for(;;){try{return {path,handle:await open(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600)};}catch(error){if(error.code!=='EEXIST')throw error;if(performance.now()>=deadline)fail('lease_busy');await delay(10);}}
+  }
+  async write(raw, activeRoot = null, options = {}) {
+    assertKnownKeyFree(raw, options.knownSecrets ?? []);
+    let lock = null; let commits = []; let temp = null; let written = null; let failure = null;
     try {
       if (this.#closed) fail('closed');
+      exactObject(options, ['expectedCatalogDigest', 'ownerExpectation','confirmMigration','bindOwnerSource','knownSecrets']);
+      if (typeof options.expectedCatalogDigest !== 'string' ||
+          !/^[a-f0-9]{64}$/u.test(options.expectedCatalogDigest)) fail('invalid_input');
+      if (options.ownerExpectation !== undefined) {
+        exactObject(options.ownerExpectation, ['projectId', 'digest']);
+        if (typeof options.ownerExpectation.projectId !== 'string' ||
+            typeof options.ownerExpectation.digest !== 'string' ||
+            !/^[a-f0-9]{64}$/u.test(options.ownerExpectation.digest)) fail('invalid_input');
+      }
       const catalog = catalogDocument(raw);
       if (activeRoot) await this.#isolate(workspaceIdentity(activeRoot));
+      assertKnownKeyFree(catalog, options.knownSecrets ?? []);
       for (const project of catalog.projects) await this.#isolate(project.workspaceIdentity, false);
       const bytes = Buffer.from(JSON.stringify(catalog), 'utf8');
       if (bytes.length > WB_LIMITS.projectBytes) fail('project_corrupt');
       const data = await canonicalDirectory(this.#data, true);
+      const dataInfo = await lstat(data, { bigint: true });
+      if(catalog.schemaVersion===2){let roots=catalog.projects.map(item=>item.workspaceIdentity);if(activeRoot)roots=[activeRoot];for(const root of roots.sort((a,b)=>this.#key(a).localeCompare(this.#key(b)))){commits.push(await this.#commitMutex(root));const project=catalog.projects.find(item=>same(item.workspaceIdentity,root));if(project){const source=await this.assertOwnerSource(project);if(!source.ok)fail(source.error.code);}}}
+      lock = await this.#acquireCatalogLock(data);
+      const currentResult = await this.read(options.knownSecrets ?? []);
+      if (!currentResult.ok) fail(currentResult.error.code);
+      const current = currentResult.value; if(current.schemaVersion===1&&!options.confirmMigration)fail('legacy_migration_requires_exit');
+      if (digestValue(current) !== options.expectedCatalogDigest) {
+        const expectedOwner = options.ownerExpectation;
+        if (expectedOwner !== undefined) {
+          const saved = current.projects.find((item) => item.id === expectedOwner.projectId);
+          if (!saved || saved.fileOwners.digest !== expectedOwner.digest) fail('stale_file_owners');
+        }
+        fail('catalog_changed');
+      }
       const target = join(data, 'workbench-projects.json');
-      try {
-        const old = await lstat(target);
-        if (!old.isFile() || old.isSymbolicLink()) fail('unsafe_path');
-      } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
-      }
-  temp = join(data, `workbench-projects-${randomUUID()}.tmp`);
-      const handle = await open(temp, 'wx');
-      let failure;
-      try {
-        await handle.writeFile(bytes);
-        await handle.sync();
-      } catch (error) {
-        failure = error;
-      }
-  try {
-        await handle.close();
-      } catch (error) {
-        failure = error;
-      }
-  if (failure) throw failure;
+      temp = join(data, `workbench-projects-${randomUUID()}.tmp`);
+      const handle = await open(temp, 'wx', 0o600);
+      try { await handle.writeFile(bytes); await handle.sync(); }
+      finally { await handle.close(); }
+      assertKnownKeyFree(catalog, options.knownSecrets ?? []);
       for (const project of catalog.projects) await this.#isolate(project.workspaceIdentity, false);
       if (activeRoot) await this.#isolate(workspaceIdentity(activeRoot));
+      const actualData = await canonicalDirectory(this.#data);
+      const currentDataInfo = await lstat(actualData, { bigint: true });
+      if (actualData !== data || currentDataInfo.dev !== dataInfo.dev ||
+          currentDataInfo.ino !== dataInfo.ino) fail('unsafe_path');
+      const original=await boundedFile(target,WB_LIMITS.projectBytes).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+      if(original && JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(original)).schemaVersion===1 && catalog.schemaVersion===2){const backup=await open(join(data,`workbench-projects-v1-${randomUUID()}.backup.json`),'wx',0o600);try{await backup.writeFile(original);await backup.sync();}finally{await backup.close();}}
+      if(options.bindOwnerSource){const project=catalog.projects.find(item=>activeRoot&&same(item.workspaceIdentity,activeRoot));if(!project)fail('owner_catalog_mismatch');const source=await this.assertOwnerSource(project,true);if(!source.ok)fail(source.error.code);}
       await rename(temp, target);
-      temp = null;
-      return wbSuccess(catalog);
-    } catch (error) {
-      if (temp) {
-        try {
-          await unlink(temp);
-        } catch (cleanup) {
-          if (cleanup.code !== 'ENOENT') return wbCaught(cleanup, 'project_unavailable');
-        }
-      }
-  return wbCaught(error, 'project_unavailable');
+      temp = null; written = catalog;
+    } catch (error) { failure = error; }
+    if (temp) {
+      try { await unlink(temp); }
+      catch (error) { if (error.code !== 'ENOENT') failure = error; }
     }
+    if (lock) {
+      try { await this.#releaseCatalogLock(lock); }
+      catch (error) { failure = error; }
+    }
+    for(const commit of commits.reverse()){try{await this.#releaseCatalogLock(commit);}catch(error){failure=error;}}
+    if (failure) return wbCaught(failure, 'project_unavailable');
+    return wbSuccess(written);
   }
   async readContext(input) {
     try {

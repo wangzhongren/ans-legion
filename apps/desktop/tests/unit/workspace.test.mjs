@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile, readdir, lstat, symlink } from 'node:fs/promises';
@@ -15,7 +17,7 @@ const testRole = process.env.LEGION_DESKTOP_TEST_ROLE ?? 'DesktopEngineer';
 assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(testRole));
 let roleDirectory = testRole;
 if (testRole !== 'DesktopEngineer') roleDirectory = `${testRole}/desktop`;
-const base = join(root, `.ans/runtime/legion-desktop-workbench-v2/${roleDirectory}`);
+const base = join(root, `.ans/runtime/legion-governed-workflow-v1/${roleDirectory}`);
 const fixtureRoot = join(base, 'fixtures');
 delete process.env.NODE_OPTIONS;
 delete process.env.NODE_COMPILE_CACHE;
@@ -219,6 +221,7 @@ test('Service: corruption retains a visibly stale last valid snapshot; fresh fai
   const first = (await service.refresh()).value;
   await service.refresh({ assignments: [{ projectId: first.project.id, roleId: 'DesktopEngineer', profileId: 'removed-profile' }] });
   const lastValid = service.state();
+  await delay(2); // Preserve the strict source/observation timestamp assertion across a real millisecond.
   await put(directory, '.ans/organization/current.yaml', 'invalid yaml text\n');
   const stale = (await service.refresh()).value;
   assert.equal(stale.status, 'unavailable');
@@ -280,4 +283,96 @@ test('Architecture: no runtime/development YAML imports, recursion, Service peer
   assert.equal(/Date\(|Date\.now|setTimeout|readFile|readdir/u.test(service), false);
   assert.throws(() => createWorkspaceService({ workspaceRoot: root, provider: {} }));
   for (const path of ['apps/desktop/src/providers/public/workspace.mjs', 'apps/desktop/src/services/public/workspace.mjs']) assert.equal(/export\s+\*|export\s+class/u.test(await readFile(join(root, path), 'utf8')), false);
+});
+
+function replaceYamlField(text, key, value) { return text.replace(new RegExp('^' + key + ':.*$', 'mu'), key + ': ' + value); }
+async function boundaryCase(change) {
+  const directory = await fixture(); const path = '.ans/roles/DesktopEngineer/boundary.yaml'; const markdownPath = '.ans/roles/DesktopEngineer/boundary.md';
+  const source = await readFile(join(directory, path), 'utf8'); const markdown = await readFile(join(directory, markdownPath), 'utf8');
+  const changed = change(source, markdown);
+  await put(directory, path, changed.yaml); await put(directory, markdownPath, changed.markdown);
+  return createWorkspaceProvider({ workspaceRoot: directory }).read();
+}
+
+test('Provider: exact approved independent boundary revision is readable; unknown revision, approval, role and status reject', async () => {
+  const positive = await createWorkspaceProvider({ workspaceRoot: await fixture() }).read(); assert.deepEqual(positive.value.errors, []); assert.equal(positive.value.organization.version, 'v004');
+  const variants = [
+    (yaml) => replaceYamlField(yaml, 'version', 'unknown-revision'),
+    (yaml) => replaceYamlField(yaml, 'approval_source', 'not-customer-approved'),
+    (yaml) => replaceYamlField(yaml, 'role_id', 'KernelEngineer'),
+    (yaml) => replaceYamlField(yaml, 'status', 'CANDIDATE'),
+    (yaml) => replaceYamlField(yaml, 'version', 'legion-desktop-workbench-v2')
+  ];
+  for (const variant of variants) {
+    const result = await boundaryCase((yaml, markdown) => ({ yaml: variant(yaml), markdown }));
+    assert.equal(result.value.errors[0].code, 'workspace_corrupt');
+    assert.ok(result.value.sources.some((source) => source.status === 'unavailable'));
+  }
+});
+
+test('Provider: approved boundary pin rejects Section1-only and simultaneous YAML/Section1 scope additions or removals', async () => {
+  for (const mode of ['markdown-add', 'markdown-remove', 'both-add', 'both-remove']) {
+    const result = await boundaryCase((yaml, markdown) => {
+      const line = /^write_scope: (.+)$/mu.exec(yaml)[1]; const scope = JSON.parse(line); const removed = scope[0];
+      if (mode.endsWith('add')) {
+        const path = 'src/not-approved.mjs'; markdown += '\n| 文件 | `' + path + '` | 未批准路径 |\n';
+        if (mode === 'both-add') yaml = replaceYamlField(yaml, 'write_scope', JSON.stringify([...scope, path]));
+      } else {
+        markdown = markdown.split('\n').filter((row) => !row.includes('`' + removed + '`')).join('\n');
+        if (mode === 'both-remove') yaml = replaceYamlField(yaml, 'write_scope', JSON.stringify(scope.slice(1)));
+      }
+      return { yaml, markdown };
+    });
+    assert.equal(result.value.errors[0].code, 'workspace_corrupt', mode);
+  }
+});
+
+test('Provider: new approved boundary revision cannot be attached to v003 or unknown organization version', async () => {
+  for (const version of ['v003', 'v999']) {
+    const directory = await fixture();
+    for (const [path, field] of [['.ans/project.yaml', 'organization_version'], ['.ans/organization/current.yaml', 'version']]) {
+      const source = await readFile(join(directory, path), 'utf8'); await put(directory, path, replaceYamlField(source, field, version));
+    }
+    assert.equal((await createWorkspaceProvider({ workspaceRoot: directory }).read()).value.errors[0].code, 'workspace_corrupt', version);
+  }
+});
+
+test('Provider: historical v004 pinned Git boundary snapshot and compatible v003 legacy format remain readable', async () => {
+  for (const version of ['v004', 'v003']) {
+    const directory = await fixture(); const current = await readFile(join(directory, '.ans/organization/current.yaml'), 'utf8');
+    const ids = [...current.matchAll(/\{id: ([A-Za-z0-9_.-]+)/gu)].map((match) => match[1]);
+    for (const id of ids) {
+      const path = '.ans/roles/' + id + '/boundary.yaml'; let gitId = id; if (id === 'Reviewer') gitId = 'reviewer'; if (id === 'Tester') gitId = 'tester'; const gitPath = '.ans/roles/' + gitId + '/boundary.yaml'; const captured = spawnSync('git', ['show', 'HEAD:' + gitPath], { cwd: root, encoding: 'utf8' });
+      assert.equal(captured.status, 0, captured.stderr); let yaml = captured.stdout;
+      if (version === 'v003') yaml = replaceYamlField(yaml, 'version', 'legion-desktop-gui-v1');
+      await put(directory, path, yaml);
+    }
+    for (const [path, field] of [['.ans/project.yaml', 'organization_version'], ['.ans/organization/current.yaml', 'version']]) {
+      const source = await readFile(join(directory, path), 'utf8'); await put(directory, path, replaceYamlField(source, field, version));
+    }
+    const result = await createWorkspaceProvider({ workspaceRoot: directory }).read(); assert.deepEqual(result.value.errors, [], version); assert.equal(result.value.organization.version, version); assert.equal(result.value.roles.length, 7);
+  }
+});
+
+test('Reader: exact Human c872 tuples and prior ddc9 semantic snapshots are readable without candidate-label activation', async () => {
+  const ids=['ProjectManager','KernelEngineer','AgentAdapterEngineer','DesktopEngineer','Reviewer','Tester'];
+  const current=await createWorkspaceProvider({workspaceRoot:await fixture()}).read();assert.deepEqual(current.value.errors,[]);assert.equal(current.value.roles.length,7);
+  const supervisor=current.value.roles.find(role=>role.id==='Supervisor');assert.equal(supervisor.boundary.some(path=>path.includes('shell-review')||path.includes('shell-publication')||path.includes('project-shell.md')),false);
+  const historical=await fixture();
+  for(const id of ids){const y='.ans/roles/'+id+'/boundary.yaml',m='.ans/roles/'+id+'/boundary.md';const source=await readFile(join(historical,y),'utf8');await put(historical,y,source.split('\n').filter(line=>!line.startsWith('project_shell_candidate_')).join('\n'));const text=await readFile(join(historical,m),'utf8');assert.ok(text.includes('本次项目 Shell v1 新增候选边界'));await put(historical,m,text.split('本次项目 Shell v1 新增候选边界')[0]);}
+  const old=await createWorkspaceProvider({workspaceRoot:historical}).read();assert.deepEqual(old.value.errors,[]);assert.equal(old.value.roles.length,7);assert.equal(old.value.roles.find(role=>role.id==='DesktopEngineer').boundary.includes('apps/desktop/tests/unit/shell-review.test.mjs'),false);
+  const formatted=await fixture();for(const id of ids){const path='.ans/roles/'+id+'/boundary.yaml';const text=await readFile(join(formatted,path),'utf8');await put(formatted,path,'# same accepted semantic tuple, formatting only\n\n'+text.replace(/\n/gu,'\r\n'));}assert.deepEqual((await createWorkspaceProvider({workspaceRoot:formatted}).read()).value.errors,[]);
+});
+
+test('Reader: four known candidate metadata fields remain pinned; unknown fields/scopes and Supervisor injection reject', async () => {
+  const variants=[
+    source=>source+'\nproject_shell_candidate_authorization: self-approved\n',
+    source=>replaceYamlField(source,'project_shell_candidate_status','ACCEPTED'),
+    source=>replaceYamlField(source,'project_shell_candidate_version','arbitrary-shell-v2'),
+    source=>replaceYamlField(source,'project_shell_candidate_write_scope','["src/not-approved.mjs"]'),
+    source=>replaceYamlField(source,'project_shell_candidate_generated_effect_scope','["src/"]'),
+    source=>replaceYamlField(source,'approval_source','direct_customer_config_sha256_c872245f285125eae264b77ef4447a97fe0dcb14506c0e77f216d41003865ea4')
+  ];for(const variant of variants){const result=await boundaryCase((source,markdown)=>({yaml:variant(source),markdown}));assert.equal(result.value.errors[0].code,'workspace_corrupt');}
+  const both=await boundaryCase((source,markdown)=>({yaml:replaceYamlField(source,'project_shell_candidate_write_scope','["src/not-approved.mjs"]'),markdown:markdown+'\n| 文件 | `src/not-approved.mjs` | unknown candidate scope |\n'}));assert.equal(both.value.errors[0].code,'workspace_corrupt');
+  const directory=await fixture(),path='.ans/roles/Supervisor/boundary.yaml';const supervisor=await readFile(join(directory,path),'utf8'),desktop=await readFile(join(directory,'.ans/roles/DesktopEngineer/boundary.yaml'),'utf8');await put(directory,path,supervisor+'\n'+desktop.split('\n').filter(line=>line.startsWith('project_shell_candidate_')).join('\n'));assert.equal((await createWorkspaceProvider({workspaceRoot:directory}).read()).value.errors[0].code,'workspace_corrupt');
 });

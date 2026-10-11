@@ -169,7 +169,32 @@ function jsonLines(text) {
 const PROJECT_KEYS = ['schema_version', 'project_id', 'name', 'status', 'timezone', 'organization_version', 'project_manager', 'scheduler', 'execution_scope_config', 'implementation_design', 'authorization_source'];
 const ORGANIZATION_KEYS = ['schema_version', 'status', 'version', 'approval_source', 'roles', 'delegations', 'handoff_topology', 'canonical_design', 'design_sha256', 'policy_sha256', 'path_base'];
 const ROLE_KEYS = ['schema_version', 'id', 'name', 'responsibility', 'status', 'read_scope', 'write_scope', 'authority_source', 'deny_scope', 'tools', 'capabilities', 'allowed_actions', 'forbidden_actions', 'delegation_scope', 'handoff_targets', 'required_approvals', 'reporting_line', 'memory_scope', 'contracts'];
-const BOUNDARY_KEYS = ['schema_version', 'role_id', 'status', 'version', 'read_scope', 'write_scope', 'generated_effect_scope', 'deny_scope', 'approval_source'];
+const SHELL_BOUNDARY_KEYS = ['project_shell_candidate_version', 'project_shell_candidate_status', 'project_shell_candidate_write_scope', 'project_shell_candidate_generated_effect_scope'];
+const BOUNDARY_KEYS = ['schema_version', 'role_id', 'status', 'version', 'read_scope', 'write_scope', 'generated_effect_scope', 'deny_scope', 'approval_source', ...SHELL_BOUNDARY_KEYS];
+// Organization membership and role boundary revisions have separate lifetimes.
+// These semantic pins identify the six boundaries approved by the customer in
+// config ddc9cfd1…; YAML formatting may vary, but scopes and Section 1 may not.
+const WORKFLOW_APPROVAL = 'direct_customer_config_sha256_ddc9cfd12dc62d413a6353c4150e488c3451bb6ac8f2f37550441e993a8ec4fa';
+const WORKFLOW_BOUNDARIES = Object.freeze({
+  ProjectManager: ['b9e193d650dbe0d821ca7219194b412cc88a649f3835047bc18b412f6bc5f134', '0ba36eabe333a6cfc2c38cf9ce0d64d2533b1c00466003b8c71ac89c35d21e58'],
+  KernelEngineer: ['f852c4683fbe89819672ab6a58a9bcbf569310dea6343050dc11543a57903469', 'd6386a0f03cb1f723f07ccf20af3ce4600f1beffa29ec7685a5e0535f2e17e7e'],
+  AgentAdapterEngineer: ['000dc984d64b30d7bb2822eab150640984b2781605f801439f6a813fc0b0bf32', '1d47d5399f0a3492e224deed2efa79e31f5a3bc72d7403973776028e337dc08c'],
+  DesktopEngineer: ['54044be14b9cc8dd936527ff726d1bfcf8933a8d2b670f175c00009d3fa21f8d', '63cb1b336e3e663120a76e17da6d726e22567d8630a9cb767915290f4467eda7'],
+  Reviewer: ['04c522b9ffde5a00c89695f5c365842f5fd3dc2ea5c1309301ab18cc394d8f60', '4e4e47860e4ff03acf72dcea6bdbfec7e541fc20a1bf2057d2dd38d645eb0c23'],
+  Tester: ['737142e0a2c6810401763505094cabc0ad87f4be2aa8ecf84069e5ba3e755829', '13259a96b299c6575eb424ae0ecb5a49dc0f2387497d650fa42caee4a9f33df0'],
+});
+// Read-only identities of the six frozen tuples accepted by Human under main
+// config c872245f285125eae264b77ef4447a97fe0dcb14506c0e77f216d41003865ea4.
+// Base ddc9 ACCEPTED/candidate-awaiting labels are historical, not activation.
+// No execution scope is assembled here; Supervisor retains its separate v2 identity.
+const SHELL_WORKFLOW_BOUNDARIES = Object.freeze({
+  ProjectManager: ['37532c0621ab47868cf022268f98d585a88d1a656f9382ce3c810591895e68b1', '1578e0c21bf5b4fd01a163a44759c4b2bcefb6457395e1056434327480aacee4'],
+  KernelEngineer: ['4e726abe06d6e2a002b0c180734cd0c5168041e2d44b57f4d294312c95113153', '1d924427f149a1c37b42b72e86a32a6c91f22306bc60d2860b65acfa3c5c39b4'],
+  AgentAdapterEngineer: ['0c5d4502cc2ccf8d5aae379f407adf6985abd804a32d91a5914860c1c6e6f8ce', 'ab9a6512c7c34609509d08f448e640622334bdcc4cfe1c4b1e369ef8455a0efe'],
+  DesktopEngineer: ['dc1abbc5d2397cc2622afad74720f4d80496ae25def3d2a035b8e4646fa304c4', 'd26c08a2905a7f86e67f289e320a50e7a3336f1f03adbc83baae62b31cdcdb1d'],
+  Reviewer: ['6c5a7262633da62a85c82a54b971ec465b1f3ad6b516c6fb8bfc29bebd0be498', '3417e9cea6bc3175719b707f7883a7ee3c7848c9bae3e7945ea42613e80a1974'],
+  Tester: ['e32d6e5710d909108589fddedac4ee93c8ced67532535dda7b9ee9749e7f39d9', '8b0d44e2b1179fc6cbc8ff3b9517ad48073a39123c2a76dc3e63d336c416af78'],
+});
 
 export class WorkspaceProviderImpl {
   #root;
@@ -331,7 +356,7 @@ export class WorkspaceProviderImpl {
       await this.#guardRoot();
       const projectData = keys(yaml(await this.#required('.ans/project.yaml', 'organization', sources)), PROJECT_KEYS, ['schema_version', 'project_id', 'name', 'organization_version']);
       const org = keys(yaml(await this.#required('.ans/organization/current.yaml', 'organization', sources)), ORGANIZATION_KEYS, ['schema_version', 'version', 'status', 'roles']);
-      if (projectData.schema_version !== 1 || org.schema_version !== 1 || org.status !== 'ACCEPTED' || projectData.organization_version !== org.version) corrupt();
+      if (projectData.schema_version !== 1 || org.schema_version !== 1 || org.status !== 'ACCEPTED' || !['v003', 'v004'].includes(org.version) || projectData.organization_version !== org.version) corrupt();
       const projectName = scalarString(projectData.name, 100);
       const projectIdentity = identifier(projectData.project_id);
       project = { id: digest(this.#root.toLowerCase()), name: projectName };
@@ -353,7 +378,7 @@ export class WorkspaceProviderImpl {
         if (!card.startsWith(`# ${id}\n`) && !card.startsWith(`# ${id}\r\n`)) corrupt();
         const boundary = keys(yaml(await this.#required(`.ans/roles/${id}/boundary.yaml`, 'boundary', sources)), BOUNDARY_KEYS, ['schema_version', 'role_id', 'status', 'version', 'write_scope']);
         let expectedBoundary = 'legion-desktop-gui-v1'; if (org.version === 'v004') expectedBoundary = 'legion-desktop-workbench-v2';
-        if (boundary.schema_version !== 1 || boundary.role_id !== id || boundary.status !== 'ACCEPTED' || boundary.version !== expectedBoundary) corrupt();
+        if (boundary.schema_version !== 1 || boundary.role_id !== id || boundary.status !== 'ACCEPTED') corrupt();
         const markdown = await this.#required(`.ans/roles/${id}/boundary.md`, 'boundary', sources);
         const section = markdown.split(/^# Section [2-9]/mu)[0];
         if (!section.startsWith('# Section 1:')) corrupt();
@@ -364,6 +389,12 @@ export class WorkspaceProviderImpl {
         }
         const scope = array(boundary.write_scope, 400).map((path) => scalarString(path, 300));
         if (scope.some((path) => !paths.includes(path))) corrupt();
+        const hasShellMetadata = SHELL_BOUNDARY_KEYS.some((key) => Object.hasOwn(boundary, key));
+        if (boundary.version !== expectedBoundary || boundary.approval_source === WORKFLOW_APPROVAL || hasShellMetadata) {
+          const pins = hasShellMetadata ? SHELL_WORKFLOW_BOUNDARIES : WORKFLOW_BOUNDARIES;
+          const approved = pins[id];
+          if (org.version !== 'v004' || boundary.version !== 'legion-governed-workflow-v1' || boundary.approval_source !== WORKFLOW_APPROVAL || !Object.hasOwn(pins, id) || digest(canonical(boundary)) !== approved[0] || digest(canonical(paths)) !== approved[1]) corrupt();
+        }
         roles.push({ id, name: scalarString(role.name, 100), reportsTo: entry.reporting_line, description: scalarString(role.responsibility), boundary: paths });
       }
     } catch (error) { recordError(errors, sources, error); }

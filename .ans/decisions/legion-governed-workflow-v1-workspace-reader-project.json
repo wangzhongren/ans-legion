@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion authorized boundary revision reader compatibility",
+  "authorizationSource": ".ans/decisions/legion-governed-workflow-v1-authorization.md",
+  "designFiles": [
+    ".ans/decisions/legion-governed-workflow-v1-design.md"
+  ],
+  "maxConcurrentWorkers": 1,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "DesktopEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "operations": [
+        "repair",
+        "test"
+      ],
+      "writeFiles": [
+        "apps/desktop/src/providers/impl/workspace.mjs",
+        "apps/desktop/tests/unit/workspace.test.mjs"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "apps/desktop/tests/unit/workspace.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

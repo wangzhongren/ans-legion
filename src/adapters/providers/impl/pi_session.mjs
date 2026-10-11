@@ -7,14 +7,135 @@ import { streamSimple as completionsStream } from "@earendil-works/pi-ai/api/ope
 import { streamSimple as responsesStream } from "@earendil-works/pi-ai/api/openai-responses";
 import { streamSimple as anthropicStream } from "@earendil-works/pi-ai/api/anthropic-messages";
 import { PiSessionProvider } from "../abstract/pi_session.mjs";
-import { modelRecord, modelString } from "../../../kernel/models/core.mjs";
+import { modelRecord, modelString, PolicyDecision, MutationResult } from "../../../kernel/models/core.mjs";
 import { AgentInstance, AgentScope, PiConnection, PiConnectionProfile, PiEventType, PiTextDelta,
   PiConversationHistory, PiConversationCheckpoint, PiToolRequest, PiToolResult, PiRunResult } from "../../../kernel/models/agent.mjs";
+import { ProjectReadDecision, ProjectReadResult, AgentTools, AgentControlTools,
+  AgentControlDecision, AgentControlResult } from "../../../kernel/models/agent.mjs";
+import { ShellRequest, ShellDecision, ShellResult } from "../../../kernel/models/shell.mjs";
+import { CheckDecision, CheckResult } from "../../../kernel/models/check.mjs";
 
 const LIMITS = Object.freeze({ maxQueueEvents: 256, maxTextCharsPerTurn: 65536,
-  maxOutputTokens: 2048, turnTimeoutMs: 60000 });
+  maxOutputTokens: 8192, turnTimeoutMs: 180000 });
 const STREAMS = Object.freeze({ "openai-completions": completionsStream,
   "openai-responses": responsesStream, "anthropic-messages": anthropicStream });
+const WRITE_TOOLS = Object.freeze(["legion_write_file", "legion_edit_file"]);
+const READ_TOOLS = Object.freeze(["legion_list_files", "legion_read_file"]);
+
+// JSON Schema describes depth and local limits; PiToolRequest enforces the aggregate
+// node/UTF-8 budgets and rejects getters, effects, credentials and caller claims.
+function controlParameters() {
+  const definitions = {};
+  const forbidden = ["__proto__", "constructor", "prototype", "apiKey", "credentials", "token",
+    "callerRoleId", "callerSessionId", "callerInstanceId"];
+  for (let depth = 8; depth >= 0; depth -= 1) {
+    const object = { type: "object", maxProperties: 4096,
+      propertyNames: { not: { enum: forbidden } }, additionalProperties: false };
+    const array = { type: "array", maxItems: 0 };
+    if (depth < 8) {
+      const child = { $ref: "#/properties/payload/$defs/value" + (depth + 1) };
+      object.additionalProperties = child;
+      array.items = child; array.maxItems = 4096;
+    }
+    definitions["value" + depth] = { anyOf: [{ type: "null" }, { type: "boolean" },
+      { type: "number" }, { type: "string", maxLength: 65536 }, object, array] };
+  }
+  // Anthropic's SDK mapping preserves property schemas, but omits root $defs.
+  const payload = { ...definitions.value0.anyOf[4], $defs: definitions };
+  return Type.Unsafe({ type: "object", properties: { payload },
+    required: ["payload"], additionalProperties: false });
+}
+
+function controlledTool(name, execute) {
+  if (["legion_delegate_pm", "legion_query_role_activity", "legion_query_role_log"].includes(name)) {
+    const id = Type.String({ minLength: 1, maxLength: 200 });
+    const filters = { roleId: Type.Optional(id), taskId: Type.Optional(id),
+      planDigest: Type.Optional(Type.String({ pattern: "^[a-f0-9]{64}$" })) };
+    let payload = Type.Object(filters, { additionalProperties: false });
+    let description = "Query actual role activity from the host using optional roleId/taskId/planDigest filters. Returns bounded current facts, not raw conversations or invented progress. Filters do not claim caller identity.";
+    if (name === "legion_query_role_log") {
+      payload = Type.Object({ ...filters, roleId: id, cursor: Type.Optional(Type.String({ minLength: 1, maxLength: 4096 })),
+        limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })) }, { additionalProperties: false });
+      description = "Read one safe page of actual role action metadata using roleId and optional taskId/planDigest/cursor/limit (host default 20, maximum 50). The host binds the cursor snapshot and returns stale_cursor when changed. No raw assistant text, prompts, tool bodies, credentials or private memory; no log writes. Result budget is 32 KiB.";
+    }
+    if (name === "legion_delegate_pm") {
+      const start = { action: Type.Literal("start"), instruction: Type.String({ minLength: 1, maxLength: 8192 }),
+        sourceRefs: Type.Array(id, { maxItems: 32 }) };
+      payload = Type.Union([
+        Type.Object({ ...start, purpose: Type.Union([Type.Literal("plan"), Type.Literal("role_design")]) }, { additionalProperties: false }),
+        Type.Object({ ...start, purpose: Type.Literal("repair"), acceptanceId: id, taskId: id }, { additionalProperties: false }),
+        Type.Object({ action: Type.Literal("resume"), delegationId: id, humanAnswerRef: id }, { additionalProperties: false })
+      ]);
+      description = "Delegate to the background PM only through the host-bound customer Su channel. Start with purpose plan/role_design/repair, instruction and registered sourceRefs; repair also requires acceptanceId/taskId. Resume only with a host delegationId and actual humanAnswerRef. Never supply an answer/value or caller/profile/owner. needs_human means waiting, not task completion: use legion_request_interaction payload questionRef to present the host question unchanged. Only the host creates execute_plan confirmation and grants. Instruction limit is 8192 UTF-8 bytes, enforced by Model/host; this tool grants no mutation authority.";
+    }
+    return { name, label: "Legion host-bound Su control", description,
+      parameters: Type.Object({ payload }, { additionalProperties: false }), executionMode: "sequential", execute };
+  }
+  if (name === "legion_request_shell") {
+    return { name, label: "Legion PM reviewed project Shell",
+      description: "Request this exact command for PM review. The host binds your task and runs it in an isolated copy, returning the final publication outcome. Shell exit zero is not a passed check.",
+      parameters: Type.Object({ command: Type.String({ minLength: 1, maxLength: 65536 }),
+        cwd: Type.Optional(Type.String()), reason: Type.String({ minLength: 1 }),
+        generatedEffects: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { maxItems: 64 })),
+        network: Type.Optional(Type.Union([Type.Literal("none"), Type.Literal("localhost"), Type.Literal("external")])),
+        timeoutSeconds: Type.Optional(Type.Integer({ minimum: 1, maximum: 900 })) },
+      { additionalProperties: false }), executionMode: "sequential", execute };
+  }
+  if (name === "legion_review_shell") {
+    return { name, label: "Legion PM exact Shell review",
+      description: "Approve or refuse the exact host request ID, digest and revision. Only the host validates this decision; approval text alone grants nothing.",
+      parameters: Type.Object({ requestId: Type.String({ minLength: 1 }),
+        requestDigest: Type.String({ pattern: "^[a-f0-9]{64}$" }),
+        revision: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+        approved: Type.Boolean(), reason: Type.String({ minLength: 1 }) },
+      { additionalProperties: false }), executionMode: "sequential", execute };
+  }
+  if (name === "legion_run_check") {
+    return { name, label: "Legion approved software check",
+      description: "Request one approved check ID. The host validates the live task and returns real execution evidence.",
+      parameters: Type.Object({ checkId: Type.String({ minLength: 1 }) },
+        { additionalProperties: false }), executionMode: "sequential", execute };
+  }
+  if (AgentControlTools.includes(name)) {
+    const descriptions = {
+      legion_remember_fact: "Submit your own project fact addition, revision or retraction in payload: action (add/revise/retract), factId when revising, kind (pitfall/decision/preference), statement, sourceRefs and expectedRevision. The host binds the real author, validates registered sources and revision, and returns the actual fact status. This does not change file ownership or grant permission.",
+      legion_query_memory: "Query effective project facts from all roles using payload kind (pitfall/decision/preference), cursor and limit when needed. The host binds the project and returns a bounded fact view with source labels; private summaries and credentials are excluded. This read does not authorize a fact revision or file change.",
+      legion_submit_supervision: "Submit a supervision suggestion using payload phase, planDigest, findings (severity, taskIds, sourceRefs, reason) and recommendation. The host validates the real Supervisor, current plan and registered sources. Suggestions do not issue grants, alter ownership, execute tasks or mark tasks complete."
+    };
+    let description = "Submit bounded workflow data. The host binds the real caller, validates permissions and returns the actual outcome.";
+    if (Object.hasOwn(descriptions, name)) description = descriptions[name];
+    return { name, label: "Legion governed workflow", description,
+      parameters: controlParameters(), executionMode: "sequential", execute };
+  }
+  if (name === "legion_write_file") {
+    return { name, label: "Legion controlled write",
+      description: "Propose text for a relative resource; the host checks and executes permissions.",
+      parameters: Type.Object({ resource: Type.String({ minLength: 1 }), content: Type.String() },
+        { additionalProperties: false }), executionMode: "sequential", execute };
+  }
+  if (name === "legion_edit_file") {
+    return { name, label: "Legion controlled edit",
+      description: "Propose exact text replacements for an existing project file using its full-file SHA-256. The host checks ownership, current content and permission before editing.",
+      parameters: Type.Object({ resource: Type.String({ minLength: 1 }),
+        expectedSha256: Type.String({ pattern: "^[a-f0-9]{64}$" }),
+        replacements: Type.Array(Type.Object({ oldText: Type.String({ minLength: 1 }),
+          newText: Type.String() }, { additionalProperties: false }), { minItems: 1, maxItems: 16 }) },
+      { additionalProperties: false }), executionMode: "sequential", execute };
+  }
+  if (name === "legion_list_files") {
+    return { name, label: "Legion project directory listing",
+      description: "List one page of ordinary entries in the current project. Use an empty resource for the project root; the host checks the path and read permission.",
+      parameters: Type.Object({ resource: Type.String(), cursor: Type.Optional(Type.String()),
+        limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })) },
+      { additionalProperties: false }), executionMode: "sequential", execute };
+  }
+  return { name, label: "Legion project text reading",
+    description: "Read a bounded UTF-8 text segment from a project-relative file. Continue with nextLine until complete; the host checks the path and read permission.",
+    parameters: Type.Object({ resource: Type.String({ minLength: 1 }),
+      startLine: Type.Optional(Type.Integer({ minimum: 1 })),
+      maxBytes: Type.Optional(Type.Integer({ minimum: 1, maximum: 65536 })) },
+    { additionalProperties: false }), executionMode: "sequential", execute };
+}
 
 function emptyResources(systemPrompt) {
   const runtime = createExtensionRuntime();
@@ -94,6 +215,7 @@ export class _PiSessionProvider extends PiSessionProvider {
   #instance;
   #profileId;
   #profileVersion;
+  #tools = [];
   #lifecycle = "single_run";
   #limits = LIMITS;
   #history = new PiConversationHistory({ messages: [] });
@@ -108,6 +230,7 @@ export class _PiSessionProvider extends PiSessionProvider {
   #turnCancelPromise;
   #closePromise;
   #restorePromise;
+  #historyRestored = false;
   #cancelled = false;
   #failureCode = "";
   #queue = [];
@@ -118,6 +241,9 @@ export class _PiSessionProvider extends PiSessionProvider {
   #assistantText = "";
   #deltaChars = 0;
   #modelError = "";
+  #activeTimer;
+  #activeStartedAt;
+  #activeRemainingMs = 0;
 
   static async create(options) {
     const provider = new _PiSessionProvider();
@@ -139,17 +265,24 @@ export class _PiSessionProvider extends PiSessionProvider {
     this.#lifecycle = options.lifecycle ?? "single_run";
     if (!["single_run", "conversation"].includes(this.#lifecycle)) throw new TypeError("invalid_lifecycle");
     const conversation = this.#lifecycle === "conversation";
+    const granted = options.scope.tools;
+    if (granted.some((name) => !AgentTools.includes(name)) ||
+        new Set(granted).size !== granted.length) throw new TypeError("unsupported_controlled_tool");
+    if (granted.includes("legion_review_shell") && this.#instance.roleId !== "ProjectManager") {
+      throw new TypeError("shell_review_requires_project_manager");
+    }
+    this.#limits = limits(options.budgets);
     if (conversation) {
-      if (options.scope.tools.length !== 0 || options.scope.write.length !== 0) {
+      if (granted.some((name) => WRITE_TOOLS.includes(name)) || options.scope.write.length !== 0) {
         throw new TypeError("conversation_must_be_toolless");
       }
-      this.#limits = limits(options.budgets);
     } else {
-      if (options.scope.tools.length !== 1 || options.scope.tools[0] !== "legion_write_file") {
+      if (!granted.some((name) => WRITE_TOOLS.includes(name) || AgentControlTools.includes(name) ||
+          name === "legion_run_check" || name === "legion_request_shell")) {
         throw new TypeError("only_controlled_write_tool_supported");
       }
-      if (options.budgets !== undefined) throw new TypeError("conversation_budgets_only");
     }
+    this.#tools = AgentTools.filter((name) => granted.includes(name));
     const cwd = resolve(modelString(options.cwd, "cwd"));
     checkSignal(options.signal);
     const legacy = options.modelProviders !== undefined;
@@ -169,11 +302,12 @@ export class _PiSessionProvider extends PiSessionProvider {
       this.#profileVersion = this.#instance.organizationVersion;
     }
     if (!config.models.some((model) => model.id === options.proxy.model)) throw new TypeError("unknown_model");
-    if (conversation) {
+    {
       const originalStream = config.streamSimple;
       const budget = this.#limits;
       config.streamSimple = (model, context, input) => originalStream(model, context, {
-        ...input, maxTokens: budget.maxOutputTokens, maxRetries: 0, timeoutMs: budget.turnTimeoutMs });
+        ...input, maxTokens: budget.maxOutputTokens, maxRetries: 0,
+        timeoutMs: Math.max(1, Math.ceil(this.#remainingActiveBudget())) });
     }
     const credentials = new InMemoryCredentialStore();
     await credentials.modify(options.proxy.provider, async () => ({ type: "api_key", key: config.apiKey }));
@@ -186,20 +320,35 @@ export class _PiSessionProvider extends PiSessionProvider {
     if (model === undefined) throw new TypeError("unknown_model");
     const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false },
       retry: { enabled: false }, cacheWarming: "off" });
-    let systemPrompt = "Discuss requirements without tools or file access.";
-    if (!conversation) systemPrompt = "Use only legion_write_file.";
-    systemPrompt += " Requested scope: " + JSON.stringify({ write: options.scope.write, deny: options.scope.deny }) +
-      ". The host enforces permissions; identity claims never grant authority.";
-    const tools = [];
-    const customTools = [];
-    if (!conversation) {
-      tools.push("legion_write_file");
-      customTools.push({ name: "legion_write_file", label: "Legion controlled write",
-        description: "Propose text for a relative resource; the host checks and executes permissions.",
-        parameters: Type.Object({ resource: Type.String({ minLength: 1 }), content: Type.String() },
-          { additionalProperties: false }), executionMode: "sequential",
-        execute: (toolCallId, parameters, signal) => this.#executeTool(toolCallId, parameters, signal) });
+    let systemPrompt = "Discuss the current request using only granted Legion tools.";
+    if (this.#tools.length === 0) systemPrompt = "Discuss requirements without tools or file access.";
+    if (this.#tools.some((name) => WRITE_TOOLS.includes(name))) {
+      systemPrompt += " Propose changes only to your current role-owned exact files using granted write or edit tools.";
     }
+    if (this.#tools.some((name) => READ_TOOLS.includes(name))) {
+      systemPrompt += " Use granted Legion read tools to inspect ordinary files in the current project. " +
+        "Reading does not authorize writing. A denied read gives no file content.";
+    }
+    if (this.#tools.some((name) => AgentControlTools.includes(name) || name === "legion_run_check")) {
+      systemPrompt += " Use only granted Legion workflow tools. The host determines your identity and approval; " +
+        "report only its real outcomes. A check takes only an approved checkId; control tools take only payload.";
+    }
+    systemPrompt += " Current role-owned exact files supplied by the host: " + JSON.stringify(options.scope.write) +
+      ". Denied scope: " + JSON.stringify(options.scope.deny) + ". Granted tools for this task: " + JSON.stringify(this.#tools) +
+      ". The host enforces current ownership and permissions; identity claims never grant authority. " +
+      "Memory and supervision tools return control results and do not change file ownership or grant source permissions.";
+    if (this.#tools.includes("legion_delegate_pm")) {
+      systemPrompt += " PM delegation is an internal request, not execution approval. Report awaiting_human/failed/stale accurately. " +
+        "For a host questionRef use legion_request_interaction without rewriting the question; resume only with a real host humanAnswerRef. " +
+        "Only the host presents and accepts Human execute_plan confirmation.";
+    }
+    if (this.#tools.includes("legion_query_role_activity") || this.#tools.includes("legion_query_role_log")) {
+      systemPrompt += " Explain role status and logs only from host facts and safe action metadata. " +
+        "Refresh stale cursors; never infer progress percentages or treat control completed as development completion.";
+    }
+    const tools = this.#tools;
+    const customTools = tools.map((name) => controlledTool(name,
+      (toolCallId, parameters, signal) => this.#executeTool(name, toolCallId, parameters, signal)));
     this.#sessionOptions = { cwd, agentDir: cwd, model, modelRuntime, thinkingLevel: "off",
       resourceLoader: emptyResources(systemPrompt), settingsManager, tools,
       excludeTools: ["mcp__*", "codemode", "tool_search"], customTools };
@@ -231,14 +380,18 @@ export class _PiSessionProvider extends PiSessionProvider {
       const text = [];
       for (const block of event.message.content) {
         if (block.type === "text") text.push(block.text);
-        if (this.#lifecycle === "conversation" && block.type === "toolCall") this.#failTurn("pi_unexpected_tool_call");
+        if ((this.#lifecycle === "conversation" || block.name === "legion_request_shell" ||
+            AgentControlTools.includes(block.name)) && block.type === "toolCall" && !this.#tools.includes(block.name)) {
+          this.#failTurn("pi_unexpected_tool_call");
+        }
       }
       const value = text.join("");
-      if (this.#lifecycle === "conversation" && value.length > this.#limits.maxTextCharsPerTurn) {
+      if (value.length > this.#limits.maxTextCharsPerTurn) {
         this.#failTurn("pi_text_budget");
       } else this.#assistantText = value;
       if (event.message.stopReason === "error") this.#modelError = safeModelError(event.message);
       if (event.message.stopReason === "aborted") this.#modelError = "pi_model_aborted";
+      if (event.message.stopReason === "length") this.#modelError = "pi_model_error";
     }
     if (this.#lifecycle === "conversation" && !this.#cancelled && this.#failureCode === "" &&
         event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
@@ -256,6 +409,7 @@ export class _PiSessionProvider extends PiSessionProvider {
   #failTurn(code) {
     if (this.#failureCode !== "" || this.#runDone) return;
     this.#failureCode = code;
+    this.#pauseActiveBudget();
     this.#settlePending(abortError());
     // Schedule abort outside the synchronous SDK event delivery; no upward callback.
     queueMicrotask(() => {
@@ -265,7 +419,7 @@ export class _PiSessionProvider extends PiSessionProvider {
   #enqueue(event, terminal = false) {
     const waiter = this.#waiters.shift();
     if (waiter !== undefined) { waiter.detach(); waiter.resolve(event); return; }
-    if (this.#lifecycle === "conversation" && !terminal) {
+    if (!terminal) {
       if (event.type === PiEventType.TEXT_DELTA) {
         const previous = this.#queue.at(-1);
         if (previous?.type === PiEventType.TEXT_DELTA && previous.delta.runId === event.delta.runId) {
@@ -278,21 +432,24 @@ export class _PiSessionProvider extends PiSessionProvider {
     }
     this.#queue.push(event);
   }
-  async #executeTool(toolCallId, parameters, signal) {
-    if (this.#closed || this.#state !== "running" || this.#cancelled || this.#lifecycle !== "single_run") throw abortError();
+  async #executeTool(tool, toolCallId, parameters, signal) {
+    if (this.#closed || this.#state !== "running" || this.#cancelled || !this.#tools.includes(tool)) throw abortError();
     modelString(toolCallId, "toolCallId");
     checkSignal(signal);
     if (this.#toolCalls.has(toolCallId)) throw new TypeError("duplicate_tool_call");
     const request = new PiToolRequest({ requestId: randomUUID(), runId: this.#runId,
-      toolCallId, tool: "legion_write_file", parameters });
+      toolCallId, tool, parameters });
     this.#toolCalls.add(toolCallId);
     return await new Promise((resolveResult, rejectResult) => {
       const pending = { resolve: resolveResult, reject: rejectResult, detach: () => {} };
       const onAbort = () => {
-        if (this.#pending.delete(request)) { pending.detach(); rejectResult(abortError()); }
+        if (this.#pending.delete(request)) {
+          pending.detach(); this.#resumeActiveBudget(); rejectResult(abortError());
+        }
       };
       pending.detach = () => signal?.removeEventListener("abort", onAbort);
       this.#pending.set(request, pending);
+      this.#pauseActiveBudget();
       signal?.addEventListener("abort", onAbort, { once: true });
       this.#enqueue(Object.freeze({ type: PiEventType.TOOL_REQUEST, request }));
     });
@@ -314,6 +471,7 @@ export class _PiSessionProvider extends PiSessionProvider {
     this.#usedRuns.add(runId);
     this.#runId = runId; this.#runDone = false; this.#cancelled = false; this.#failureCode = "";
     this.#modelError = ""; this.#assistantText = ""; this.#deltaChars = 0; this.#toolResults = [];
+    this.#toolCalls.clear();
     this.#turnCancelPromise = undefined;
     this.#state = "running";
     // Bind each SDK listener to its originating run. Unsubscription alone cannot guard an already queued listener.
@@ -323,8 +481,9 @@ export class _PiSessionProvider extends PiSessionProvider {
     this.#runPromise = this.#run(prompt);
   }
   async #run(prompt) {
-    let status = "completed"; let errorCode = ""; let timer;
-    if (this.#lifecycle === "conversation") timer = setTimeout(() => this.#failTurn("pi_turn_timeout"), this.#limits.turnTimeoutMs);
+    let status = "completed"; let errorCode = "";
+    this.#activeRemainingMs = this.#limits.turnTimeoutMs;
+    this.#resumeActiveBudget();
     try {
       await this.#session.prompt(prompt, { expandPromptTemplates: false });
       await this.#session.waitForIdle();
@@ -332,7 +491,7 @@ export class _PiSessionProvider extends PiSessionProvider {
     } catch (error) {
       status = "failed"; errorCode = "pi_run_failed";
       if (error?.name === "AbortError") errorCode = "pi_model_aborted";
-    } finally { clearTimeout(timer); }
+    } finally { this.#pauseActiveBudget(); }
     if (this.#cancelled) { status = "cancelled"; errorCode = "pi_run_cancelled"; }
     if (this.#failureCode !== "") { status = "failed"; errorCode = this.#failureCode; }
     this.#settlePending(abortError());
@@ -362,6 +521,22 @@ export class _PiSessionProvider extends PiSessionProvider {
     const session = this.#session; this.#session = undefined;
     session?.dispose();
   }
+  #remainingActiveBudget() {
+    if (this.#activeStartedAt === undefined) return this.#activeRemainingMs;
+    return Math.max(0, this.#activeRemainingMs - (performance.now() - this.#activeStartedAt));
+  }
+  #pauseActiveBudget() {
+    this.#activeRemainingMs = this.#remainingActiveBudget();
+    clearTimeout(this.#activeTimer);
+    this.#activeTimer = undefined; this.#activeStartedAt = undefined;
+  }
+  #resumeActiveBudget() {
+    if (this.#activeStartedAt !== undefined || this.#pending.size > 0 ||
+        this.#closed || this.#cancelled || this.#failureCode !== "" || this.#state !== "running") return;
+    if (this.#activeRemainingMs <= 0) { this.#failTurn("pi_turn_timeout"); return; }
+    this.#activeStartedAt = performance.now();
+    this.#activeTimer = setTimeout(() => this.#failTurn("pi_turn_timeout"), this.#activeRemainingMs);
+  }
   #settlePending(error) {
     for (const pending of this.#pending.values()) { pending.detach(); pending.reject(error); }
     this.#pending.clear();
@@ -387,11 +562,39 @@ export class _PiSessionProvider extends PiSessionProvider {
   }
   respond_tool(request, result) {
     const pending = this.#pending.get(request);
+    let matching = false;
+    if (request instanceof PiToolRequest && result instanceof PiToolResult && this.#tools.includes(request.tool)) {
+      if (WRITE_TOOLS.includes(request.tool)) {
+        matching = result.decision instanceof PolicyDecision && result.result instanceof MutationResult &&
+          result.decision.proposalDigest === result.result.proposalDigest &&
+          result.result.resource === request.parameters.resource;
+      } else if (READ_TOOLS.includes(request.tool) &&
+          result.decision instanceof ProjectReadDecision && result.result instanceof ProjectReadResult) {
+        matching = result.result.resource === request.parameters.resource &&
+          (result.decision.allowed || result.result.status === "denied") &&
+          (result.result.status === "denied" ||
+            (request.tool === "legion_list_files" && result.result.status === "listed") ||
+            (request.tool === "legion_read_file" && result.result.status === "read"));
+      } else if (request.tool === "legion_request_shell") {
+        const shell = new ShellRequest({ requestId: request.requestId, runId: request.runId,
+          ...request.parameters });
+        matching = result.decision instanceof ShellDecision && result.result instanceof ShellResult &&
+          result.decision.requestDigest === shell.digest && result.result.requestDigest === shell.digest &&
+          result.result.status !== "ready_for_publication";
+      } else if (request.tool === "legion_run_check") {
+        matching = result.decision instanceof CheckDecision && result.result instanceof CheckResult &&
+          result.decision.checkId === request.parameters.checkId && result.result.checkId === request.parameters.checkId;
+      } else if (AgentControlTools.includes(request.tool)) {
+        matching = result.decision instanceof AgentControlDecision && result.result instanceof AgentControlResult &&
+          result.decision.tool === request.tool && result.result.tool === request.tool;
+      }
+    }
     if (this.#closed || this.#cancelled || this.#state !== "running" || pending === undefined ||
         !(request instanceof PiToolRequest) || !(result instanceof PiToolResult) ||
         request.runId !== this.#runId || result.runId !== request.runId || result.requestId !== request.requestId ||
-        result.decision.proposalDigest !== result.result.proposalDigest) throw new TypeError("invalid_or_late_tool_response");
+        !matching) throw new TypeError("invalid_or_late_tool_response");
     this.#pending.delete(request); pending.detach(); this.#toolResults.push(result);
+    this.#resumeActiveBudget();
     const details = { decision: result.decision, result: result.result };
     pending.resolve({ content: [{ type: "text", text: JSON.stringify(details) }], details });
   }
@@ -400,9 +603,14 @@ export class _PiSessionProvider extends PiSessionProvider {
     return this.#history;
   }
   async restore_history(checkpoint) {
-    if (this.#closed || this.#terminated || this.#lifecycle !== "conversation" ||
-        !["ready", "idle"].includes(this.#state) || this.#queue.length !== 0 || this.#waiters.length !== 0) {
-      throw new TypeError("conversation_not_idle");
+    const conversationRestore = this.#lifecycle === "conversation" &&
+      ["ready", "idle"].includes(this.#state);
+    const singleRunRestore = this.#lifecycle === "single_run" && this.#state === "ready" &&
+      this.#runId === undefined && this.#usedRuns.size === 0 && !this.#historyRestored;
+    if (this.#closed || this.#terminated || (!conversationRestore && !singleRunRestore) ||
+        this.#queue.length !== 0 || this.#waiters.length !== 0 || this.#pending.size !== 0) {
+      if (this.#lifecycle === "conversation") throw new TypeError("conversation_not_idle");
+      throw new TypeError("single_run_history_restore_unavailable");
     }
     if (!(checkpoint instanceof PiConversationCheckpoint) ||
         Object.keys(this.#instance).some((key) => checkpoint.instance[key] !== this.#instance[key]) ||
@@ -418,7 +626,9 @@ export class _PiSessionProvider extends PiSessionProvider {
     try {
       await this.#createSession(history);
       if (this.#closed || this.#terminated) { this.#dispose(); throw abortError(); }
-      this.#history = history; this.#state = "idle";
+      this.#history = history;
+      if (this.#lifecycle === "single_run") this.#historyRestored = true;
+      this.#state = this.#lifecycle === "single_run" ? "ready" : "idle";
     } catch (error) {
       this.#terminated = true; this.#dispose(); this.#state = "failed"; throw error;
     }

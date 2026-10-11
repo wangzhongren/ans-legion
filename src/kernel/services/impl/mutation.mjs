@@ -3,7 +3,12 @@ import { createStorageProvider, StorageError } from "../../providers/public/stor
 export class _MutationService extends MutationService {
   #storage;
   constructor(options) { super(); this.#storage = createStorageProvider(options); Object.freeze(this); }
-  async execute(proposal, permit) { return await this.#storage.write(proposal, permit); }
+  observeTime(){return this.#storage.observeTime();}
+  async execute(proposal, permit) {
+    if(proposal?.action==="delete_file")return await this.#storage.delete(proposal,permit);
+    if (proposal?.action === "edit_file") return await this.#storage.edit(proposal, permit);
+    return await this.#storage.write(proposal, permit);
+  }
   async recordEvents(events) {
     try { return await this.#storage.appendEvents(events); }
     catch (error) {

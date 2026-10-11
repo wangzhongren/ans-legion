@@ -1,5 +1,15 @@
 # Reviewer职责与有限审查流程
 
+## 当前项目Shell阶段
+
+Reviewer独立审查结构、权限、IPC和包源一致性，定位真实缺陷交原owner修复，再核对当前候选日志；Supervisor负责verify。当前功能、证据与有限覆盖见[项目Shell最终报告](docs/review-project-shell-v1.md)。
+
+当前工作流：确认设计/精确配置→原owner冻结实现→Reviewer五个有限测试→Tester真实集成/原生/GUI六门→Reviewer八份最终文档冻结→原两门同候选→complete→Supervisorverify。只有实际派发writeSet可写，当前生产与五测试均只读。
+
+每条Shell经PM结构化审批和Host一次授权；部分发布恢复必须新Human确认当前输入，不重放旧批准。保留的正确旧成果由Host事实表达并与新Mutation分开；当前checks和独立Acceptance仍必需。真实GUI/外部provider/客户项目验收的边界按证据明确列出，Windows没有本轮执行证明。
+
+## Workbench v2历史流程（原记录保留）
+
 Reviewer向Human、ProjectManager及Supervisor交付实际结构、权限、IPC、凭据和包源一致性证据，不授业务权限，不代替Tester验收。当前工作台只有ProjectManager接收Human需求；点击执行成员只读，确认计划后才允许动态任务受控写入。
 
 ```mermaid

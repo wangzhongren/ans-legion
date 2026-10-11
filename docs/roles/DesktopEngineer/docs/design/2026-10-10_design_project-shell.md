@@ -1,0 +1,84 @@
+---
+id: desktop-project-shell-v1
+type: design
+created: "2026-10-10"
+status: implemented-pending-verification
+---
+
+# Desktop 项目Shell接线
+
+依据已由Human确认并冻结的 [Shell v1](../../../../../.ans/decisions/handwell-pm-approved-project-shell-v1-design.md)，本角色在exact46文件范围实现。上游Kernel/Adapter源码与PM已安装0.8.0包只读，实际契约以其当前API为准；产品PM审批与本仓库task_ops授权分别验证。
+
+## 生命周期
+
+原执行角色调用legion_request_shell，Host从原PiToolRequest推导id/run/真实actor，形成Kernel ShellRequest并prepare隔离mirror与实际输入/生成generation。独立typed ledger原子保存请求、scope/role/plan/profile/context/owner版本与完整inventory，再由PM串行审核；不调用sendMessage/ensureManager，不递增active generation，不占主Pipeline.tail等待模型或进程。PM使用真实ProjectManager身份的fresh受限实例恢复自己的plain持续上下文，只有legion_review_shell按exact id/digest/revision/approved/reason可授予。Reviewer真实文字/理由进PM对话，不能造Human或新成员。
+
+Kernel validator在approve/consume/publication阶段复核所有live绑定；consume在共享project锁内原子claim持久批准，短时许可不出Host、不重放。原执行SDK同instance/run/request一直pending，活动预算由已安装Adapter暂停；审批总等待5分钟独立TTL。批准后Shell Service在私有mirror实际执行，输出有限持续记录原role，主区显示待PM审批/执行Shell/发布中。拒绝/过期/失败回应原request一次，不retry/autogrant。
+
+## 受控发布
+
+ready_for_publication只为中间态。Host读取candidate UTF8或canonicalB64并验证实际bytes/SHA/≤2MiB，构造legion_shell_publish/request_shell的write_file或delete_file proposal，expectedBaseline与executable必须实际匹配。只通过controller.issueShellPublication(real receipt)与publicMutation发布role自己当前task.writeSet文件；其他role或未归属源码拒绝。opaque receipt/privatebytes不入SDK、renderer或history。
+
+发布前整批preflight且先持久journal/source recovery记录，逐项保存真实Mutation观察；generated由Kernel publishGenerated按已Human确认artifactScopes发布，完整authored inventory含未归属普通源码防src/伪装。finishPublication传真实results/generated结果。失败/中断保真实partial_published、已发布路径/墓碑并暂停，不能称原子回滚或自动重跑旧Shell。原文件owner在删除后保持；missing基线必须来自该授权删除并进入checkAbsentBaseline，普通缺失仍拒。
+
+## 锁、检查与上下文
+
+Host Provider建立物理private同project lockRoot给Shell和Check，runtime为实际Node/Electron，npmCli只固定Host安装路径。generated变化更新generation并使旧Check/Acceptance stale；Shell exit0不充作自测。任务results/outputs/依赖交接纳实际source publication/delete metadata，不自动灌正文。角色自己的SDK最终收到typed ShellDecision/ShellResult，default8KiB preview按当前输入余量下调、≤64KiB；archive stdout/stderr1MiB，binary仅metadata。持续memory只facts与真实文字，不恢复permission/receipt/pending。
+
+## 取消与重启
+
+stop/select/close/profile/context/role/plan变化先abort审核/command信号、撤待审与未消费批准、settle原pending，再等待回收；只回收本次Shell树。leader退出也须收完后台子树，额外cleanup30秒，失败关闭后端。restart旧请求只展示facts，permit不恢复；未完成publication保持recovery-required，不重跑命令、不覆盖后续合法修改。
+
+## UI与验证
+
+保留5tabs、stable members/origin、hidden scrollbar、focus/draft/scroll/Esc与旧Human popup。主区实际phase chips打开原role对话，PM审核理由在PM对话，请求/output在原role对话，由requestId关联，无Shell审核员新成员。安全textContent/本地Markdown输出、无CSP/IPC权限扩展。
+
+新增shell-review/shell-publication真实SDKlocalhost驱动PM approve/deny→真实native隔离命令→source/generated发布→原SDK继续→真实role check/Acceptance。覆盖未批/yes/forged/replay/stale/cancel/auditfail/partial/restart、CAS串行、multi请求、close无死锁、binarymetadata及旧协议。最终shell/regression_model/regression_unit三固定门同候选，失败日志保留；客户GUI/SSH不作为本角色fixture。
+
+## 已实现接线与候选验证（2026-10-10）
+
+生产入口为WorkbenchPipelineImpl.#requestShell/#queueShellReview/#reviewShell；原single_run仅按Host已送history/prompt和实际事件文字/响应累计本地字符，不调用SDK不支持的get_history。PM审核独立串行队列，不占UI tail、不递增执行generation；请求/真实审理由/结构化结果存Organization typed ledger，原role工具pending收到一次最终ShellResult。有限phase/失败code不包含原SDK异常文字。
+
+审批timer从实际prepare并持久请求之后开始，独立5分钟；审批后命令许可期限与Service总执行预算独立。预览为剩余本地工作字符的保守估算，空间不足明确prompt_budget，不创建preview=0 backend。当前模型token窗口/费用未知。archive保持有效UTF8 JSONL并严格1MiB上限。
+
+artifactScopes在所有任务中同scope不同kind明确拒绝。完整authored库存包含未归属普通源码；只有先前Host真实生成发布及仍匹配其私有generation摘要的目录可按既有产物事实处理，不接受模型自报注册。Shell授权完整input generation仅用0.8.1 prepare opaque字段，Check与Shell同物理锁；Check按实际Host产物摘要核验过期。生成交接仅实际scope/producer/generation摘要，源码交接实际SHA/bytes/missing，不灌正文。RoleArchitect的Shell发布仍须匹配已批准文档SHA。
+
+source partial不自动withdraw。真实已发布Mutation、墓碑与候选journal保留；重启publishing一律保守暂停，旧permit不恢复。Human需讨论并确认不同planDigest的恢复计划，弹窗展示当前资源SHA/absence。确认和每次操作复查该基线，后续合法修改不会被旧批准覆盖；新任务使用新授权/当前baseline与独立plan backend目录，旧journal不删。新计划全部当前检查和独立验收通过、最新变更SHA与磁盘一致后才追加recovered来源；旧partial_published结果仍保留，不能改称旧命令成功。generated同会话withdraw仍是Kernel公开recoverGenerated，Workbench当前产品恢复采用新Human计划，不自动重跑。
+
+Interface使用原getState白名单DTO，无新增Shell执行/审批IPC。真实状态chip复用节点，点击原role对话；成员日志按run隔离，PM审核以实际reviewer/run/status显示，不新增成员。execute_plan完整范围包含generatedEffects/artifactScopes；静态CSP/Markdown安全、five tabs、焦点/滚动/草稿/Esc保持。
+
+已局部实际证明：SDK审批/拒绝/文字yes/伪digest/审核失败/输入改变/取消重启；native source发布、自测与Acceptance；删除/二进制墓碑与absence；离线本地npm安装、readonly .bin only-dist build；真实持久锁故障导致source partial→重启暂停→新Human nonce计划→新审批/新授权恢复。局部失败输出保留，不替代最终同candidate shell/regression_model/regression_unit三门。
+
+安装输入为实际legion-runtime0.8.1，tar SHA970bf9954813022cef8f396b8ac388088024cdca9ffd18d1533347723b5a73f1；旧0.8.0/0.7产物和所有旧失败/批准均保留。最终成绩由本任务task_ops证据与Supervisor/Tester/Reviewer独立验收记录决定，本Owner不自verify。
+
+### 实际固定门首失败的最小修复
+
+首shell门candidate e8f435cbaa1499c430b822219eac41b67bfc9d45330fc5deea17c9c902ab557c在300秒实际超时，日志desktop-shell-1-shell-7ed8eb44永久保留。定位为requestRepair在Organization.#mutate中调用允许删除的snapshotInputs→load→等待自身tail。现改用本事务已验证state直接投影same-plan真实observed墓碑和当前owner，再通过Provider读当前输入；公共snapshot仍从真实load投影。没有去掉检查/放宽absence、修改argv或超时。修后冻结新的candidate并重新三门，旧成绩不充作新证据。
+
+二次shell门e00d699/5977b4ad实际结束，无超时，仅两个具体失败。only-dist完成生成发布后的私有单scope快照误把其他已确认dependencies的.bin当普通源码link，现安全树读取始终用完整Human artifactScopes，私有摘要只筛所选scope；Shell opaque input generation和本条发布范围不变。新UI回归Mock初始drawer未设HTML的hidden，现夹具恢复实际hidden初始值，Esc同trigger严格引用断言保留。旧日志/候选保留，重新三门。
+
+### 生成-only部分发布恢复的必要守卫
+
+Source candidate为空不能代表生成partial已恢复：新的Human确认计划必须覆盖旧request生成scope，每个scope须由新plan实际Shell published并与当前私有generation摘要一致，才允许recovered；所有当前checks仍要真实通过。前次partial中已真实publishedResources(action generated)及私有版本匹配的scope可作为Host生成来源，不能把全部候选当已发布，也不能排除后来新增或改动的普通源码。final发布记录故障保留原ready/真实结果收束为partial和已发布facts，不误回成executed=false。
+
+该generated-only真实回归使用Core已发布后Host Organization实际锁故障、重启保留partial、新Human计划及PM审批、当前生成版本与独立检查。定位到finishPublication私有journal为wx一次创建，不重复调用；Core已完成而Host记录失败时保留真实最终观察并标Host partial/record_failed，旧权限不复活。夹具为生成文件声明真实Worker/Acceptance check inputs，不用常量检查冒充。所有局部失败输出保留，最终三门重新同候选。
+
+已观察Mutation必须先加入真实结果集，再await恢复基线复查；即使当前版本因后续合法变化而拒绝恢复，partial仍包含已经实际发生的写入/删除。该顺序保护不增加许可、重试或范围。最终三个固定门在此候选重新运行。
+
+## 2026-10-10 显式fresh时间事实Host适配（同Shell v1）
+
+独立纯度审查后Kernel已将Model时钟观察移到Provider，实际安装包现为legion-runtime0.8.2，tarSHA1a2a7c483f04f2bb939d6bf4d25aa7a4318bc866a473dcac251f74d1ee592622。旧0.8.1输入和通过/失败证据保留历史。仅在每个真实源码proposal发放许可时调用本次Shell Service.observeTime()，controller.issueShellPublication(proposal,receipt,service.observeTime())第三参数必需；不在prepare/PM阶段缓存整批时刻，不向Model传Date.now/callback，不新增SDK/request/rendererclock字段。后续consume/recheck和真正create/replace/delete前，由各Provider重新观察到期事实，普通write/edit、预算与partial/newHuman恢复保持。现有真实SDK/native source/binary/delete/多文件恢复及生成恢复分支继续作为Host接线证据，不重复Kernel底层时钟测试或扩权限。源码和这些契约文档一次冻结后，当前任务三个固定门重新同candidate运行，独立验收仍由Supervisor安排。
+
+## 2026-10-10 absence wire、活动入口焦点及正确资产恢复（同v1必要修复）
+
+真实删除检查基线仅state:absent/sha256:null/byteLength:0/noexec可经原getState wire公开；legacy present仍严格SHA，非法状态/字段冲突/未知字段拒绝。成员证据和检查记录显示获准缺失，不显示SHA null。活动入口采用既有内侧1px/-3px焦点及无按下位移，保留真实鼠标/键盘/Esc回原trigger和结束fallback，不blur或隐藏键盘焦点。阶段截图由实际DOM/transition稳定判定，不猜新生产bug。
+
+只针对旧partial中真实成功/observedMutation、actual publishedResources与candidate一致且当前仍匹配目标SHA/bytes/safeexec的产物，Host在新Human明确当前baseline和新plan确认后创建独立recovery_verified_retained事实。事实绑定旧request/proposal/candidate摘要、新Human请求/plan、currentowner/task/instance/run与已核验baseline；task.retainedOutputs与新Mutation results分列，不伪造observedMutation，不重写正确binary，不泛化普通nochange。新计划仍声明原精确writeSet与检查输入，保留事实仅承接该已明确范围内的交付。Human确认明示可核验保留的资源/来源，SDK只得到Host事实不是许可。当前selfchecks/Acceptance和末次磁盘/生成版本复核之后才append recovered，旧partial结果不改。SHA/bytes/mode改变、缺provenance、baseline/owner/task/plan不符均拒绝。
+
+Core/Adapter/SDK工具/IPC操作与0.8.2包不变，公共Organization abstract/public/impl facade一致，仅Desktop可选task-state元数据兼容旧缺失字段。真实自有SDK/native partial→restart→newHuman/newPM/newShell保持正确binary无diff/无新Mutation，保留事实后检查/Acceptance；否定changedSHA/mode/missingprovenance；wire原IPC和native focus分支严格回归。全部三个固定门同新candidate，不复用旧177/34/199，独立验收由Supervisor后继调度。
+
+保留事实在task.retainedOutputs显式呈现，并在完成恢复时追加到旧Shell recovery.retainedOutputs作为持久独立来源，后续新计划替换当前tasks不会丢掉该证明。事实纯验证归属Interaction Model，Workbench重用同一schema；旧缺失字段兼容，不改原partial result或伪造Mutation。正例binary原inode保持、newcandidate/results无该资源；changedSHA/mode先拒保留，只有新真实Mutation修复才可完成，missingprovenance无diff则继续缺交付拒绝。
+
+已支持的旧成功delete保留仍action:retain_file，但依赖交接明确state:absent/missing:true/sha:null/0bytes和原tombstone、request/proposal来源；不能把它冒作本轮新delete或未知SHA。事实自身也保持该真实墓碑，普通未证明缺失拒绝。实际删除先发生、第二次无diff后当前检查仍验证absence。原d617三门作为历史保留，补齐此必要数据后全部三门刷新。
+
+真实retained delete回归定位检查入口先前传active.project静态启动快照，缺当前task.retainedOutputs，导致合法absence被拒。改为已checkBindings后的当前Project事实进行snapshotInputs，仍只通过same-plan真实删除/墓碑或已核验保留来源证明absence；不对普通missing放行。临时有限诊断已移除，旧失败输出保留。

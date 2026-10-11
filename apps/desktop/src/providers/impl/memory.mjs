@@ -1,0 +1,23 @@
+import { assertKnownKeyFree } from '../../models/workbench.mjs';
+import { projectIdentifier } from '../../models/desktop.mjs';
+import { lstat,realpath,mkdir,open,rename,unlink,rmdir } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { resolve,dirname,join,isAbsolute,relative } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { memoryProviderOptions } from '../abstract/memory.mjs';
+import { memoryDocument,MemoryValidationError } from '../../models/memory.mjs';
+const MAX_BYTES=1048576;
+function fail(code){throw new MemoryValidationError(code);}
+async function directory(path,create=false){const target=resolve(path);let current=target;const missing=[];for(;;){try{const info=await lstat(current);if(!info.isDirectory()||info.isSymbolicLink())fail('unsafe_path');break;}catch(error){if(error.code!=='ENOENT')throw error;missing.unshift(current);const parent=dirname(current);if(parent===current)throw error;current=parent;}}for(let ancestor=current;;ancestor=dirname(ancestor)){const stat=await lstat(ancestor);if(!stat.isDirectory()||stat.isSymbolicLink())fail('unsafe_path');if(dirname(ancestor)===ancestor)break;}if(await realpath(current)!==current)fail('unsafe_path');if(create)for(const item of missing)await mkdir(item,{mode:0o700});return target;}
+async function readDocument(path){let handle;try{const info=await lstat(path);if(!info.isFile()||info.isSymbolicLink()||info.nlink!==1||info.size>MAX_BYTES)fail('memory_corrupt');handle=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);const before=await handle.stat();if(before.dev!==info.dev||before.ino!==info.ino)fail('memory_corrupt');const bytes=await handle.readFile();const after=await handle.stat(),last=await lstat(path);if(bytes.length>MAX_BYTES||before.size!==after.size||before.mtimeMs!==after.mtimeMs||last.isSymbolicLink()||last.ino!==before.ino)fail('memory_corrupt');return memoryDocument(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)));}catch(error){if(error.code==='ENOENT')return null;throw error;}finally{if(handle)await handle.close();}}
+export class MemoryProviderImpl{
+ #data;#closed=false;
+ constructor(options){const checked=memoryProviderOptions(options);if(!isAbsolute(checked.userDataDir))fail('unsafe_path');this.#data=resolve(checked.userDataDir);}
+ newId(){return 'fact-'+randomUUID();}now(){return new Date().toISOString();}close(){this.#closed=true;}
+ async #path(project){if(this.#closed)fail('closed');projectIdentifier(project.id);const workspace=project.workspaceIdentity;const root=await directory(workspace.canonicalPath);const info=await lstat(root,{bigint:true});if(String(info.dev)!==workspace.deviceId||String(info.ino)!==workspace.fileId)fail('root_identity_changed');const data=await directory(this.#data,true);for(const [a,b]of [[root,data],[data,root]]){const part=relative(a,b);if(part===''||(!isAbsolute(part)&&part!=='..'&&!part.startsWith('../')))fail('data_overlap');}const target=await directory(join(data,'workbench-memory'),true);return join(target,project.id+'.json');}
+ async read(project,knownSecrets=[]){const path=await this.#path(project);const document=await readDocument(path);if(document&&document.projectId!==project.id)fail('memory_project_mismatch');return assertKnownKeyFree(document,knownSecrets);}
+ async write(value,project,expectedDigest,signal=null,knownSecrets=[]){const document=assertKnownKeyFree(memoryDocument(value),knownSecrets);if(document.projectId!==project.id)fail('memory_project_mismatch');if(signal?.aborted)fail('stale_action');const path=await this.#path(project),lock=path+'.lock';let acquired=false,temporary=null,lockIdentity;
+  try{try{await mkdir(lock,{mode:0o700});acquired=true;lockIdentity=await lstat(lock);}catch(error){if(error.code==='EEXIST')fail('memory_busy');throw error;}const current=assertKnownKeyFree(await readDocument(path),knownSecrets);let currentDigest=null;if(current)currentDigest=current.digest;if(currentDigest!==expectedDigest)fail('stale_memory');const bytes=Buffer.from(JSON.stringify(document));if(bytes.length>MAX_BYTES)fail('memory_budget');temporary=join(dirname(path),randomUUID()+'.tmp');const handle=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);try{await handle.writeFile(bytes);await handle.sync();}finally{await handle.close();}await this.#path(project);if(signal?.aborted)fail('stale_action');await rename(temporary,path);temporary=null;return document;
+  }finally{if(temporary)await unlink(temporary);if(acquired){const current=await lstat(lock);if(current.isSymbolicLink()||current.ino!==lockIdentity.ino||current.dev!==lockIdentity.dev)fail('memory_lock_changed');await rmdir(lock);}}
+ }
+}

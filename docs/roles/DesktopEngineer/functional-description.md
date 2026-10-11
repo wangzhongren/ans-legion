@@ -24,3 +24,9 @@ AI 设置支持 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages�
 
 本版能力正式检查 47/47 已由 Supervisor 核验；五测试调用者目录修复后完整六 suite 再次 47/47，已在新任务核验。当前 Interface 有限检查入口含7个用例，覆盖真实公开 Pipeline/本地文件效果、IPC 边界、文本安全、显示分离与聚焦 DOM 替身回归；本候选正式成绩以 [当前调度记录](../../scheduling/legion-desktop-workbench-v2-fixture-repair.md) 为准。DOM 替身不证明原生布局；本阶段尚未运行 v2 原生 Electron 窗口、DPAPI 重启或便携 ZIP。实际步骤与历史见 [工作台功能](docs/feature/desktop-console.md)，接线见 [API](api-spec.md)。
 
+
+## 项目Shell v1生产candidate
+
+角色可以申请项目内通用Shell；每条由当前PM独立结构化审核。主composer执行时禁用仍能推进PM队列，原执行角色的same pending上下文等待/恢复。只发布当前角色任务源码与Human确认产物，Shell结果/自测/独立验收分开。主区显示实际待PM审批/执行Shell/发布中，原role对话显示命令与有限输出，PM对话显示真实审核。
+
+拒绝、取消或旧审批不执行；部分发布留真实文件与journal并暂停。新Human计划基线确认和新授权可完成恢复，旧失败不删除。当前候选需三个固定门及独立Tester/Reviewer验收；不声称客户项目已经开发或其他平台已通过。[功能与限制](docs/feature/project-shell.md)。

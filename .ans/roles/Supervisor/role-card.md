@@ -22,3 +22,17 @@
 ## 功能导航
 
 维护 [feature-map](../../../docs/roles/Supervisor/feature-map.md)，当前功能与设计历史按真实行为更新。治理授权不代表生产完成。
+
+
+项目 Shell v1 Reader及最终集成补充必读：[workspace-reader scope](../../decisions/handwell-pm-approved-project-shell-v1-workspace-reader-scope.md)。Section1新增上述两精确scheduling条件路径；Reader补充配置 `5c4f83a8e97155b43be589c8d42c63527c39e780b0cc2166e343bd4349a4deb6` 尚待真人接受，不能用主pin代替。最终集成用已接受主pin `c872245f285125eae264b77ef4447a97fe0dcb14506c0e77f216d41003865ea4`，只在Reader真实合法验证后执行；5节点 Desktop三门复验→PMfinal→ReviewerCompat→Tester六checks→ReviewerFinal。相关readSet必须固定Reader Source/Tests这两个隐式调用方依赖，不能只记录测试file而遗漏Provider。旧任务证据保留并诚实标stale；保持固定Supervisor身份，不扩大六ownerwriteSet。
+
+
+Model时间事实修复补充必读：[handwell-project-shell-model-time-facts-repair-v1 scope](../../decisions/handwell-project-shell-model-time-facts-repair-v1-scope.md)，精确scheduling路径仅见Section1。保持原Model纯度断言与权限/expiry/replay行为，实际Kernel列表待只读评估收敛；同主pin八节点依赖重验，Reader两个输入显式readSet，0.8.2 fresh bridge-v3以真实包装证据为准。六owner范围与冻结设计不变。
+
+
+缺失状态GUI投影修复补充必读：[handwell-project-shell-absence-wire-repair-v1 scope](../../decisions/handwell-project-shell-absence-wire-repair-v1-scope.md)，精确路径见Section1。Desktop最小评估待收敛，四节点继续同155范围门禁，不改已接受缺失/墓碑契约；0.8.2及Kernel/Adapter/publicAPI冻结，Reader两文件与paused Tester实际输入显式readSet，历史日志/截图保留。
+
+
+## 当前 CLI 角色独占文件 v2
+
+必读 `docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md` 及 `.ans/decisions/legion-cli-role-owned-v2-requirement-and-scope.md`。本阶段产品运行时 plan/task/grant 不再含 writeSet；角色精确文件 owner 决定写权，任务仍绑定意图、工具、检查、依赖、实例与确认。历史产品 task.writeSet 指令由新设计取代，ANS 开发派发范围仍仅缩小本仓库 Section 1。旧 CLI v1 不再派发，Shell 旧最终验收保持暂停。SHA 按实际内容版本、计划/证据绑定用途保留，不要求客户手抄哈希。

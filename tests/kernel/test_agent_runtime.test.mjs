@@ -1,13 +1,22 @@
+import { makeTestOwners, testLeaseContext } from "./test_control_memory.test.mjs";
+const kernelOwners = makeTestOwners("Backend", ["backend/a.txt", "backend/b.txt"]);
 import test from "node:test";
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import nodeFs from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+function tmpdir() {
+  const path = fileURLToPath(new URL("../../.ans/runtime/legion-cli-role-owned-v2/KernelEngineer/tmp/", import.meta.url));
+  mkdirSync(path, { recursive: true });
+  return path;
+}
 import { createFauxCore, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 import { AgentSession as SdkSession } from "@earendil-works/pi-coding-agent";
 import { createRuntime } from "../../src/kernel/interface/runtime.mjs";
 import { AgentSession, RoleBoundary, ActionProposal, Outcome, ExecutionPermit, PolicyDecision } from "../../src/kernel/models/core.mjs";
+import { createHash } from "node:crypto";
 let sequence = 0;
 function provider(responses, id = "local-" + ++sequence) {
   const core = createFauxCore({ provider: id, models: [{ id: "model" }], tokensPerSecond: 0 });
@@ -24,13 +33,13 @@ async function fixture(t, providers = [provider()], extra = {}) {
   const workspace = await fs.mkdtemp(join(tmpdir(), "legion-runtime-"));
   const boundary = new RoleBoundary({ roleId: "Backend", writeScope: ["backend/"], denyScope: ["backend/private/"],
     tools: ["legion_write_file"], capabilities: ["write_file"] });
-  const context = { roleId: "Backend", taskId: "task", organizationVersion: "v3", writeSet: ["backend/a.txt", "backend/b.txt"], tools: ["legion_write_file"] };
-  const options = { workspace, boundaries: [boundary], organizationVersion: "v3", dispatchContext: context,
+  const context = { roleId: "Backend", taskId: "task", organizationVersion: "v3", fileOwnersDigest: kernelOwners.digest, ownerGeneration: kernelOwners.version, tools: ["legion_write_file"] };
+  const options = { workspace, fileOwners: kernelOwners, leaseContext: testLeaseContext(workspace, kernelOwners), boundaries: [boundary], organizationVersion: "v3", dispatchContext: context,
     modelProviders: providers.map((p) => p.config), ...extra };
   const runtime = createRuntime(options);
   t.after(async () => { t.mock.restoreAll(); await runtime.close(); await fs.rm(workspace, { recursive: true }); });
   function config(name = "agent", resource = "backend/a.txt", p = providers[0]) { return { name,
-    proxy: { provider: p.config.provider, model: "model" }, scope: { write: [resource], deny: [".ans/"], tools: ["legion_write_file"] } }; }
+    proxy: { provider: p.config.provider, model: "model" }, scope: { write: ["backend/a.txt", "backend/b.txt"], deny: [".ans/"], tools: ["legion_write_file"] } }; }
   return { workspace, boundary, context, options, providers, runtime, config };
 }
 test("public immutable façade hides services, authority, SDK and capabilities", async (t) => {
@@ -41,13 +50,17 @@ test("public immutable façade hides services, authority, SDK and capabilities",
   for (const field of ["authority", "pipeline", "policy", "mutation", "provider", "session", "permit", "submit"]) assert.equal(agent[field], undefined);
   await agent.close(); await agent.close(); await assert.rejects(agent.run({ taskId: "task", prompt: "x" }), /not_ready/);
 });
-test("real SDK two instances write only own exact scope with independent sessions/transcripts", async (t) => {
-  const a = provider([tool("backend/a.txt", "A"), tool("backend/b.txt", "forbidden"), fauxAssistantMessage("A complete")]);
+test("real SDK same-role runs serialize with full owner scope and independent sessions/transcripts", async (t) => {
+  const a = provider([tool("backend/a.txt", "A"), tool("backend/c.txt", "forbidden"), fauxAssistantMessage("A complete")]);
   const b = provider([tool("backend/b.txt", "B"), fauxAssistantMessage("B complete")]);
   const f = await fixture(t, [a, b]);
   t.mock.method(globalThis, "fetch", () => { throw new Error("network forbidden"); });
+  let active = 0; let peak = 0;
   const sessions = []; const prompt = SdkSession.prototype.prompt;
-  t.mock.method(SdkSession.prototype, "prompt", function (...args) { sessions.push(this); return prompt.apply(this, args); });
+  t.mock.method(SdkSession.prototype, "prompt", async function (...args) {
+    sessions.push(this); active += 1; peak = Math.max(peak, active);
+    try { return await prompt.apply(this, args); } finally { active -= 1; }
+  });
   const [aa, bb] = await Promise.all([f.runtime.createAgent(f.config("A", "backend/a.txt", a)), f.runtime.createAgent(f.config("B", "backend/b.txt", b))]);
   const [ar, br] = await Promise.all([aa.run({ taskId: "task", prompt: "only A" }), bb.run({ taskId: "task", prompt: "only B" })]);
   assert.equal(ar.status, "completed"); assert.equal(br.status, "completed");
@@ -55,11 +68,12 @@ test("real SDK two instances write only own exact scope with independent session
   assert.equal(ar.toolResults[1].decision.reason, "outside_instance_or_task_scope");
   assert.equal(await f.runtime.readFile("backend/a.txt"), "A"); assert.equal(await f.runtime.readFile("backend/b.txt"), "B");
   assert.notEqual(aa.sessionId, bb.sessionId); assert.notEqual(a.calls[0].sessionId, b.calls[0].sessionId);
+  assert.equal(peak, 1);
   assert.equal(sessions.length, 2); assert.notEqual(sessions[0], sessions[1]);
   assert.match(a.calls[2].context, /denied/); assert.doesNotMatch(a.calls[0].context, /only B/);
   for (const call of [...a.calls, ...b.calls]) assert.ok(!call.keys.some((key) => ["runtime", "submit", "writeFile", "permit"].includes(key)));
   assert.equal(globalThis.fetch.mock.callCount(), 0);
-  const events = await f.runtime.events(); assert.ok(events.some((e) => e.kind === "mutation_failure" && e.resource === "backend/b.txt"));
+  const events = await f.runtime.events(); assert.ok(events.some((e) => e.kind === "mutation_failure" && e.resource === "backend/c.txt"));
   assert.ok(!JSON.stringify(events).includes("offline-key"));
 });
 test("unknown provider/model, expanded task/role scope and invalid tools reject before SDK", async (t) => {
@@ -182,11 +196,45 @@ test("legacy trusted prepare/execute APIs preserve opaque authority and update r
   assert.equal((await f.runtime.execute(proposal, prepared.permit)).status, "denied");
   assert.equal((await f.runtime.submit(proposal)).result.status, "written");
   const outside = await f.runtime.submit(new ActionProposal({ ...proposal, resource: "backend/not-task.txt" }));
-  assert.equal(outside.decision.outcome, Outcome.DENY); assert.equal(outside.decision.reason, "outside_task_scope");
+  assert.equal(outside.decision.outcome, Outcome.DENY); assert.equal(outside.decision.reason, "file_owner_mismatch");
   await assert.rejects(fs.stat(join(f.workspace, "backend/not-task.txt")), { code: "ENOENT" });
 });
 test("SDK inference failure returns safe code, closes session and cannot run again", async (t) => {
   const p = provider([]); const f = await fixture(t, [p]); const agent = await f.runtime.createAgent(f.config());
   const result = await agent.run({ taskId: "task", prompt: "x" }); assert.equal(result.status, "failed");
   assert.equal(result.errorCode, "pi_model_error"); await assert.rejects(agent.run({ taskId: "task", prompt: "again" }), /not_ready/);
+});
+
+test("trusted Runtime routes edit through exact task scope and existing approval gate", async (t) => {
+  const workspace = await fs.mkdtemp(join(tmpdir(), "legion-runtime-edit-"));
+  await fs.mkdir(join(workspace, "backend"));
+  await fs.writeFile(join(workspace, "backend/a.txt"), "one two\n");
+  const session = new AgentSession({ sessionId: "edit-session", roleId: "Backend", taskId: "task",
+    organizationVersion: "v3" });
+  const boundary = new RoleBoundary({ roleId: "Backend", writeScope: ["backend/"],
+    capabilities: ["write_file"], tools: ["legion_edit_file"] });
+  const runtime = createRuntime({ fileOwners: makeTestOwners("Backend", ["backend/a.txt"]), leaseContext: testLeaseContext(workspace, makeTestOwners("Backend", ["backend/a.txt"])), workspace: await fs.realpath(workspace), boundaries: [boundary],
+    sessions: [session], organizationVersion: "v3", dispatchContext: { roleId: "Backend", taskId: "task",
+      organizationVersion: "v3", fileOwnersDigest: makeTestOwners("Backend", ["backend/a.txt"]).digest, ownerGeneration: kernelOwners.version, tools: ["legion_edit_file"] },
+    modelProviders: [] });
+  t.after(async () => { await runtime.close(); await fs.rm(workspace, { recursive: true, force: true }); });
+  function edit(resource, current, replacement) {
+    return new ActionProposal({ proposalId: "edit-" + resource, action: "edit_file", resource,
+      expectedSha256: createHash("sha256").update(current).digest("hex"),
+      replacements: [{ oldText: replacement, newText: "ONE" }], tool: "legion_edit_file",
+      capability: "write_file", session });
+  }
+  const first = edit("backend/a.txt", "one two\n", "one");
+  const allowed = await runtime.submit(first);
+  assert.equal(allowed.decision.outcome, Outcome.ALLOW);
+  assert.equal(allowed.result.status, "written");
+  assert.equal(await fs.readFile(join(workspace, "backend/a.txt"), "utf8"), "ONE two\n");
+  const outside = await runtime.submit(edit("backend/b.txt", "x", "x"));
+  assert.equal(outside.decision.reason, "file_owner_mismatch");
+  await assert.rejects(fs.stat(join(workspace, "backend/b.txt")), { code: "ENOENT" });
+  await runtime.updateBoundary(new RoleBoundary({ ...boundary, requiredApprovals: ["write_file"] }));
+  const approved = await runtime.submit(edit("backend/a.txt", "ONE two\n", "ONE"));
+  assert.equal(approved.decision.outcome, Outcome.REQUIRE_APPROVAL);
+  assert.equal(approved.result.status, "denied");
+  assert.equal(await fs.readFile(join(workspace, "backend/a.txt"), "utf8"), "ONE two\n");
 });

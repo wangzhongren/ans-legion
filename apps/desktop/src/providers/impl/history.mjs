@@ -1,10 +1,12 @@
+import { digestValue } from 'legion-runtime/workbench-models';
 import {
   lstat,
   realpath,
   mkdir,
   open,
   rename,
-  unlink
+  unlink,
+  rmdir
 } from 'node:fs/promises';
 import {
   resolve,
@@ -150,8 +152,8 @@ function fail(code) {
       return wbCaught(error, 'history_corrupt');
     }
   }
-  async write(raw, root) {
-    let temp = null;
+  async write(raw, root, options = {}) {
+    let temp = null; let lock = null;
     try {
       const document = historyDocument(raw);
       const directory = await this.#guard(root);
@@ -162,6 +164,10 @@ function fail(code) {
       });
       await this.#guard(root);
       const target = join(directory, `${document.projectId}.json`);
+      const locking = target + '.lock';
+      try { await mkdir(locking, { mode: 0o700 }); lock = locking; } catch (error) { if (error.code === 'EEXIST') fail('history_busy'); throw error; }
+      const current = await this.read(document.projectId, root); if (!current.ok) fail(current.error.code);
+      if (options.expectedDigest !== undefined && options.expectedDigest !== digestValue(current.value)) fail('stale_history');
       try {
         const info = await lstat(target);
         if (!info.isFile() || info.isSymbolicLink()) fail('unsafe_path');
@@ -196,6 +202,6 @@ function fail(code) {
         }
       }
   return wbCaught(error, 'history_unavailable');
-    }
+    } finally { if (lock) await rmdir(lock); }
   }
 }

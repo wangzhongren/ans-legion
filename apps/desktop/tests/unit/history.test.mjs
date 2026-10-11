@@ -29,7 +29,7 @@ assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(t
 const projectRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 let roleDirectory = testRole;
 if (testRole !== 'DesktopEngineer') roleDirectory = `${testRole}/desktop`;
-const base = resolve(projectRoot, `.ans/runtime/legion-desktop-workbench-v2/${roleDirectory}`);
+const base = resolve(projectRoot, `.ans/runtime/legion-governed-workflow-v1/${roleDirectory}`);
 await mkdir(join(base, 'fixtures'), {
   recursive: true
 });
@@ -112,4 +112,18 @@ test('history rejects real path overlap before creating its data directory', asy
       messages: []
     }
   }, identity); assert.equal(result.error.code, 'data_overlap'); assert.deepEqual(await readdir(root), []);
+});
+
+test('two history Services cannot overwrite a newer loaded digest; reloading preserves the new conversation', async () => {
+  const directory = await mkdtemp(join(base, 'fixtures', 'history-cas-')); const root = join(directory, 'customer'); await mkdir(root); const data = join(directory, 'data');
+  const workspaceIdentity = (await createProjectProvider({ userDataDir: data }).describeRoot(root)).value.workspaceIdentity;
+  const projectId = identityKey(workspaceIdentity); const first = createHistoryService({ userDataDir: data }); const second = createHistoryService({ userDataDir: data });
+  try {
+    const input = { projectId, workspaceIdentity }; assert.equal((await first.load(input)).ok, true); assert.equal((await second.load(input)).ok, true);
+    const history = { messages: [{ role: 'user', text: '第一个窗口已保存' }] };
+    assert.equal((await first.save({ ...input, history })).ok, true);
+    assert.equal((await second.save({ ...input, history: { messages: [{ role: 'user', text: '旧窗口覆盖' }] } })).error.code, 'stale_history');
+    assert.deepEqual((await second.load(input)).value.messages, history.messages);
+    assert.equal((await second.save({ ...input, history: { messages: [...history.messages, { role: 'assistant', text: '新版本继续' }] } })).ok, true);
+  } finally { await first.close(); await second.close(); }
 });

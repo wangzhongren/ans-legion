@@ -1,0 +1,15 @@
+schema_version: 1
+role_id: ProductDesigner
+label: 产品与界面设计
+status: ACCEPTED
+version: legion-ui-productdesigner-v1
+read_scope: ['project/**']
+write_scope:
+  - 'docs/roles/ProductDesigner/feature-map.md'
+  - 'docs/roles/ProductDesigner/functional-description.md'
+  - 'docs/roles/ProductDesigner/api-spec.md'
+  - 'docs/roles/ProductDesigner/changelog.md'
+  - 'docs/roles/ProductDesigner/docs/design/2026-10-08_design_legion-ui.md'
+  - 'docs/roles/ProductDesigner/prototypes/legion-ui.html'
+deny_scope: ['all_application_source', 'all_tests', '.ans/organization/**', '.ans/project.json', '.ans/roles/**', 'all_other_role_documents', 'runtime_user_data']
+approval_source: direct_customer_config_sha256_7b5addceef43202f4abf2411cb436275a097fa4bdcaf5e4a094386d75b5952b1

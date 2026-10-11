@@ -19,7 +19,7 @@ assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(t
 const projectRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 let roleDirectory = testRole;
 if (testRole !== 'DesktopEngineer') roleDirectory = `${testRole}/desktop`;
-const base = join(projectRoot, `.ans/runtime/legion-desktop-workbench-v2/${roleDirectory}`);
+const base = join(projectRoot, `.ans/runtime/legion-governed-workflow-v1/${roleDirectory}`);
 const fixtureRoot = join(base, 'fixtures');
 process.env.NODE_DISABLE_COMPILE_CACHE = '1';
 delete process.env.NODE_OPTIONS;

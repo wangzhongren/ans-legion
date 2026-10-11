@@ -12,3 +12,6 @@ public工厂返回自己的abstract契约，具体impl隐藏。Workbench Pipelin
 
 实际套件Provider27/Service4/Proposal只读7共38通过、零跳过。真实localhost三协议HTTP+SDK多轮、零工具、隔离、typed restore、预算、旧listener重放及cancel/close竞态均覆盖。沙箱localhost EACCES已实际验证，自动批准的相同命令38通过，断言保持。生成目录只在本角色本阶段，未安装或付费；owner结果不替代Kernel/Desktop/新版发行独立验收。[API](api-spec.md)、[功能流程](docs/feature/pi-agent.md)、[当前设计](docs/design/2026-10-07_design_desktop-workbench-v2.md)、[任务证据](../../scheduling/legion-desktop-workbench-v2.md)。
 
+
+
+项目 Shell v1 增加两个精确 SDK 工具、PM 实例限定、Shell typed 终态摘要匹配及 single_run 活动预算。申请在原角色原工具调用等待，Host 收尾后一次回应。取消释放等待；恢复只载入当前绑定纯文本。功能与边界见 [project-shell](docs/feature/project-shell.md)。本层不执行命令或发布文件，Shell 成功不计检查通过。

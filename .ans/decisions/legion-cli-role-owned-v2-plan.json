@@ -1,0 +1,414 @@
+{
+  "schemaVersion": 1,
+  "taskId": "legion-cli-role-owned-v2",
+  "requirement": {
+    "path": ".ans/decisions/legion-cli-role-owned-v2-requirement-and-scope.md",
+    "version": "human-role-owned-2026-10-10"
+  },
+  "design": {
+    "path": "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+    "version": "cli-role-owned-files-v2-sha8ace0d4a"
+  },
+  "nodes": [
+    {
+      "nodeId": "kernel-role-authority",
+      "roleId": "KernelEngineer",
+      "stage": "role-owned active runtime authority and typed controls",
+      "operation": "implement",
+      "writeSet": [
+        "docs/roles/KernelEngineer/api-spec.md",
+        "docs/roles/KernelEngineer/changelog.md",
+        "docs/roles/KernelEngineer/docs/design/2026-10-10_design_cli-controls.md",
+        "docs/roles/KernelEngineer/docs/feature/cli-controls.md",
+        "docs/roles/KernelEngineer/docs/feature/generic-agents.md",
+        "docs/roles/KernelEngineer/docs/feature/permission.md",
+        "docs/roles/KernelEngineer/feature-map.md",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/models/core.mjs",
+        "src/kernel/models/shell.mjs",
+        "src/kernel/models/workbench.mjs",
+        "src/kernel/pipelines/permission.mjs",
+        "src/kernel/providers/abstract/storage.mjs",
+        "src/kernel/providers/impl/shell.mjs",
+        "src/kernel/providers/impl/storage.mjs",
+        "src/kernel/providers/public/storage.mjs",
+        "src/kernel/services/abstract/mutation.mjs",
+        "src/kernel/services/abstract/policy.mjs",
+        "src/kernel/services/impl/mutation.mjs",
+        "src/kernel/services/impl/policy.mjs",
+        "src/kernel/services/public/mutation.mjs",
+        "tests/kernel/test_agent_models.test.mjs",
+        "tests/kernel/test_agent_runtime.test.mjs",
+        "tests/kernel/test_agent_scope.test.mjs",
+        "tests/kernel/test_check_models.test.mjs",
+        "tests/kernel/test_check_provider.test.mjs",
+        "tests/kernel/test_check_service.test.mjs",
+        "tests/kernel/test_control_memory.test.mjs",
+        "tests/kernel/test_demo.test.mjs",
+        "tests/kernel/test_events.test.mjs",
+        "tests/kernel/test_models.test.mjs",
+        "tests/kernel/test_mutation.test.mjs",
+        "tests/kernel/test_policy.test.mjs",
+        "tests/kernel/test_project_read.test.mjs",
+        "tests/kernel/test_shell_models.test.mjs",
+        "tests/kernel/test_shell_provider.test.mjs",
+        "tests/kernel/test_shell_service.test.mjs",
+        "tests/kernel/test_workbench_models.test.mjs"
+      ],
+      "requiredOutputs": [
+        "src/kernel/models/core.mjs",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/models/workbench.mjs",
+        "src/kernel/models/shell.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md"
+      ],
+      "checks": [
+        "unit"
+      ],
+      "dependsOn": []
+    },
+    {
+      "nodeId": "desktop-headless",
+      "roleId": "DesktopEngineer",
+      "stage": "environment profiles and shared project lease",
+      "operation": "implement",
+      "writeSet": [
+        "apps/desktop/src/models/desktop.mjs",
+        "apps/desktop/src/providers/abstract/environment_profile.mjs",
+        "apps/desktop/src/providers/abstract/project_lease.mjs",
+        "apps/desktop/src/providers/impl/environment_profile.mjs",
+        "apps/desktop/src/providers/impl/project_lease.mjs",
+        "apps/desktop/src/providers/public/environment_profile.mjs",
+        "apps/desktop/src/providers/public/project_lease.mjs",
+        "apps/desktop/src/services/abstract/environment_profiles.mjs",
+        "apps/desktop/src/services/impl/environment_profiles.mjs",
+        "apps/desktop/src/services/public/environment_profiles.mjs",
+        "apps/desktop/tests/unit/environment-profiles.test.mjs",
+        "apps/desktop/tests/unit/project-lease.test.mjs",
+        "docs/roles/DesktopEngineer/docs/feature/cli-project-host.md"
+      ],
+      "requiredOutputs": [
+        "apps/desktop/src/services/impl/environment_profiles.mjs",
+        "apps/desktop/src/providers/impl/project_lease.mjs",
+        "apps/desktop/tests/unit/project-lease.test.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+        "apps/desktop/src/services/impl/profiles.mjs"
+      ],
+      "checks": [
+        "headless"
+      ],
+      "dependsOn": []
+    },
+    {
+      "nodeId": "adapter-controls",
+      "roleId": "AgentAdapterEngineer",
+      "stage": "role-owned prompt and controlled memory/supervision tools",
+      "operation": "implement",
+      "writeSet": [
+        "docs/roles/AgentAdapterEngineer/api-spec.md",
+        "docs/roles/AgentAdapterEngineer/changelog.md",
+        "docs/roles/AgentAdapterEngineer/docs/design/2026-10-10_design_cli-controls.md",
+        "docs/roles/AgentAdapterEngineer/docs/feature/cli-controls.md",
+        "src/adapters/providers/impl/pi_session.mjs",
+        "tests/adapters/test_control_tools.mjs",
+        "tests/adapters/test_memory_supervision_tools.mjs",
+        "tests/adapters/test_pi_provider.mjs",
+        "tests/adapters/test_pi_service.mjs",
+        "tests/adapters/test_proposal.mjs"
+      ],
+      "requiredOutputs": [
+        "src/adapters/providers/impl/pi_session.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/models/core.mjs"
+      ],
+      "checks": [
+        "unit"
+      ],
+      "dependsOn": [
+        "kernel-role-authority"
+      ]
+    },
+    {
+      "nodeId": "pm-runtime-package",
+      "roleId": "ProjectManager",
+      "stage": "fresh current runtime tar and Desktop dependency",
+      "operation": "implement",
+      "writeSet": [
+        "apps/desktop/package-lock.json",
+        "apps/desktop/package.json",
+        "apps/desktop/scripts/verify-dependencies.mjs",
+        "apps/desktop/tests/package/desktop-package.test.mjs",
+        "package-lock.json",
+        "package.json",
+        "tests/package/test_package.mjs"
+      ],
+      "requiredOutputs": [
+        "package.json",
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+        "src/kernel/models/agent.mjs",
+        "src/adapters/providers/impl/pi_session.mjs"
+      ],
+      "checks": [
+        "runtime_package",
+        "desktop_dependency"
+      ],
+      "dependsOn": [
+        "adapter-controls"
+      ]
+    },
+    {
+      "nodeId": "desktop-role-owner",
+      "roleId": "DesktopEngineer",
+      "stage": "v2 role-owned plan, authorization, output evidence and migration",
+      "operation": "implement",
+      "writeSet": [
+        "apps/desktop/src/interface/renderer.mjs",
+        "apps/desktop/src/models/organization.mjs",
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/providers/abstract/organization.mjs",
+        "apps/desktop/src/providers/abstract/project.mjs",
+        "apps/desktop/src/providers/impl/organization.mjs",
+        "apps/desktop/src/providers/impl/project.mjs",
+        "apps/desktop/src/providers/public/organization.mjs",
+        "apps/desktop/src/providers/public/project.mjs",
+        "apps/desktop/src/services/abstract/project.mjs",
+        "apps/desktop/src/services/impl/organization.mjs",
+        "apps/desktop/src/services/impl/project.mjs",
+        "apps/desktop/src/services/public/project.mjs",
+        "apps/desktop/tests/unit/acceptance.test.mjs",
+        "apps/desktop/tests/unit/ipc.test.mjs",
+        "apps/desktop/tests/unit/organization-model.test.mjs",
+        "apps/desktop/tests/unit/organization.test.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "apps/desktop/tests/unit/project.test.mjs",
+        "apps/desktop/tests/unit/shell-publication.test.mjs",
+        "apps/desktop/tests/unit/shell-review.test.mjs",
+        "apps/desktop/tests/unit/workbench-model.test.mjs",
+        "apps/desktop/tests/unit/workbench.test.mjs",
+        "docs/roles/DesktopEngineer/docs/design/2026-10-10_design_cli-host.md"
+      ],
+      "requiredOutputs": [
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/models/workbench.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+        "apps/desktop/package.json",
+        "apps/desktop/src/services/impl/environment_profiles.mjs",
+        "apps/desktop/src/providers/impl/project_lease.mjs"
+      ],
+      "checks": [
+        "owner"
+      ],
+      "dependsOn": [
+        "pm-runtime-package",
+        "desktop-headless"
+      ]
+    },
+    {
+      "nodeId": "desktop-memory-supervisor",
+      "roleId": "DesktopEngineer",
+      "stage": "persistent role facts and independent product Supervisor",
+      "operation": "implement",
+      "writeSet": [
+        "apps/desktop/src/models/interaction.mjs",
+        "apps/desktop/src/models/memory.mjs",
+        "apps/desktop/src/models/organization.mjs",
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/providers/abstract/memory.mjs",
+        "apps/desktop/src/providers/impl/memory.mjs",
+        "apps/desktop/src/providers/impl/organization.mjs",
+        "apps/desktop/src/providers/public/memory.mjs",
+        "apps/desktop/src/services/abstract/memory.mjs",
+        "apps/desktop/src/services/abstract/organization.mjs",
+        "apps/desktop/src/services/impl/memory.mjs",
+        "apps/desktop/src/services/impl/organization.mjs",
+        "apps/desktop/src/services/public/memory.mjs",
+        "apps/desktop/src/services/public/organization.mjs",
+        "apps/desktop/tests/unit/acceptance.test.mjs",
+        "apps/desktop/tests/unit/interaction-model.test.mjs",
+        "apps/desktop/tests/unit/memory.test.mjs",
+        "apps/desktop/tests/unit/organization-model.test.mjs",
+        "apps/desktop/tests/unit/organization.test.mjs",
+        "apps/desktop/tests/unit/workbench-model.test.mjs",
+        "apps/desktop/tests/unit/workbench.test.mjs",
+        "docs/roles/DesktopEngineer/docs/design/2026-10-10_design_cli-host.md"
+      ],
+      "requiredOutputs": [
+        "apps/desktop/src/models/memory.mjs",
+        "apps/desktop/tests/unit/memory.test.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+        "apps/desktop/src/providers/impl/project_lease.mjs"
+      ],
+      "checks": [
+        "host"
+      ],
+      "dependsOn": [
+        "desktop-role-owner"
+      ]
+    },
+    {
+      "nodeId": "desktop-parallel",
+      "roleId": "DesktopEngineer",
+      "stage": "headless Workbench factory and different-role ready-set parallelism",
+      "operation": "implement",
+      "writeSet": [
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/providers/impl/project.mjs",
+        "apps/desktop/src/services/impl/project.mjs",
+        "apps/desktop/tests/unit/parallel-scheduler.test.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "apps/desktop/tests/unit/project.test.mjs",
+        "apps/desktop/tests/unit/workbench.test.mjs",
+        "docs/roles/DesktopEngineer/api-spec.md",
+        "docs/roles/DesktopEngineer/changelog.md",
+        "docs/roles/DesktopEngineer/docs/change/2026-10-10_change_cli-host.md",
+        "docs/roles/DesktopEngineer/feature-map.md"
+      ],
+      "requiredOutputs": [
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/tests/unit/parallel-scheduler.test.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+        "apps/desktop/src/services/impl/environment_profiles.mjs",
+        "apps/desktop/src/providers/impl/project_lease.mjs",
+        "apps/desktop/src/models/memory.mjs"
+      ],
+      "checks": [
+        "parallel"
+      ],
+      "dependsOn": [
+        "desktop-memory-supervisor"
+      ]
+    },
+    {
+      "nodeId": "pm-installed-cli",
+      "roleId": "ProjectManager",
+      "stage": "legion chat interface and final installed npm package",
+      "operation": "implement",
+      "writeSet": [
+        "README.md",
+        "apps/desktop/package-lock.json",
+        "apps/desktop/package.json",
+        "apps/desktop/scripts/verify-dependencies.mjs",
+        "apps/desktop/tests/package/desktop-package.test.mjs",
+        "bin/chat.mjs",
+        "bin/legion.mjs",
+        "docs/roles/ProjectManager/api-spec.md",
+        "docs/roles/ProjectManager/changelog.md",
+        "docs/roles/ProjectManager/docs/architecture.md",
+        "docs/roles/ProjectManager/docs/change/2026-10-10_change_cli-first.md",
+        "docs/roles/ProjectManager/docs/feature/cli-project-workflow.md",
+        "docs/roles/ProjectManager/feature-map.md",
+        "package-lock.json",
+        "package.json",
+        "tests/cli/test_chat.test.mjs",
+        "tests/package/test_package.mjs"
+      ],
+      "requiredOutputs": [
+        "bin/chat.mjs",
+        "bin/legion.mjs",
+        "package.json",
+        "tests/cli/test_chat.test.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/models/workbench.mjs"
+      ],
+      "checks": [
+        "cli"
+      ],
+      "dependsOn": [
+        "desktop-parallel"
+      ]
+    },
+    {
+      "nodeId": "tester-installed-flow",
+      "roleId": "Tester",
+      "stage": "independent installed CLI and role-owned runtime flow",
+      "operation": "test",
+      "writeSet": [
+        "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs",
+        "apps/desktop/tests/e2e/workbench-ui.test.mjs",
+        "apps/desktop/tests/integration/governed-workflow.test.mjs",
+        "apps/desktop/tests/integration/shell-workflow.test.mjs",
+        "apps/desktop/tests/integration/workbench-flow.test.mjs",
+        "docs/roles/Tester/changelog.md",
+        "docs/roles/Tester/docs/design/2026-10-10_design_cli-verification.md",
+        "docs/roles/Tester/docs/verification-cli-v1.md",
+        "tests/integration/test_check_flow.mjs",
+        "tests/integration/test_cli_installed_flow.mjs",
+        "tests/integration/test_generic_agents.mjs",
+        "tests/integration/test_permission_flow.mjs",
+        "tests/integration/test_shell_flow.mjs"
+      ],
+      "requiredOutputs": [
+        "tests/integration/test_cli_installed_flow.mjs",
+        "docs/roles/Tester/docs/verification-cli-v1.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+        "bin/chat.mjs",
+        "package.json",
+        "apps/desktop/src/pipelines/workbench.mjs"
+      ],
+      "checks": [
+        "installed",
+        "regression"
+      ],
+      "dependsOn": [
+        "pm-installed-cli"
+      ]
+    },
+    {
+      "nodeId": "reviewer-cli",
+      "roleId": "Reviewer",
+      "stage": "independent role-owner authority, boundaries and final CLI review",
+      "operation": "review",
+      "writeSet": [
+        "apps/desktop/tests/reviewer/governed-workflow-boundaries.test.mjs",
+        "apps/desktop/tests/reviewer/shell-workflow-boundaries.test.mjs",
+        "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs",
+        "docs/roles/Reviewer/changelog.md",
+        "docs/roles/Reviewer/docs/review-cli-v1.md",
+        "tests/reviewer/test_cli_boundaries.mjs",
+        "tests/reviewer/test_shell_boundaries.mjs",
+        "tests/reviewer/test_structure.mjs"
+      ],
+      "requiredOutputs": [
+        "tests/reviewer/test_cli_boundaries.mjs",
+        "docs/roles/Reviewer/docs/review-cli-v1.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md",
+        "tests/integration/test_cli_installed_flow.mjs",
+        "bin/chat.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs"
+      ],
+      "checks": [
+        "structure"
+      ],
+      "dependsOn": [
+        "tester-installed-flow"
+      ]
+    }
+  ]
+}

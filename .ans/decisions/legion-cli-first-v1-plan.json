@@ -1,0 +1,321 @@
+{
+  "schemaVersion": 1,
+  "taskId": "legion-cli-first-v1",
+  "requirement": {
+    "path": ".ans/decisions/legion-cli-first-v1-requirement-and-scope.md",
+    "version": "customer-cli-first-2026-10-10"
+  },
+  "design": {
+    "path": "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md",
+    "version": "cli-first-role-memory-supervisor-v1-sha8800a806"
+  },
+  "nodes": [
+    {
+      "nodeId": "kernel-controls",
+      "roleId": "KernelEngineer",
+      "stage": "typed memory and supervision tools",
+      "operation": "implement",
+      "writeSet": [
+        "src/kernel/models/agent.mjs",
+        "tests/kernel/test_agent_models.test.mjs",
+        "tests/kernel/test_agent_scope.test.mjs",
+        "tests/kernel/test_control_memory.test.mjs",
+        "docs/roles/KernelEngineer/docs/design/2026-10-10_design_cli-controls.md",
+        "docs/roles/KernelEngineer/docs/feature/cli-controls.md",
+        "docs/roles/KernelEngineer/api-spec.md",
+        "docs/roles/KernelEngineer/changelog.md"
+      ],
+      "requiredOutputs": [
+        "src/kernel/models/agent.mjs",
+        "docs/roles/KernelEngineer/docs/design/2026-10-10_design_cli-controls.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md"
+      ],
+      "checks": [
+        "unit"
+      ],
+      "dependsOn": []
+    },
+    {
+      "nodeId": "adapter-controls",
+      "roleId": "AgentAdapterEngineer",
+      "stage": "Pi controlled tool registration",
+      "operation": "implement",
+      "writeSet": [
+        "src/adapters/providers/impl/pi_session.mjs",
+        "tests/adapters/test_control_tools.mjs",
+        "tests/adapters/test_pi_provider.mjs",
+        "tests/adapters/test_memory_supervision_tools.mjs",
+        "docs/roles/AgentAdapterEngineer/docs/design/2026-10-10_design_cli-controls.md",
+        "docs/roles/AgentAdapterEngineer/docs/feature/cli-controls.md",
+        "docs/roles/AgentAdapterEngineer/api-spec.md",
+        "docs/roles/AgentAdapterEngineer/changelog.md"
+      ],
+      "requiredOutputs": [
+        "src/adapters/providers/impl/pi_session.mjs",
+        "docs/roles/AgentAdapterEngineer/docs/design/2026-10-10_design_cli-controls.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md",
+        "src/kernel/models/agent.mjs"
+      ],
+      "checks": [
+        "unit"
+      ],
+      "dependsOn": [
+        "kernel-controls"
+      ]
+    },
+    {
+      "nodeId": "pm-runtime-package",
+      "roleId": "ProjectManager",
+      "stage": "refresh installable runtime dependency for Desktop",
+      "operation": "implement",
+      "writeSet": [
+        "package.json",
+        "package-lock.json",
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json",
+        "apps/desktop/scripts/verify-dependencies.mjs",
+        "tests/package/test_package.mjs",
+        "apps/desktop/tests/package/desktop-package.test.mjs"
+      ],
+      "requiredOutputs": [
+        "package.json",
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md",
+        "src/kernel/models/agent.mjs",
+        "src/adapters/providers/impl/pi_session.mjs"
+      ],
+      "checks": [
+        "package"
+      ],
+      "dependsOn": [
+        "adapter-controls"
+      ]
+    },
+    {
+      "nodeId": "desktop-host",
+      "roleId": "DesktopEngineer",
+      "stage": "organization migration, classified memory and Supervisor run",
+      "operation": "implement",
+      "writeSet": [
+        "apps/desktop/src/models/organization.mjs",
+        "apps/desktop/src/models/interaction.mjs",
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/models/memory.mjs",
+        "apps/desktop/src/services/abstract/organization.mjs",
+        "apps/desktop/src/services/public/organization.mjs",
+        "apps/desktop/src/services/impl/organization.mjs",
+        "apps/desktop/src/providers/impl/organization.mjs",
+        "apps/desktop/src/providers/abstract/memory.mjs",
+        "apps/desktop/src/providers/public/memory.mjs",
+        "apps/desktop/src/providers/impl/memory.mjs",
+        "apps/desktop/src/services/abstract/memory.mjs",
+        "apps/desktop/src/services/public/memory.mjs",
+        "apps/desktop/src/services/impl/memory.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/tests/unit/organization-model.test.mjs",
+        "apps/desktop/tests/unit/interaction-model.test.mjs",
+        "apps/desktop/tests/unit/organization.test.mjs",
+        "apps/desktop/tests/unit/workbench-model.test.mjs",
+        "apps/desktop/tests/unit/workbench.test.mjs",
+        "apps/desktop/tests/unit/acceptance.test.mjs",
+        "apps/desktop/tests/unit/memory.test.mjs",
+        "docs/roles/DesktopEngineer/docs/design/2026-10-10_design_cli-host.md"
+      ],
+      "requiredOutputs": [
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/models/memory.mjs",
+        "apps/desktop/tests/unit/memory.test.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md",
+        "src/kernel/models/agent.mjs",
+        "src/adapters/providers/impl/pi_session.mjs",
+        "apps/desktop/package.json"
+      ],
+      "checks": [
+        "host"
+      ],
+      "dependsOn": [
+        "pm-runtime-package"
+      ]
+    },
+    {
+      "nodeId": "desktop-headless",
+      "roleId": "DesktopEngineer",
+      "stage": "environment profile and project lease",
+      "operation": "implement",
+      "writeSet": [
+        "apps/desktop/src/providers/abstract/environment_profile.mjs",
+        "apps/desktop/src/providers/public/environment_profile.mjs",
+        "apps/desktop/src/providers/impl/environment_profile.mjs",
+        "apps/desktop/src/services/abstract/environment_profiles.mjs",
+        "apps/desktop/src/services/public/environment_profiles.mjs",
+        "apps/desktop/src/services/impl/environment_profiles.mjs",
+        "apps/desktop/src/providers/abstract/project_lease.mjs",
+        "apps/desktop/src/providers/public/project_lease.mjs",
+        "apps/desktop/src/providers/impl/project_lease.mjs",
+        "apps/desktop/tests/unit/environment-profiles.test.mjs",
+        "apps/desktop/tests/unit/project-lease.test.mjs",
+        "docs/roles/DesktopEngineer/docs/feature/cli-project-host.md"
+      ],
+      "requiredOutputs": [
+        "apps/desktop/src/providers/impl/environment_profile.mjs",
+        "apps/desktop/src/services/impl/environment_profiles.mjs",
+        "apps/desktop/src/providers/impl/project_lease.mjs",
+        "apps/desktop/tests/unit/project-lease.test.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md",
+        "apps/desktop/package.json",
+        "apps/desktop/src/services/impl/profiles.mjs"
+      ],
+      "checks": [
+        "headless"
+      ],
+      "dependsOn": [
+        "pm-runtime-package"
+      ]
+    },
+    {
+      "nodeId": "desktop-parallel",
+      "roleId": "DesktopEngineer",
+      "stage": "headless Workbench wiring and safe ready-set concurrency",
+      "operation": "implement",
+      "writeSet": [
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/services/impl/project.mjs",
+        "apps/desktop/src/providers/impl/project.mjs",
+        "apps/desktop/tests/unit/parallel-scheduler.test.mjs",
+        "apps/desktop/tests/unit/workbench.test.mjs",
+        "apps/desktop/tests/unit/project.test.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "docs/roles/DesktopEngineer/docs/change/2026-10-10_change_cli-host.md",
+        "docs/roles/DesktopEngineer/api-spec.md",
+        "docs/roles/DesktopEngineer/feature-map.md",
+        "docs/roles/DesktopEngineer/changelog.md"
+      ],
+      "requiredOutputs": [
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/tests/unit/parallel-scheduler.test.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md",
+        "apps/desktop/src/models/memory.mjs",
+        "apps/desktop/src/services/impl/environment_profiles.mjs",
+        "apps/desktop/src/providers/impl/project_lease.mjs"
+      ],
+      "checks": [
+        "parallel"
+      ],
+      "dependsOn": [
+        "desktop-host",
+        "desktop-headless"
+      ]
+    },
+    {
+      "nodeId": "pm-installed-cli",
+      "roleId": "ProjectManager",
+      "stage": "final npm package and legion chat",
+      "operation": "implement",
+      "writeSet": [
+        "package.json",
+        "package-lock.json",
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json",
+        "apps/desktop/scripts/verify-dependencies.mjs",
+        "tests/package/test_package.mjs",
+        "apps/desktop/tests/package/desktop-package.test.mjs",
+        "bin/legion.mjs",
+        "bin/chat.mjs",
+        "README.md",
+        "tests/cli/test_chat.test.mjs",
+        "docs/roles/ProjectManager/docs/feature/cli-project-workflow.md",
+        "docs/roles/ProjectManager/docs/change/2026-10-10_change_cli-first.md",
+        "docs/roles/ProjectManager/api-spec.md",
+        "docs/roles/ProjectManager/feature-map.md",
+        "docs/roles/ProjectManager/changelog.md"
+      ],
+      "requiredOutputs": [
+        "bin/legion.mjs",
+        "bin/chat.mjs",
+        "package.json",
+        "tests/cli/test_chat.test.mjs"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/services/impl/environment_profiles.mjs",
+        "apps/desktop/src/providers/impl/project_lease.mjs"
+      ],
+      "checks": [
+        "cli"
+      ],
+      "dependsOn": [
+        "desktop-parallel"
+      ]
+    },
+    {
+      "nodeId": "tester-installed-flow",
+      "roleId": "Tester",
+      "stage": "independent installed CLI full flow and safety verification",
+      "operation": "test",
+      "writeSet": [
+        "tests/integration/test_cli_installed_flow.mjs",
+        "docs/roles/Tester/docs/design/2026-10-10_design_cli-verification.md",
+        "docs/roles/Tester/docs/verification-cli-v1.md",
+        "docs/roles/Tester/changelog.md"
+      ],
+      "requiredOutputs": [
+        "tests/integration/test_cli_installed_flow.mjs",
+        "docs/roles/Tester/docs/verification-cli-v1.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md",
+        "bin/chat.mjs",
+        "package.json",
+        "apps/desktop/src/pipelines/workbench.mjs"
+      ],
+      "checks": [
+        "installed"
+      ],
+      "dependsOn": [
+        "pm-installed-cli"
+      ]
+    },
+    {
+      "nodeId": "reviewer-cli",
+      "roleId": "Reviewer",
+      "stage": "independent final structure and authority review",
+      "operation": "review",
+      "writeSet": [
+        "tests/reviewer/test_cli_boundaries.mjs",
+        "docs/roles/Reviewer/docs/review-cli-v1.md",
+        "docs/roles/Reviewer/changelog.md"
+      ],
+      "requiredOutputs": [
+        "tests/reviewer/test_cli_boundaries.mjs",
+        "docs/roles/Reviewer/docs/review-cli-v1.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-first-role-memory-supervisor.md",
+        "tests/integration/test_cli_installed_flow.mjs",
+        "bin/chat.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs"
+      ],
+      "checks": [
+        "structure"
+      ],
+      "dependsOn": [
+        "tester-installed-flow"
+      ]
+    }
+  ]
+}

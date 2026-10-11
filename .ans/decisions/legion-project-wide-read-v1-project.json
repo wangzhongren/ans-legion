@@ -1,0 +1,229 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion Runtime",
+  "authorizationSource": ".ans/decisions/legion-project-wide-read-v1-authorization.md",
+  "designFiles": [
+    "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-project-wide-read.md"
+  ],
+  "maxConcurrentWorkers": 1,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "ProjectManager": {
+      "autoDispatch": true,
+      "card": ".ans/roles/ProjectManager/role-card.md",
+      "boundary": ".ans/roles/ProjectManager/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-project-wide-read.md",
+        "package.json",
+        "package-lock.json",
+        "workbench.mjs",
+        "README.md",
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json",
+        "apps/desktop/README.md",
+        "tests/package/test_package.mjs",
+        "apps/desktop/tests/package/desktop-package.test.mjs",
+        "docs/roles/ProjectManager/docs/architecture.md",
+        "docs/roles/ProjectManager/docs/feature/distribution.md",
+        "docs/roles/ProjectManager/docs/feature/desktop-distribution.md",
+        "docs/roles/ProjectManager/api-spec.md",
+        "docs/roles/ProjectManager/changelog.md"
+      ],
+      "checks": {
+        "package": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/package/test_package.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "KernelEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/KernelEngineer/role-card.md",
+      "boundary": ".ans/roles/KernelEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "src/kernel/models/core.mjs",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/models/workbench.mjs",
+        "src/kernel/pipelines/permission.mjs",
+        "src/kernel/services/abstract/policy.mjs",
+        "src/kernel/services/impl/policy.mjs",
+        "src/kernel/services/abstract/read.mjs",
+        "src/kernel/services/public/read.mjs",
+        "src/kernel/services/impl/read.mjs",
+        "src/kernel/providers/abstract/storage.mjs",
+        "src/kernel/providers/impl/storage.mjs",
+        "tests/kernel/test_models.test.mjs",
+        "tests/kernel/test_policy.test.mjs",
+        "tests/kernel/test_agent_scope.test.mjs",
+        "tests/kernel/test_agent_runtime.test.mjs",
+        "tests/kernel/test_project_read.test.mjs",
+        "tests/kernel/test_workbench_models.test.mjs",
+        "docs/roles/KernelEngineer/docs/feature/permission.md",
+        "docs/roles/KernelEngineer/docs/feature/generic-agents.md",
+        "docs/roles/KernelEngineer/api-spec.md",
+        "docs/roles/KernelEngineer/changelog.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/kernel/test_models.test.mjs",
+            "tests/kernel/test_policy.test.mjs",
+            "tests/kernel/test_agent_scope.test.mjs",
+            "tests/kernel/test_agent_runtime.test.mjs",
+            "tests/kernel/test_project_read.test.mjs",
+            "tests/kernel/test_workbench_models.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "AgentAdapterEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/AgentAdapterEngineer/role-card.md",
+      "boundary": ".ans/roles/AgentAdapterEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "src/adapters/services/abstract/pi_agent.mjs",
+        "src/adapters/services/public/pi_agent.mjs",
+        "src/adapters/services/impl/pi_agent.mjs",
+        "src/adapters/providers/abstract/pi_session.mjs",
+        "src/adapters/providers/public/pi_session.mjs",
+        "src/adapters/providers/impl/pi_session.mjs",
+        "tests/adapters/test_pi_provider.mjs",
+        "tests/adapters/test_pi_service.mjs",
+        "docs/roles/AgentAdapterEngineer/docs/feature/pi-agent.md",
+        "docs/roles/AgentAdapterEngineer/api-spec.md",
+        "docs/roles/AgentAdapterEngineer/changelog.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/adapters/test_pi_provider.mjs",
+            "tests/adapters/test_pi_service.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "DesktopEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/providers/abstract/project.mjs",
+        "apps/desktop/src/providers/public/project.mjs",
+        "apps/desktop/src/providers/impl/project.mjs",
+        "apps/desktop/src/services/abstract/project.mjs",
+        "apps/desktop/src/services/public/project.mjs",
+        "apps/desktop/src/services/impl/project.mjs",
+        "apps/desktop/src/interface/main.mjs",
+        "apps/desktop/src/interface/renderer.mjs",
+        "apps/desktop/tests/unit/workbench-model.test.mjs",
+        "apps/desktop/tests/unit/project.test.mjs",
+        "apps/desktop/tests/unit/workbench.test.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "docs/roles/DesktopEngineer/docs/feature/desktop-console.md",
+        "docs/roles/DesktopEngineer/api-spec.md",
+        "docs/roles/DesktopEngineer/changelog.md"
+      ],
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "apps/desktop/tests/unit/workbench-model.test.mjs",
+            "apps/desktop/tests/unit/project.test.mjs",
+            "apps/desktop/tests/unit/workbench.test.mjs",
+            "apps/desktop/tests/unit/pipeline.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Reviewer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Reviewer/role-card.md",
+      "boundary": ".ans/roles/Reviewer/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "tests/reviewer/test_structure.mjs",
+        "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs",
+        "docs/roles/Reviewer/docs/review-desktop-workbench-v2.md"
+      ],
+      "checks": {
+        "review": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/reviewer/test_structure.mjs",
+            "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Tester": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Tester/role-card.md",
+      "boundary": ".ans/roles/Tester/boundary.md",
+      "operations": [
+        "implement",
+        "review",
+        "test"
+      ],
+      "writeFiles": [
+        "tests/integration/test_permission_flow.mjs",
+        "tests/integration/test_generic_agents.mjs",
+        "apps/desktop/tests/integration/workbench-flow.test.mjs",
+        "apps/desktop/tests/e2e/workbench-ui.test.mjs",
+        "docs/roles/Tester/docs/verification-desktop-workbench-v2.md"
+      ],
+      "checks": {
+        "integration": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/integration/test_permission_flow.mjs",
+            "tests/integration/test_generic_agents.mjs",
+            "apps/desktop/tests/integration/workbench-flow.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

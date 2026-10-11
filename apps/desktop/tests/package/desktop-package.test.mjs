@@ -13,15 +13,17 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const desktop = join(root, 'apps/desktop');
 const role = process.env.LEGION_DESKTOP_TEST_ROLE ?? 'ProjectManager';
 assert.ok(['ProjectManager', 'Reviewer', 'Tester'].includes(role), 'unknown_desktop_test_role');
-const generated = join(root, '.ans/runtime/legion-desktop-workbench-v2', role, 'desktop');
-const packaging = join(generated, 'packaging');
-const fixtures = join(generated, 'fixtures');
-const userDataRoot = join(generated, 'user-data');
-const temporary = join(generated, 'tmp');
+const generated = join(root, '.ans/runtime/legion-cli-role-owned-v2', role);
+const packaging = join(generated, 'packaging', 'su-frontdoor-memory-repair-v1');
+const fixtures = join(generated, 'fixtures', 'su-frontdoor-memory-repair-v1');
+const userDataRoot = join(generated, 'user-data', 'su-frontdoor-memory-repair-v1');
+const temporary = join(generated, 'tmp', 'su-frontdoor-memory-repair-v1');
 const npm = 'D:/soft/nodejs/node_modules/npm/bin/npm-cli.js';
 const stableZip = join(packaging, 'LegionDesktop-0.2.0-win32-x64.zip');
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const protocols = ['openai-completions', 'openai-responses', 'anthropic-messages'];
+const readTools = ['legion_list_files', 'legion_read_file'].sort();
+const workerTools = ['legion_write_file', 'legion_edit_file', ...readTools].sort();
 const operations = ['getState', 'chooseProject', 'refreshProject', 'setDefaultProfile', 'saveProfile',
   'deleteProfile', 'assignProfile', 'sendMessage', 'selectContext', 'confirmPlan', 'cancelTurn',
   'stopExecution', 'testConnection', 'cancelProbe'].sort();
@@ -37,14 +39,34 @@ async function files(directory, prefix = '') {
   return result.sort();
 }
 
+async function currentPackageSmoke() {
+  const descriptor = join(root, '.ans/runtime/legion-cli-role-owned-v2/ProjectManager/packaging/su-frontdoor-memory-repair-v1/package-smoke.json');
+  try { return JSON.parse(await readFile(descriptor, 'utf8')); }
+  catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    assert.equal(role, 'ProjectManager', 'only the package owner prepares the missing bridge descriptor');
+    const { buildPackageEvidence } = await import('../../../../tests/package/test_package.mjs');
+    await buildPackageEvidence();
+    return JSON.parse(await readFile(descriptor, 'utf8'));
+  }
+}
+
 async function snapshot() {
-  const core = JSON.parse(await readFile(join(root, '.ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/core-package-deps-complete.json'), 'utf8'));
+  const packageEvidence = JSON.parse(await readFile(join(root,
+    '.ans/runtime/legion-cli-role-owned-v2/ProjectManager/packaging/su-frontdoor-memory-repair-v1/package-smoke.json'), 'utf8'));
   const hashes = {};
-  const paths = [...Object.keys(core.authoredHashes), ...Object.keys(JSON.parse(await readFile(join(root,
-    '.ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/package-smoke.json'), 'utf8')).sourceHashes)];
-  paths.push(relative(root, core.artifact.path).split(sep).join('/'));
+  const paths = Object.keys(packageEvidence.sourceHashes);
+  paths.push('.ans/runtime/legion-governed-workflow-v1/ProjectManager/packaging/legion-runtime-0.7.0.tgz', '.ans/runtime/legion-governed-workflow-v1/ProjectManager/packaging/package-smoke.json');
+  paths.push(relative(root, packageEvidence.tarball).split(sep).join('/'));
+  const previousTarballs = [
+    ['.ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/legion-runtime-0.4.0.tgz',
+      'f3114a19205b69542c5629cfbb4a2664e9aebc62fc81f76a69d332e6f922140c'],
+    ['.ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/legion-runtime-0.5.0.tgz',
+      '9fe38c708833d261ee3f3d7b25e7d66c19f6a4978039d1d8a38e7a31b69350da']];
+  for (const [path] of previousTarballs) paths.push(path);
   const historical = {};
   const links = {};
+  const absent = [];
   async function visit(path) {
     for (const item of await readdir(join(root, path), { withFileTypes: true })) {
       const child = path + '/' + item.name;
@@ -53,15 +75,21 @@ async function snapshot() {
       else { assert.ok(item.isFile()); historical[child] = sha(await readFile(join(root, child))); }
     }
   }
-  for (const path of ['.ans/runtime/legion-pi-node-v3', '.ans/runtime/legion-desktop-gui-v1', '.ans/runtime/legion-node-fixture-compat-v1']) await visit(path);
+  for (const path of ['.ans/runtime/legion-pi-node-v3', '.ans/runtime/legion-desktop-gui-v1', '.ans/runtime/legion-node-fixture-compat-v1']) {
+    try { await visit(path); }
+    catch (error) { if (error.code === 'ENOENT') absent.push(path); else throw error; }
+  }
   for (const path of [...new Set(paths)].sort()) hashes[path] = sha(await readFile(join(root, path)));
-  for (const [path, expected] of Object.entries(core.authoredHashes)) assert.equal(hashes[path], expected, 'frozen_core:' + path);
-  assert.equal(hashes[relative(root, core.artifact.path).split(sep).join('/')], core.artifact.sha256);
+  for (const [path, expected] of Object.entries(packageEvidence.sourceHashes)) assert.equal(hashes[path], expected, 'runtime_source:' + path);
+  assert.equal(hashes[relative(root, packageEvidence.tarball).split(sep).join('/')], packageEvidence.sha256);
+  for (const [path, digest] of previousTarballs) assert.equal(hashes[path], digest);
   const protectedBaseline = JSON.parse(await readFile(join(root, '.ans/decisions/legion-desktop-workbench-v2-protected-baseline.json'), 'utf8'));
   for (const [path, item] of Object.entries(protectedBaseline.protected)) {
-    hashes[path] = sha(await readFile(join(root, path))); assert.equal(hashes[path], item.sha256, path);
+    try { hashes[path] = sha(await readFile(join(root, path))); assert.equal(hashes[path], item.sha256, path); }
+    catch (error) { if (error.code === 'ENOENT') absent.push(path); else throw error; }
   }
-  return { hashes, historical, links, sourceAggregate: core.artifact.sourceAggregateSha256 };
+  return { hashes, historical, links, absent: [...new Set(absent)].sort(),
+    sourceAggregate: packageEvidence.sourceAggregateSha256 };
 }
 
 async function guardedRemove(target, base) {
@@ -81,7 +109,7 @@ async function guardedRemove(target, base) {
 
 function environment(extra = {}) {
   const env = { ...process.env, ...extra, LEGION_DESKTOP_TEST_ROLE: role, TEMP: temporary, TMP: temporary,
-    npm_config_cache: join(generated, 'npm-cache'), npm_config_ignore_scripts: 'true',
+    npm_config_cache: join(generated, 'npm-cache', 'su-frontdoor-memory-repair-v1'), npm_config_ignore_scripts: 'true',
     npm_config_audit: 'false', npm_config_fund: 'false', npm_config_offline: 'true',
     NODE_DISABLE_COMPILE_CACHE: '1', ELECTRON_DISABLE_SECURITY_WARNINGS: 'false' };
   for (const key of ['NODE_OPTIONS', 'NODE_COMPILE_CACHE', 'NODE_PATH', 'ELECTRON_RUN_AS_NODE',
@@ -140,11 +168,11 @@ async function capture(page, name, screenshots) {
   await page.screenshot({ path, fullPage: true }); screenshots.push(path);
   console.log('NATIVE_ZIP_SCREENSHOT ' + path);
 }
-function completion(text, model, tool = null) {
+function completion(text, model, tool = null, toolName = 'legion_write_file') {
   let delta = { role: 'assistant', content: text };
   let finish = 'stop';
-  if (tool) { delta = { role: 'assistant', tool_calls: [{ index: 0, id: 'fixture-write', type: 'function',
-    function: { name: 'legion_write_file', arguments: JSON.stringify(tool) } }] }; finish = 'tool_calls'; }
+  if (tool) { delta = { role: 'assistant', tool_calls: [{ index: 0, id: 'fixture-' + toolName, type: 'function',
+    function: { name: toolName, arguments: JSON.stringify(tool) } }] }; finish = 'tool_calls'; }
   const first = { id: 'chat1', object: 'chat.completion.chunk', created: 1, model, choices: [{ index: 0, delta, finish_reason: null }] };
   const last = { ...first, choices: [{ index: 0, delta: {}, finish_reason: finish }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } };
   return 'data: ' + JSON.stringify(first) + '\n\ndata: ' + JSON.stringify(last) + '\n\ndata: [DONE]\n\n';
@@ -177,6 +205,13 @@ function sse(protocol, text, model) {
 }
 
 test('workbench entry imports inertly and validates plain public startup options', async () => {
+  const manifest = JSON.parse(await readFile(join(desktop, 'package.json'), 'utf8'));
+  for (const module of ['tests/unit/organization-model.test.mjs', 'tests/unit/interaction-model.test.mjs',
+    'tests/unit/organization.test.mjs', 'tests/unit/acceptance.test.mjs',
+    'tests/reviewer/governed-workflow-boundaries.test.mjs', 'tests/integration/governed-workflow.test.mjs',
+    'tests/e2e/governed-workflow-ui.test.mjs']) {
+    assert.ok(manifest.scripts.test.split(/\s+/).includes(module), 'missing_normal_test_entry:' + module);
+  }
   assert.deepEqual(Object.keys(entry), ['bootstrap']);
   await assert.rejects(entry.bootstrap({ userDataDir: 'relative' }));
   await assert.rejects(entry.bootstrap({ show: 'yes' }));
@@ -186,8 +221,7 @@ test('workbench entry imports inertly and validates plain public startup options
   assert.match(source, /starting\.then/u);
 });
 
-test('current Windows ZIP ships real runtime and supports isolated native PM workflow', { timeout: 285000 }, async () => {
-  assert.equal(process.platform, 'win32', 'Windows package proof requires Windows');
+if (process.platform === 'win32') test('current Windows ZIP ships real runtime and supports isolated native PM workflow', { timeout: 285000 }, async () => {
   for (const directory of [packaging, fixtures, userDataRoot, temporary]) await mkdir(directory, { recursive: true });
   const before = await snapshot();
   await writeFile(join(packaging, 'desktop-package-before.json'), JSON.stringify(before, null, 2) + '\n');
@@ -205,6 +239,7 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
   assert.ok(!workspace.startsWith(userData + sep) && !userData.startsWith(workspace + sep));
   const screenshots = []; const requests = []; const exits = []; const logs = [];
   let profileId; let electron; let evidence; let held = 0;
+  let editReadObserved = false; let editRequestIssued = false;
   const sockets = new Set();
   const server = createServer(async (request, response) => {
     const chunks = []; for await (const chunk of request) chunks.push(chunk);
@@ -214,12 +249,28 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
     const authenticated = request.headers.authorization === 'Bearer fixture-package-key' || request.headers['x-api-key'] === 'fixture-package-key';
     assert.equal(authenticated, true);
     const prompt = JSON.stringify([...body.messages ?? []].reverse().find(item => item.role === 'user') ?? body.input ?? '');
-    const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
-    let kind = 'text'; if (hasTools) kind = 'execution';
-    requests.push({ protocol, authenticated, hasTools, model: body.model, kind, continued: prompt.includes('继续讨论') });
+    const toolNames = (body.tools ?? []).map(tool => tool.function?.name ?? tool.name).sort();
+    const hasTools = toolNames.length > 0;
+    const canWrite = toolNames.includes('legion_write_file');
+    let kind = 'text'; if (canWrite) kind = 'execution';
+    requests.push({ protocol, authenticated, hasTools, toolNames, canWrite, model: body.model, kind, continued: prompt.includes('继续讨论') });
     response.writeHead(200, { 'content-type': 'text/event-stream' });
     if (prompt.includes('hold execution') || prompt.includes('停止这一轮')) { held++; response.flushHeaders(); return; }
-    if (hasTools) {
+    if (prompt.includes('edit result.txt')) {
+      assert.deepEqual(toolNames, workerTools);
+      const toolResponses = (body.messages ?? []).filter(item => item.role === 'tool');
+      if (toolResponses.length === 0) {
+        response.end(completion('', body.model, { resource: 'result.txt', maxBytes: 65536 }, 'legion_read_file'));
+      } else if (toolResponses.length === 1) {
+        const expectedSha256 = sha(Buffer.from('controlled ZIP write\n'));
+        assert.ok(JSON.stringify(toolResponses[0]).includes(expectedSha256), 'complete_file_sha_reaches_edit_agent');
+        editReadObserved = true; editRequestIssued = true;
+        response.end(completion('', body.model, { resource: 'result.txt', expectedSha256,
+          replacements: [{ oldText: 'controlled ZIP write', newText: 'controlled ZIP edit' }] }, 'legion_edit_file'));
+      } else response.end(completion('已完成受控编辑，软件检查未运行。', body.model));
+      return;
+    }
+    if (canWrite) {
       if ((body.messages ?? []).some(item => item.role === 'tool')) response.end(completion('已提交真实工具结果，软件检查未运行。', body.model));
       else response.end(completion('', body.model, { resource: 'result.txt', content: 'controlled ZIP write\n' }));
       return;
@@ -228,9 +279,18 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
     if (prompt.includes('Human消息')) {
       reply = '我们先明确一个小目标：生成结果文件，然后等待你的后续决定。请检查下面的精确范围后再确认。';
       if (!prompt.includes('继续讨论')) {
-        const plan = { goal: '生成一个受控结果并演示停止后续执行', roles: [{ id: 'Writer', name: '实施成员', purpose: '只执行已确认任务', profileId }],
-          tasks: [{ id: 'write-result', title: '生成结果文件', roleId: 'Writer', profileId, dependsOn: [], writeSet: ['result.txt'], instruction: 'write result.txt with controlled ZIP write' },
-            { id: 'wait-next', title: '等待可停止的后续任务', roleId: 'Writer', profileId, dependsOn: ['write-result'], writeSet: ['later.txt'], instruction: 'hold execution' }] };
+        let plan;
+        if (prompt.includes('归属转交')) {
+          plan = { goal: '确认把既有结果文件转交给Editor', roles: [{ id: 'Editor', name: '接手成员', purpose: '只执行确认任务', profileId }],
+            tasks: [{ id: 'transfer-hold', title: '确认归属后等待', roleId: 'Editor', profileId, dependsOn: [],
+              writeSet: ['result.txt'], instruction: 'hold execution' }],
+            transfers: [{ resource: 'result.txt', fromRoleId: 'Writer', toRoleId: 'Editor' }] };
+        } else {
+          plan = { goal: '生成并受控编辑结果，再演示停止', roles: [{ id: 'Writer', name: '实施成员', purpose: '只执行已确认任务', profileId }],
+            tasks: [{ id: 'write-result', title: '生成结果文件', roleId: 'Writer', profileId, dependsOn: [], writeSet: ['result.txt'], instruction: 'write result.txt with controlled ZIP write' },
+              { id: 'edit-result', title: '受控局部编辑', roleId: 'Writer', profileId, dependsOn: ['write-result'], writeSet: ['result.txt'], instruction: 'edit result.txt after reading its SHA' },
+              { id: 'wait-next', title: '等待可停止的后续任务', roleId: 'Writer', profileId, dependsOn: ['edit-result'], writeSet: ['later.txt'], instruction: 'hold execution' }] };
+        }
         reply += '\n\n```legion-plan\n' + JSON.stringify(plan) + '\n```';
       }
     }
@@ -264,11 +324,11 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
     const sourceFiles = await files(join(desktop, 'src'));
     for (const path of [...sourceFiles.map(name => 'src/' + name), 'main.mjs', 'README.md'])
       assert.equal(sha(await readFile(join(appRoot, path))), sha(await readFile(join(desktop, path))), path);
-    const coreSmoke = JSON.parse(await readFile(join(root, '.ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/package-smoke.json'), 'utf8'));
+    const coreSmoke = JSON.parse(await readFile(join(root, '.ans/runtime/legion-cli-role-owned-v2/ProjectManager/packaging/su-frontdoor-memory-repair-v1/package-smoke.json'), 'utf8'));
     const runtimeRoot = join(appRoot, 'node_modules/legion-runtime');
-    const runtimeFiles = await files(runtimeRoot); assert.equal(runtimeFiles.length, 29);
+    const runtimeFiles = await files(runtimeRoot); assert.equal(runtimeFiles.length, coreSmoke.fileCount);
     for (const path of runtimeFiles) assert.equal(sha(await readFile(join(runtimeRoot, path))), sha(await readFile(join(root, path))), 'runtime_package:' + path);
-    assert.deepEqual(runtimeFiles, ['package.json', 'README.md', ...Object.keys(coreSmoke.sourceHashes)].sort());
+    assert.deepEqual(runtimeFiles, coreSmoke.packageFiles);
     const executable = join(extracted, 'LegionDesktop.exe');
     const probeCode = `import assert from 'node:assert/strict';
       import {normalizeContext} from '@earendil-works/pi-ai';
@@ -280,15 +340,19 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
       import {createPiAgentService} from 'legion-runtime/services/pi-agent';
       import {createPolicyService} from 'legion-runtime/services/policy';
       import {createMutationService} from 'legion-runtime/services/mutation';
+      import {createReadService} from 'legion-runtime/services/read';
       import {createProposalService} from 'legion-runtime/services/proposal';
       import {readFileSync} from 'node:fs';
       assert.equal(typeof normalizeContext,'function');for(const api of [a,b,c])assert.equal(typeof api.streamSimple,'function');
-      assert.equal(typeof createAgentSession,'function');assert.equal(Object.keys(models).length,30);
-      for(const factory of [createPiAgentService,createPolicyService,createMutationService,createProposalService])assert.equal(typeof factory,'function');
+      assert.equal(typeof createAgentSession,'function');assert.equal(Object.keys(models).length,62);
+      for(const name of ['ProjectReadRequest','ProjectReadDecision','ProjectReadResult','normalizeProjectReadResource',
+        'ProjectFileOwners','FileOwnershipPlan','FileOwnershipTransfer','FileOwnershipError',
+        'applyFileOwnershipPlan','assertFileOwner','assertDistinctRoleWriteScopes'])assert.equal(typeof models[name],'function');
+      for(const factory of [createPiAgentService,createPolicyService,createMutationService,createReadService,createProposalService])assert.equal(typeof factory,'function');
       for(const name of ['pi-ai','pi-coding-agent'])assert.equal(JSON.parse(readFileSync('node_modules/@earendil-works/'+name+'/package.json')).version,'1.0.4');
-      assert.equal(JSON.parse(readFileSync('node_modules/legion-runtime/package.json')).version,'0.4.0');
+      assert.equal(JSON.parse(readFileSync('node_modules/legion-runtime/package.json')).version,'1.1.3');
       assert.equal(process.versions.electron,'44.6.0');const v=process.versions.node.split('.').map(Number);assert.ok(v[0]>22||(v[0]===22&&v[1]>=19));
-      console.log(JSON.stringify({electron:process.versions.electron,node:process.versions.node,piAi:'1.0.4',piSdk:'1.0.4',runtime:'0.4.0',models:30,publicApis:3}));`;
+      console.log(JSON.stringify({electron:process.versions.electron,node:process.versions.node,piAi:'1.0.4',piSdk:'1.0.4',runtime:'1.1.3',models:62,publicApis:3,readService:true,fileOwners:true}));`;
     const embedded = command(executable, ['--input-type=module', '-e', probeCode], {
       cwd: appRoot, env: { ...environment(), ELECTRON_RUN_AS_NODE: '1' }, timeout: 30000 });
     const runtime = JSON.parse(embedded.stdout.trim());
@@ -344,10 +408,17 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
     let discussed = await waitState(page, value => value.plan?.status === 'draft' && value.turn?.status === 'completed', 'real PM plan');
     assert.equal(discussed.currentProject.hasManager, true); assert.equal(discussed.roles.filter(item => item.id === 'ProjectManager').length, 1);
     assert.equal(discussed.history.messages.length, 2); assert.deepEqual(await readdir(workspace), []);
-    assert.equal(discussed.plan.tasks.length, 2); assert.deepEqual(discussed.plan.tasks.flatMap(item => item.writeSet).sort(), ['later.txt', 'result.txt']);
+    assert.deepEqual(requests.at(-1).toolNames, readTools);
+    assert.equal(requests.some(item => item.canWrite), false, 'unconfirmed_discussion_cannot_write');
+    assert.equal(discussed.plan.tasks.length, 3);
+    assert.deepEqual(discussed.plan.tasks.flatMap(item => item.writeSet).sort(), ['later.txt', 'result.txt', 'result.txt']);
+    assert.deepEqual(discussed.plan.fileOwnership.claims.map(item => [item.resource, item.roleId]),
+      [['later.txt', 'Writer'], ['result.txt', 'Writer']]);
+    assert.deepEqual(discussed.plan.fileOwnership.transfers, []);
     await page.waitForSelector('#plan-panel:not([hidden])');
     assert.equal(await page.locator('#details-drawer').isHidden(), true);
     assert.equal(await page.locator('#plan-panel').isVisible(), true);
+    assert.match(await page.locator('#plan-ownership').textContent(), /result\.txt → Writer/u);
     await theme(page, 'light'); await capture(page, 'conversation-light', screenshots);
     await theme(page, 'dark'); await capture(page, 'conversation-dark', screenshots);
     await electron.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(960, 640));
@@ -369,6 +440,10 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
     const heldDeadline = Date.now() + 5000;
     while (held < 1 && Date.now() < heldDeadline) await new Promise(accept => setTimeout(accept, 50));
     assert.ok(held >= 1, 'real held execution request');
+    assert.ok(requests.some(item => item.canWrite && workerTools.every(name => item.toolNames.includes(name))),
+      'confirmed_worker_must_keep_read_write_and_edit_tools');
+    assert.equal(editReadObserved, true);
+    assert.equal(editRequestIssued, true);
     const workerRequestCount = requests.length;
     const workerEntry = page.locator('#member-list button').filter({ hasText: '实施成员' });
     await workerEntry.click(); assert.equal(await page.locator('#details-drawer').isVisible(), true);
@@ -378,11 +453,13 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
     assert.equal(await workerCard.getByRole('button', { name: '保存连接映射' }).isHidden(), true);
     assert.equal(requests.length, workerRequestCount, 'worker details never invoke SDK');
     await page.locator('#details-close').click();
-    assert.equal(await readFile(join(workspace, 'result.txt'), 'utf8'), 'controlled ZIP write\n');
+    assert.equal(await readFile(join(workspace, 'result.txt'), 'utf8'), 'controlled ZIP edit\n');
     assert.ok((await stat(join(workspace, '.ans'))).isDirectory());
     await page.locator('#stop-execution').click();
     const stopped = await waitState(page, value => value.plan?.status === 'invalidated' && value.tasks.every(item => item.status !== 'running'), 'stop revokes running execution');
     assert.equal(stopped.tasks.find(item => item.id === 'write-result').status, 'completed');
+    assert.equal(stopped.tasks.find(item => item.id === 'edit-result').status, 'completed');
+    assert.equal(stopped.fileOwners.owners.find(item => item.resource === 'result.txt').roleId, 'Writer');
     assert.equal(stopped.tasks.every(item => item.checkStatus === 'not_executed'), true);
     await assert.rejects(readFile(join(workspace, 'later.txt')), { code: 'ENOENT' });
     await page.locator('#message-input').fill('停止这一轮'); await page.locator('#send-message').click();
@@ -399,17 +476,41 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
     await page.locator('#message-input').fill('继续讨论'); await page.locator('#send-message').click();
     const continued = await waitState(page, value => value.turn?.status === 'completed' && value.history.messages.length === 4, 'DPAPI key decrypt and real continued SDK history');
     assert.equal(continued.roles.filter(item => item.id === 'ProjectManager').length, 1);
-    assert.ok(requests.at(-1).authenticated); assert.equal(requests.at(-1).hasTools, false);
+    assert.ok(requests.at(-1).authenticated); assert.deepEqual(requests.at(-1).toolNames, readTools);
     assert.ok(requests.every(item => item.authenticated));
+    await page.locator('#message-input').fill('请把 result.txt 的文件归属转交给 Editor。'); await page.locator('#send-message').click();
+    const transferDraft = await waitState(page, value => value.plan?.status === 'draft' &&
+      value.plan.fileOwnership?.transfers.length === 1 && value.turn?.status === 'completed', 'explicit transfer draft');
+    assert.deepEqual(transferDraft.plan.fileOwnership.transfers.map(item =>
+      [item.resource, item.fromRoleId, item.toRoleId]), [['result.txt', 'Writer', 'Editor']]);
+    assert.equal(transferDraft.fileOwners.owners.find(item => item.resource === 'result.txt').roleId, 'Writer');
+    assert.match(await page.locator('#plan-ownership').textContent(), /Writer → Editor/u);
+    await page.locator('#confirm-plan').click();
+    const transferred = await waitState(page, value => value.fileOwners.owners.some(item =>
+      item.resource === 'result.txt' && item.roleId === 'Editor') &&
+      value.tasks.some(item => item.id === 'transfer-hold' && item.status === 'running'), 'confirmed file transfer');
+    assert.equal(transferred.fileOwners.version, transferDraft.plan.fileOwnership.nextVersion);
+    await page.locator('#stop-execution').click();
+    await waitState(page, value => value.plan?.status === 'invalidated' &&
+      value.tasks.every(item => item.status !== 'running'), 'stop transferred task');
+    await closeApp();
+    page = await launch();
+    await chooseNativeProject(electron, page, workspace);
+    const ownershipRestored = await waitState(page, value => value.currentProject?.id === discussed.currentProject.id,
+      'same project owner map restored');
+    assert.equal(ownershipRestored.fileOwners.owners.find(item => item.resource === 'result.txt').roleId, 'Editor');
+    assert.equal(await readFile(join(workspace, 'result.txt'), 'utf8'), 'controlled ZIP edit\n');
     await closeApp();
     await writeFile(join(packaging, 'desktop-executable.log'), logs.join('\n'));
     evidence = { make: { executable: process.execPath, argv: makeArgv, exitCode: make.status },
       zip: { path: stableZip, sha256: zipSha, bytes: (await stat(stableZip)).size }, runtime,
-      productionDependency: manifest.dependencies, sourceFilesVerified: sourceFiles.length + 2, runtimePackageFiles: 29,
+      productionDependency: manifest.dependencies, sourceFilesVerified: sourceFiles.length + 2, runtimePackageFiles: 46,
       readiness, processExits: exits, isolation, screenshots, actualZipExecutable: true,
       nativeFolderChooser: true, pages: ['conversation', 'settings'], minimumWindow: { width: 960, height: 640 },
       realSdkRequests: requests, discussionZeroWorkspaceWrites: true, confirmedExactWriteSet: ['result.txt', 'later.txt'],
-      actualWritten: ['result.txt'], stopRevokedRemainingWrite: true, sameProjectManagerAfterRestart: true,
+      actualWritten: ['result.txt'], controlledEditFromReadSha: editReadObserved && editRequestIssued,
+      fileOwnerAfterTransfer: ownershipRestored.fileOwners.owners.find(item => item.resource === 'result.txt').roleId,
+      ownerPersistedAcrossRestart: true, stopRevokedRemainingWrite: true, sameProjectManagerAfterRestart: true,
       DPAPISaveRestartAuthenticated: true, historyAfterRestart: continued.history.messages.length,
       checkStatus: 'not_executed', modelMetadata: 'unknown', paidModelCalls: 0, heldRequestsCancelled: held,
       independentReviewerTester: 'pending', limitations: 'Local controlled fixtures prove this package path; live paid providers and arbitrary shell execution are not tested.' };
@@ -424,4 +525,430 @@ test('current Windows ZIP ships real runtime and supports isolated native PM wor
   evidence.temporaryConsumers = (await readdir(packaging)).filter(name => name.startsWith('consumer-')).length;
   assert.equal(evidence.temporaryConsumers, 0);
   await writeFile(join(packaging, 'desktop-package.json'), JSON.stringify(evidence, null, 2) + '\n');
+});
+
+if (process.platform === 'darwin') test('macOS installed package identity; Windows ZIP proof pending', async () => {
+  const nodePackage = join(root, '.ans/runtime/legion-cli-role-owned-v2/ProjectManager/packaging/su-frontdoor-memory-repair-v1');
+  const smoke = await currentPackageSmoke();
+  const archive = await readFile(join(nodePackage, 'legion-runtime-1.1.3.tgz'));
+  assert.equal(smoke.sha256, sha(archive));
+  assert.equal(sha(await readFile(join(root, '.ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/legion-runtime-0.4.0.tgz'))),
+    'f3114a19205b69542c5629cfbb4a2664e9aebc62fc81f76a69d332e6f922140c');
+  assert.equal(sha(await readFile(join(root, '.ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/legion-runtime-0.5.0.tgz'))),
+    '9fe38c708833d261ee3f3d7b25e7d66c19f6a4978039d1d8a38e7a31b69350da');
+  assert.ok(smoke.fileCount > 46);
+  assert.equal(Object.keys(smoke.sourceHashes).length, smoke.fileCount - 3);
+  assert.equal(smoke.modelExports.length, 62);
+  assert.equal(smoke.smoke.fileOwnership, true);
+  assert.equal(smoke.smoke.controlledEdit, true);
+  const manifest = JSON.parse(await readFile(join(desktop, 'package.json'), 'utf8'));
+  const lock = JSON.parse(await readFile(join(desktop, 'package-lock.json'), 'utf8'));
+  const spec = manifest.dependencies['legion-runtime'];
+  assert.equal(spec, 'file:../../.ans/runtime/legion-cli-role-owned-v2/ProjectManager/packaging/su-frontdoor-memory-repair-v1/legion-runtime-1.1.3.tgz');
+  assert.equal(lock.packages[''].dependencies['legion-runtime'], spec);
+  const entry = lock.packages['node_modules/legion-runtime'];
+  assert.equal(entry.version, '1.1.3');
+  assert.equal(entry.resolved, spec);
+  assert.equal(entry.integrity, 'sha512-' + createHash('sha512').update(archive).digest('base64'));
+  assert.equal(entry.link, undefined);
+  const runtimeRoot = join(desktop, 'node_modules/legion-runtime');
+  const runtimeInfo = await lstat(runtimeRoot);
+  assert.ok(runtimeInfo.isDirectory() && !runtimeInfo.isSymbolicLink());
+  const published = JSON.parse(await readFile(join(runtimeRoot, 'package.json'), 'utf8'));
+  assert.equal(published.version, '1.1.3');
+  for (const file of ['README.md', 'package.json'])
+    assert.deepEqual(await readFile(join(runtimeRoot, file)), await readFile(join(root, file)), 'installed_source_bytes:' + file);
+  assert.deepEqual(published.exports, smoke.packageExports);
+  const runtimeFiles = await files(runtimeRoot);
+  assert.equal(runtimeFiles.length, smoke.fileCount);
+  assert.deepEqual(runtimeFiles, smoke.packageFiles);
+  for (const [path, digest] of Object.entries(smoke.sourceHashes)) {
+    assert.equal(sha(await readFile(join(runtimeRoot, path))), digest, 'installed_runtime_source:' + path);
+  }
+  const models = await import('legion-runtime/workbench-models');
+  assert.deepEqual(Object.keys(models).sort(), smoke.modelExports);
+  for (const [name, names] of Object.entries(smoke.serviceExports)) {
+    const service = await import('legion-runtime/services/' + name);
+    assert.deepEqual(Object.keys(service).sort(), [...names].sort(), 'service:' + name);
+  }
+  assert.deepEqual(Object.keys(await import('legion-runtime')).sort(), smoke.publicExports);
+  assert.equal(typeof models.ProjectReadRequest, 'function');
+  assert.equal(typeof models.ProjectReadDecision, 'function');
+  assert.equal(typeof models.ProjectReadResult, 'function');
+  assert.equal(typeof models.normalizeProjectReadResource, 'function');
+  for (const name of ['ProjectFileOwners', 'FileOwnershipPlan', 'FileOwnershipTransfer', 'FileOwnershipError',
+    'applyFileOwnershipPlan', 'assertFileOwner', 'assertDistinctRoleWriteScopes']) assert.equal(typeof models[name], 'function');
+  const owners = new models.ProjectFileOwners({ projectId: 'installed-smoke', version: 'v1',
+    owners: [{ resource: 'src/api.ts', roleId: 'Backend' }] });
+  const transfer = new models.FileOwnershipPlan({ projectId: 'installed-smoke', baseVersion: 'v1',
+    baseDigest: owners.digest, nextVersion: 'v2', claims: [{ resource: 'src/api.ts', roleId: 'Frontend' }],
+    transfers: [new models.FileOwnershipTransfer({ resource: 'src/api.ts', fromRoleId: 'Backend', toRoleId: 'Frontend' })] });
+  assert.equal(models.applyFileOwnershipPlan(owners, transfer).ownerOf('SRC/API.TS'), 'Frontend');
+  assert.throws(() => new models.FileOwnershipPlan({ projectId: 'installed-smoke', baseVersion: 'v1',
+    baseDigest: owners.digest, nextVersion: 'v2', claims: [
+      { resource: 'src/api.ts', roleId: 'Backend' }, { resource: 'SRC/API.TS', roleId: 'Frontend' }] }),
+  /cross_role_claim/);
+  const sourceSha = sha(Buffer.from('alpha\n'));
+  const read = new models.ProjectReadResult({ status: 'read', reason: 'read', resource: 'src/api.ts',
+    text: 'alpha\n', byteLength: 6, nextLine: 0, complete: true, sha256: sourceSha });
+  assert.equal(read.sha256, sourceSha);
+  const session = new models.AgentSession({ sessionId: 'installed-smoke', roleId: 'Frontend',
+    taskId: 'edit-api', organizationVersion: 'v1' });
+  const edit = new models.ActionProposal({ proposalId: 'edit-api', action: 'edit_file',
+    resource: 'src/api.ts', tool: 'legion_edit_file', capability: 'write_file', session,
+    expectedSha256: read.sha256, replacements: [{ oldText: 'alpha', newText: 'beta' }] });
+  assert.equal(edit.expectedSha256, sourceSha);
+  assert.equal(typeof (await import('legion-runtime/services/read')).createReadService, 'function');
+  const electron = JSON.parse(await readFile(join(desktop, 'node_modules/electron/package.json'), 'utf8'));
+  assert.equal(electron.version, '44.6.0');
+  const electronPath = await readFile(join(desktop, 'node_modules/electron/path.txt'), 'utf8');
+  assert.equal(electronPath, 'Electron.app/Contents/MacOS/Electron');
+  assert.ok((await stat(join(desktop, 'node_modules/electron/dist', electronPath))).isFile());
+  console.log('MACOS_PACKAGE_IDENTITY ' + JSON.stringify({ runtime: published.version,
+    models: smoke.modelExports.length, services: Object.keys(smoke.serviceExports).length,
+    files: runtimeFiles.length, electron: electron.version, windowsZip: 'not_executed_on_macos' }));
+});
+
+async function electronCheckSmoke(generated) {
+  const assert = (await import('node:assert/strict')).default;
+  const fs = (await import('node:fs')).promises;
+  const path = await import('node:path');
+  const { createHash } = await import('node:crypto');
+  const wb = await import('legion-runtime/workbench-models');
+  const { createCheckService } = await import('legion-runtime/services/check');
+  assert.equal(process.versions.electron, '44.6.0');
+  assert.ok(process.execPath.endsWith('/Electron'));
+  const fixtureRoot = path.join(generated, 'fixtures', 'su-frontdoor-memory-repair-v1');
+  await fs.mkdir(fixtureRoot, { recursive: true });
+  const base = await fs.mkdtemp(path.join(fixtureRoot, 'electron-check-'));
+  const candidate = path.join(base, 'candidate');
+  const output = path.join(base, 'output');
+  await fs.mkdir(candidate); await fs.mkdir(output);
+  const source = "import test from 'node:test'; import assert from 'node:assert/strict'; import {Session} from 'node:inspector'; import {Worker} from 'node:worker_threads'; test('actual Electron isolated test',()=>{ assert.equal(2+2,4); assert.equal(process.env.NODE_OPTIONS,undefined); assert.equal(process.permission.has('inspector'),false); assert.throws(()=>new Session().connect(),e=>e.code==='ERR_ACCESS_DENIED'); assert.throws(()=>process.binding('fs'),e=>e.code==='ERR_ACCESS_DENIED'); assert.throws(()=>new Worker('0',{eval:true}),e=>e.code==='ERR_ACCESS_DENIED'); });";
+  await fs.writeFile(path.join(candidate, 'unit.mjs'), source);
+  const stat = await fs.lstat(candidate, { bigint: true });
+  const lifetime = new AbortController();
+  const spec = new wb.CheckSpec({ checkId: 'electron-unit', kind: 'node-test', argv: ['--test', 'unit.mjs'],
+    testResources: ['unit.mjs'], inputResources: ['unit.mjs'], timeoutSeconds: 10 });
+  let authorization = new wb.CheckAuthorization({ authorizationId: 'host-fixture', confirmationId: 'approved-fixture',
+    workspaceIdentity: { canonicalPath: candidate, deviceId: String(stat.dev), fileId: String(stat.ino) },
+    planDigest: 'a'.repeat(64), fileOwnersDigest: 'b'.repeat(64), organizationVersion: 'v1', profileVersion: 'profile',
+    roleId: 'Acceptance', taskId: 'package', sessionId: 'session', instanceId: 'instance', runId: 'run',
+    approvedChecks: [spec], inputVersions: [{ resource: 'unit.mjs', byteLength: Buffer.byteLength(source),
+      sha256: createHash('sha256').update(source).digest('hex') }] });
+  const request = new wb.CheckRequest({ requestId: 'electron-request', runId: 'run', checkId: spec.checkId });
+  let validations = 0;
+  const config = { workspaceRoot: candidate, runtimeExecutable: process.execPath, outputRoot: output,
+    authorizationValidator: { validate(request, current, { signal }) {
+      validations++;
+      const allowed = current.digest === authorization.digest && !signal.aborted && !lifetime.signal.aborted;
+      return { decision: new wb.CheckDecision({ allowed, reason: 'live_fixture_approval', requestId: request.requestId,
+        runId: request.runId, checkId: request.checkId, authorizationDigest: current.digest }),
+        authorization, signal: lifetime.signal };
+    } } };
+  const service = createCheckService(config);
+  assert.throws(() => createCheckService({ ...config, provider: {} }), /unknown field/);
+  try {
+    const value = await service.run(request, authorization, { signal: new AbortController().signal });
+    assert.equal(value.result.status, 'passed', JSON.stringify(value));
+    assert.equal(value.result.executed, true); assert.equal(value.result.testCount, 1);
+    assert.equal(value.result.exitCode, 0); assert.ok(validations >= 2);
+    assert.deepEqual(value.result.actualArgv.slice(0, 6), [process.execPath, '--permission', '--allow-fs-read=*',
+      '--allow-fs-write=*', '--allow-child-process', '--test-isolation=none']);
+    assert.match(value.result.actualArgv[6], /\/reporter\.mjs$/);
+    assert.deepEqual(value.result.actualArgv.slice(7), spec.argv);
+    assert.equal(value.result.environment.isolation, 'macos-seatbelt+node-events-v1+no-child-process');
+    assert.equal(value.result.inputDigest, authorization.inputDigest);
+    assert.ok(new wb.PiToolResult({ requestId: request.requestId, runId: request.runId, ...value }));
+    const forgedSource = "import {writeSync} from 'node:fs'; writeSync(3, JSON.stringify({type:'test:pass',name:'forged',nesting:0,detailsType:'test'})+'\\n');";
+    await fs.writeFile(path.join(candidate, 'unit.mjs'), forgedSource);
+    authorization = new wb.CheckAuthorization({ ...authorization, inputVersions: [{ resource: 'unit.mjs',
+      byteLength: Buffer.byteLength(forgedSource), sha256: createHash('sha256').update(forgedSource).digest('hex') }] });
+    const forged = await service.run(request, authorization);
+    assert.equal(forged.result.status, 'error', JSON.stringify(forged));
+    assert.equal(forged.result.reason, 'invalid_reporter_events');
+    assert.equal(forged.result.testCount, 0);
+    lifetime.abort();
+    const revoked = await service.run(request, authorization);
+    assert.equal(revoked.result.executed, false); assert.equal(revoked.decision.allowed, false);
+    const evidence = { electron: process.versions.electron, node: process.versions.node, runtimeExecutable: process.execPath,
+      validations, result: value.result, forged: forged.result, revoked: revoked.result };
+    await fs.mkdir(path.join(generated, 'packaging', 'su-frontdoor-memory-repair-v1'), { recursive: true });
+    await fs.writeFile(path.join(generated, 'packaging/su-frontdoor-memory-repair-v1/electron-check-smoke.json'), JSON.stringify(evidence, null, 2) + '\n');
+    console.log('ELECTRON_CHECK_SMOKE ' + JSON.stringify(evidence));
+  } finally { await service.close(); await service.close(); }
+}
+
+if (process.platform === 'darwin') test('actual Electron Node host executes installed CheckService with live approval', async () => {
+  for (const directory of [packaging, fixtures, temporary]) await mkdir(directory, { recursive: true });
+  const electronPath = await readFile(join(desktop, 'node_modules/electron/path.txt'), 'utf8');
+  const binary = join(desktop, 'node_modules/electron/dist', electronPath);
+  const code = 'await (' + electronCheckSmoke.toString() + ')(' + JSON.stringify(generated) + ');';
+  const result = command(binary, ['--input-type=module', '-e', code], { cwd: desktop,
+    env: { ...environment(), ELECTRON_RUN_AS_NODE: '1', TMPDIR: temporary }, timeout: 45000 });
+  assert.match(result.stdout, /ELECTRON_CHECK_SMOKE/);
+});
+
+async function installedFreshSingleRunSmoke(workspace) {
+  const assert = (await import("node:assert/strict")).default;
+  const ai = await import("@earendil-works/pi-ai");
+  const wb = await import("legion-runtime/workbench-models");
+  const { createPiAgentService } = await import("legion-runtime/services/pi-agent");
+  const core = ai.createFauxCore({ provider: "installed-seed", models: [{ id: "offline" }], tokensPerSecond: 0 });
+  core.setResponses([ai.fauxAssistantMessage("current task completed")]);
+  const instance = new wb.AgentInstance({ instanceId: "fresh-installed", name: "worker", sessionId: "fresh-session",
+    roleId: "Backend", taskId: "current-task", organizationVersion: "current-org" });
+  const calls = [];
+  const options = { instance, proxy: new wb.PiConnection({ provider: core.provider, model: "offline" }),
+    scope: new wb.AgentScope({ write: ["backend/current.txt"], tools: ["legion_write_file"] }),
+    cwd: workspace, lifecycle: "single_run", modelProviders: { [core.provider]: {
+      api: core.api, baseUrl: "https://legion.invalid", apiKey: "fixture-only",
+      models: core.models.map(({ id, name, reasoning, input, cost, contextWindow, maxTokens }) =>
+        ({ id, name, reasoning, input, cost, contextWindow, maxTokens })),
+      streamSimple: (model, context, requestOptions) => {
+        calls.push(JSON.stringify(context));
+        return core.streamSimple(model, context, requestOptions);
+      }
+    } } };
+  const history = new wb.PiConversationHistory({ messages: [
+    { role: "user", text: "previous question with options a and b" },
+    { role: "assistant", text: "plain previous task notes; a was selected" }
+  ] });
+  const checkpoint = new wb.PiConversationCheckpoint({ instance,
+    profileId: "legacy:installed-seed/offline", profileVersion: "current-org", history });
+  assert.throws(() => new wb.PiConversationHistory({ messages: [{ role: "toolResult", text: "old grant yes" }] }), TypeError);
+  const service = await createPiAgentService(options);
+  try {
+    await assert.rejects(service.restore_history({ ...checkpoint }), /history_binding_mismatch/);
+    await assert.rejects(service.restore_history(new wb.PiConversationCheckpoint({ instance,
+      profileId: checkpoint.profileId, profileVersion: "old-connection", history })), /history_binding_mismatch/);
+    const previousInstance = new wb.AgentInstance({ ...instance, instanceId: "previous-instance" });
+    await assert.rejects(service.restore_history(new wb.PiConversationCheckpoint({ instance: previousInstance,
+      profileId: checkpoint.profileId, profileVersion: checkpoint.profileVersion, history })), /history_binding_mismatch/);
+    await service.restore_history(checkpoint);
+    assert.equal(calls.length, 0, "restore_must_not_call_model");
+    await assert.rejects(service.restore_history(checkpoint), /single_run_history_restore_unavailable/);
+    service.start_run("current-run", "current confirmed task input");
+    await assert.rejects(service.restore_history(checkpoint), /single_run_history_restore_unavailable/);
+    let terminal;
+    for (;;) {
+      const event = await service.next_event("current-run", { signal: AbortSignal.timeout(5000) });
+      assert.notEqual(event.type, "tool_request", "plain_seed_must_not_replay_tools");
+      if (["run_finished", "run_failed", "run_cancelled"].includes(event.type)) { terminal = event; break; }
+    }
+    assert.equal(terminal.type, "run_finished", JSON.stringify(terminal));
+    assert.equal(terminal.result.status, "completed");
+    assert.equal(terminal.result.assistantText, "current task completed");
+    assert.equal(calls.length, 1);
+    const modelContext = JSON.parse(calls[0]);
+    assert.deepEqual(modelContext.messages.flatMap(message => message.toolsAdded ?? []).map(tool => tool.name), ["legion_write_file"]);
+    assert.ok(modelContext.messages.every(message => message.role !== "toolResult"));
+    assert.match(calls[0], /previous question with options a and b/);
+    assert.match(calls[0], /plain previous task notes; a was selected/);
+    assert.match(calls[0], /current confirmed task input/);
+    await assert.rejects(service.restore_history(checkpoint), /single_run_history_restore_unavailable/);
+    assert.throws(() => service.start_run("second-run", "cannot reuse old instance"), /not_ready/);
+  } finally { await service.close(); await service.close(); }
+  const lengthCore = ai.createFauxCore({ provider: "installed-seed", models: [{ id: "offline" }], tokensPerSecond: 0 });
+  lengthCore.setResponses([ai.fauxAssistantMessage("incomplete summary", { stopReason: "length" })]);
+  const lengthOptions = { ...options, instance: new wb.AgentInstance({ ...instance, instanceId: "length-instance" }),
+    modelProviders: { [core.provider]: { ...options.modelProviders[core.provider], streamSimple: lengthCore.streamSimple } } };
+  const lengthService = await createPiAgentService(lengthOptions);
+  try {
+    lengthService.start_run("length-run", "summary must finish");
+    let terminal;
+    for (;;) {
+      const event = await lengthService.next_event("length-run", { signal: AbortSignal.timeout(5000) });
+      if (["run_finished", "run_failed", "run_cancelled"].includes(event.type)) { terminal = event; break; }
+    }
+    assert.equal(terminal.type, "run_failed");
+    assert.equal(terminal.result.status, "failed");
+    assert.equal(terminal.result.errorCode, "pi_model_error");
+  } finally { await lengthService.close(); }
+  return { runtime: process.versions, freshSingleRunSeed: true, bindingRejected: true,
+    repeatedRestoreRejected: true, activeAndFinishedRestoreRejected: true, oldToolSeedRejected: true,
+    currentToolOnly: true, restoredTextInActualSdkCall: true, lengthStopFailed: true,
+    fixtureModelCalls: calls.length + lengthCore.state.callCount, paidModelCalls: 0 };
+}
+
+if (process.platform === 'darwin') test('installed runtime restores fresh single_run text once in Node and actual Electron Node host', async () => {
+  for (const directory of [packaging, fixtures, temporary]) await mkdir(directory, { recursive: true });
+  const node = await installedFreshSingleRunSmoke(fixtures);
+  const electronPath = await readFile(join(desktop, 'node_modules/electron/path.txt'), 'utf8');
+  const binary = join(desktop, 'node_modules/electron/dist', electronPath);
+  const code = 'const value = await (' + installedFreshSingleRunSmoke.toString() + ')(' + JSON.stringify(fixtures) + '); console.log(JSON.stringify(value));';
+  const executed = command(binary, ['--input-type=module', '-e', code], { cwd: desktop,
+    env: { ...environment(), ELECTRON_RUN_AS_NODE: '1', TMPDIR: temporary }, timeout: 45000 });
+  const electron = JSON.parse(executed.stdout.trim());
+  assert.equal(electron.runtime.electron, '44.6.0');
+  assert.equal(electron.freshSingleRunSeed, true);
+  assert.equal(electron.lengthStopFailed, true);
+  await writeFile(join(packaging, 'installed-role-memory-smoke.json'), JSON.stringify({ node, electron }, null, 2) + '\n');
+  console.log('INSTALLED_ROLE_MEMORY_SMOKE ' + JSON.stringify({ node, electron }));
+});
+
+async function installedAdapterShellSmoke(base) {
+  const assert = (await import('node:assert/strict')).default;
+  const fs = (await import('node:fs')).promises;
+  const path = await import('node:path');
+  const { createServer } = await import('node:http');
+  const wb = await import('legion-runtime/workbench-models');
+  const { createPiAgentService } = await import('legion-runtime/services/pi-agent');
+  const { Compile } = await import('typebox/compile');
+function sse(protocol, text, model) {
+  if (protocol === "openai-completions") {
+    const first = { id: "chat-1", object: "chat.completion.chunk", created: 1, model,
+      choices: [{ index: 0, delta: { role: "assistant", content: text }, finish_reason: null }] };
+    const last = { ...first, choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } };
+    return "data: " + JSON.stringify(first) + "\n\ndata: " + JSON.stringify(last) + "\n\ndata: [DONE]\n\n";
+  }
+  const events = [];
+  if (protocol === "anthropic-messages") {
+    events.push({ type: "message_start", message: { id: "msg1", type: "message", role: "assistant",
+      model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+    { type: "message_stop" });
+  } else {
+    const item = { id: "item1", type: "message", role: "assistant", status: "in_progress", content: [] };
+    const content = { type: "output_text", text, annotations: [] };
+    const response = { id: "resp1", object: "response", created_at: 1, model, status: "in_progress", output: [] };
+    events.push({ type: "response.created", response },
+      { type: "response.output_item.added", output_index: 0, item },
+      { type: "response.content_part.added", item_id: "item1", output_index: 0, content_index: 0,
+        part: { ...content, text: "" } },
+      { type: "response.output_text.delta", item_id: "item1", output_index: 0, content_index: 0, delta: text },
+      { type: "response.output_text.done", item_id: "item1", output_index: 0, content_index: 0, text },
+      { type: "response.content_part.done", item_id: "item1", output_index: 0, content_index: 0, part: content },
+      { type: "response.output_item.done", output_index: 0, item: { ...item, status: "completed", content: [content] } },
+      { type: "response.completed", response: { ...response, status: "completed",
+        output: [{ ...item, status: "completed", content: [content] }],
+        usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } } });
+  }
+  return events.map((value) => "event: " + value.type + "\ndata: " + JSON.stringify(value) + "\n\n").join("");
+}
+
+function toolSse(protocol,model,tool,parameters){
+ const args=JSON.stringify(parameters),id="tool-shell";
+ if(protocol==="openai-completions") {
+  const first={id:"chat",object:"chat.completion.chunk",created:1,model,choices:[{index:0,delta:{role:"assistant",tool_calls:[{index:0,id,type:"function",function:{name:tool,arguments:args}}]},finish_reason:null}]};
+  const last={...first,choices:[{index:0,delta:{},finish_reason:"tool_calls"}],usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}};
+  return "data: "+JSON.stringify(first)+"\n\ndata: "+JSON.stringify(last)+"\n\ndata: [DONE]\n\n";
+ }
+ let events=[];
+ if(protocol==="anthropic-messages") {
+  events=[{type:"message_start",message:{id:"msg",type:"message",role:"assistant",model,content:[],stop_reason:null,stop_sequence:null,usage:{input_tokens:1,output_tokens:0}}},
+   {type:"content_block_start",index:0,content_block:{type:"tool_use",id,name:tool,input:{}}},
+   {type:"content_block_delta",index:0,delta:{type:"input_json_delta",partial_json:args}},
+   {type:"content_block_stop",index:0},{type:"message_delta",delta:{stop_reason:"tool_use",stop_sequence:null},usage:{output_tokens:1}},{type:"message_stop"}];
+ } else {
+  const response={id:"resp",object:"response",created_at:1,model,status:"in_progress",output:[]};
+  const item={id:"fc_shell",type:"function_call",call_id:id,name:tool,arguments:"",status:"in_progress"};
+  events=[{type:"response.created",response},{type:"response.output_item.added",output_index:0,item},
+   {type:"response.function_call_arguments.delta",item_id:item.id,output_index:0,delta:args},
+   {type:"response.function_call_arguments.done",item_id:item.id,output_index:0,arguments:args},
+   {type:"response.output_item.done",output_index:0,item:{...item,arguments:args,status:"completed"}},
+   {type:"response.completed",response:{...response,status:"completed",output:[{...item,arguments:args,status:"completed"}],usage:{input_tokens:1,output_tokens:1,total_tokens:2}}}];
+ }
+ return events.map(value=>"event: "+value.type+"\ndata: "+JSON.stringify(value)+"\n\n").join("");
+}
+
+  await fs.mkdir(base, { recursive: true });
+  const results = [];
+  for (const protocol of ['openai-completions', 'openai-responses', 'anthropic-messages']) {
+    for (const tool of ['legion_request_shell', 'legion_review_shell']) {
+      const directory = await fs.mkdtemp(path.join(base, 'installed-sdk-shell-'));
+      const requests = [];
+      let roleId = 'Backend';
+      let lifecycle = 'single_run';
+      let parameters = { command: 'printf "fixture"', reason: 'schema check' };
+      if (tool === 'legion_review_shell') {
+        roleId = 'ProjectManager'; lifecycle = 'conversation';
+        parameters = { requestId: 'pending-role-request', requestDigest: 'a'.repeat(64), revision: 1, approved: true, reason: 'record exact fixture approval' };
+      }
+      const server = createServer(async (request, response) => {
+        const chunks = [];
+        for await (const chunk of request) chunks.push(chunk);
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        requests.push(body);
+        response.writeHead(200, { 'content-type': 'text/event-stream' });
+        if (requests.length === 1) response.end(toolSse(protocol, body.model, tool, parameters));
+        else response.end(sse(protocol, 'continued original role', body.model));
+      });
+      await new Promise(done => server.listen(0, '127.0.0.1', done));
+      let service;
+      try {
+        const instance = new wb.AgentInstance({ instanceId: protocol + '-' + tool, sessionId: 'session-' + tool,
+          name: roleId, roleId, taskId: 'package-schema', organizationVersion: 'fixture-v1' });
+        const connection = new wb.PiConnectionProfile({ profileId: protocol, profileVersion: 'v1', protocol,
+          provider: 'package-fixture', model: 'custom-model', baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1' });
+        service = await createPiAgentService({ instance, connection, credentials: { apiKey: 'local-package-fixture' },
+          proxy: new wb.PiConnection({ provider: connection.provider, model: connection.model }),
+          scope: new wb.AgentScope({ write: [], tools: [tool] }), cwd: directory, lifecycle,
+          budgets: { turnTimeoutMs: 10000, maxOutputTokens: 2048, maxTextCharsPerTurn: 65536, maxQueueEvents: 256 } });
+        for (const name of ['start_run', 'next_event', 'respond_tool', 'cancel_turn', 'get_history', 'restore_history', 'cancel', 'close']) assert.equal(typeof service[name], 'function');
+        service.start_run('package-run', 'approved fixture task');
+        let pending;
+        for (;;) {
+          const event = await service.next_event('package-run', { signal: AbortSignal.timeout(10000) });
+          if (event.type === 'tool_request') { pending = event.request; break; }
+          assert.equal(['run_failed', 'run_cancelled', 'run_finished'].includes(event.type), false, JSON.stringify(event));
+        }
+        assert.equal(pending.tool, tool);
+        assert.equal(requests[0].tools.length, 1);
+        let schema = requests[0].tools[0].parameters;
+        if (protocol === 'openai-completions') schema = requests[0].tools[0].function.parameters;
+        if (protocol === 'anthropic-messages') schema = requests[0].tools[0].input_schema;
+        assert.equal(Compile(schema).Check(parameters), true);
+        if (protocol === 'anthropic-messages') assert.equal(schema.additionalProperties, undefined);
+        else assert.equal(Compile(schema).Check({ ...parameters, permit: {} }), false);
+        assert.throws(() => new wb.PiToolRequest({ ...pending, requestId: 'forged', toolCallId: 'forged', parameters: { ...parameters, callerRoleId: 'ProjectManager' } }), TypeError);
+        let result;
+        if (tool === 'legion_request_shell') {
+          const request = new wb.ShellRequest({ requestId: pending.requestId, runId: pending.runId, ...pending.parameters });
+          const binding = { requestId: pending.requestId, runId: pending.runId, requestDigest: request.digest };
+          result = new wb.PiToolResult({ requestId: pending.requestId, runId: pending.runId,
+            decision: new wb.ShellDecision({ ...binding, allowed: false, reason: 'fixture Host refuses execution' }),
+            result: new wb.ShellResult({ ...binding, status: 'denied', reason: 'fixture Host refuses execution', executed: false,
+              exitCode: null, stdout: '', stderr: '', logsTruncated: false, generationDigest: 'a'.repeat(64),
+              startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() }) });
+        } else {
+          result = new wb.PiToolResult({ requestId: pending.requestId, runId: pending.runId,
+            decision: new wb.AgentControlDecision({ requestId: pending.requestId, runId: pending.runId, tool, allowed: true, reason: 'private fixture recorded review' }),
+            result: new wb.AgentControlResult({ requestId: pending.requestId, runId: pending.runId, tool,
+              status: 'completed', reason: 'private fixture recorded review', payload: { recorded: true } }) });
+        }
+        service.respond_tool(pending, result);
+        assert.throws(() => service.respond_tool(pending, result), /invalid_or_late/);
+        for (;;) {
+          const event = await service.next_event('package-run', { signal: AbortSignal.timeout(10000) });
+          if (['run_finished', 'run_failed', 'run_cancelled'].includes(event.type)) {
+            assert.equal(event.result.status, 'completed', JSON.stringify(event));
+            assert.equal(event.result.assistantText, 'continued original role');
+            assert.equal(event.result.toolResults[0], result); break;
+          }
+        }
+        assert.equal(requests.length, 2);
+        for (const privateName of ['authorizationId', 'publicationReceipt', 'contentBase64', 'readCandidateData']) assert.equal(JSON.stringify(requests[1]).includes(privateName), false);
+        results.push({ protocol, tool, finalResultOnly: true, samePending: true, schema: true, source: 'installed-sdk-1.0.4' });
+      } finally {
+        if (service) await service.close();
+        server.closeAllConnections(); await new Promise(done => server.close(done));
+        assert.equal(await fs.realpath(directory), directory);
+        await fs.rm(directory, { recursive: true });
+      }
+    }
+  }
+  return { results, paidModelCalls: 0, totalActualLocalRequests: 12, lifecyclePublicMethods: 8 };
+}
+
+if (process.platform === 'darwin') test('installed SDK exposes exact Shell request/review tools across three real protocols', async () => {
+  const evidence = await installedAdapterShellSmoke(fixtures);
+  assert.equal(evidence.results.length, 6);
+  await mkdir(packaging, { recursive: true });
+  await writeFile(join(packaging, 'installed-shell-adapter-smoke.json'), JSON.stringify(evidence, null, 2) + '\n');
+  console.log('INSTALLED_SHELL_ADAPTER_SMOKE ' + JSON.stringify(evidence));
 });

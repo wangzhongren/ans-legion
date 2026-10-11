@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion Runtime desktop release compatibility",
+  "authorizationSource": ".ans/decisions/legion-project-wide-read-v1-authorization.md",
+  "designFiles": [
+    "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-project-wide-read.md"
+  ],
+  "maxConcurrentWorkers": 1,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "ProjectManager": {
+      "autoDispatch": true,
+      "card": ".ans/roles/ProjectManager/role-card.md",
+      "boundary": ".ans/roles/ProjectManager/boundary.md",
+      "operations": [
+        "implement"
+      ],
+      "writeFiles": [
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json",
+        "apps/desktop/scripts/verify-dependencies.mjs"
+      ],
+      "checks": {
+        "syntax": {
+          "argv": [
+            "node",
+            "--check",
+            "apps/desktop/scripts/verify-dependencies.mjs"
+          ],
+          "timeoutSeconds": 60
+        },
+        "lock-sync": {
+          "argv": [
+            "npm",
+            "--prefix",
+            "apps/desktop",
+            "ci",
+            "--ignore-scripts",
+            "--dry-run",
+            "--offline",
+            "--cache",
+            "/private/tmp/legion-npm-cache"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

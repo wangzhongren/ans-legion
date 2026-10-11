@@ -17,3 +17,7 @@ Runtime 私有持有 authority；Agent 仅公开只读身份及 run/cancel/close
 Runtime.close 同步撤权后等待 Adapter 停止及完整 run 终态审计，最后才关闭 Mutation。run.finally 只等待 Adapter，不回等 Runtime.close；真实审计故障保持失败。此前 Tester19通过/1失败定位了关闭顺序缺陷，严格原测试未改。
 
 [当前总设计](../../design/2026-10-07_design_desktop-workbench-v2.md) · [功能导航](feature-map.md) · [公开接口](api-spec.md) · [当前证据](../../scheduling/legion-desktop-workbench-v2.md)。原13项pipeline、74项Node close修复证据是历史；本阶段固定九suite与下游独立验收刷新其输入。
+
+## 项目 Shell v1
+
+维护独立Shell请求/审查/授权/结果/基线Model、OS执行Provider与Host验证Service。提供真实镜像执行、权限签名回收、生成树发布journal和原Mutation源删除。source owners、Human计划artifacts、缺失基线和dependency generation均绑定当前上下文。包/SDK/renderer不暴露内部permit或receipt；Workbench公开组合入口见api-spec。

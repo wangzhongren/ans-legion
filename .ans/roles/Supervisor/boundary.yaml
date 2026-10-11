@@ -7,3 +7,43 @@ write_scope: ["docs/roles/Supervisor/feature-map.md","docs/roles/Supervisor/func
 generated_effect_scope: []
 deny_scope: ['outside_boundary', '.ans/organization/**', '.ans/roles/**', '.ans/project.json', 'historical_runtime_artifacts']
 approval_source: direct_customer_workbench_v2_confirm_2026-10-07
+su_frontdoor_cli_repair_integration:
+  state: AUTHORIZED_WITHIN_ACCEPTED_79_FILE_CONFIG
+  conditional_record: docs/scheduling/legion-supervisor-frontdoor-v1-cli-repair-integration.md
+  scope_reference: .ans/decisions/legion-supervisor-frontdoor-v1-cli-repair-integration-scope.md
+  accepted_config_sha256: c8032728888d3652ce0987a94cb7ca84557c9ecf53bb3f27bb3f0df6d6b9e7b2
+  accepted_design_sha256: 9f6628178502f5167b641c6bfe76d7e9b223ceb780f4ff79ba6dfa622cf5b0a1
+  permission_source: legion-supervisor-frontdoor-v1-authorization.md
+  new_application_paths: []
+su_frontdoor_cancel_repair_integration:
+  state: AUTHORIZED_ONLY_WITHIN_ACCEPTED_79_FILE_CONFIG
+  conditional_record: docs/scheduling/legion-supervisor-frontdoor-v1-su-cancel-repair-integration.md
+  scope_reference: .ans/decisions/legion-supervisor-frontdoor-v1-su-cancel-repair-integration-scope.md
+  accepted_config_sha256: c8032728888d3652ce0987a94cb7ca84557c9ecf53bb3f27bb3f0df6d6b9e7b2
+  accepted_design_sha256: 9f6628178502f5167b641c6bfe76d7e9b223ceb780f4ff79ba6dfa622cf5b0a1
+  permission_source: legion-supervisor-frontdoor-v1-authorization.md
+  new_application_paths: []
+su_frontdoor_cancel_host_repair_integration:
+  state: AUTHORIZED_ONLY_WITHIN_ACCEPTED_79_FILE_CONFIG
+  conditional_record: docs/scheduling/legion-supervisor-frontdoor-v1-su-cancel-host-repair-integration.md
+  scope_reference: .ans/decisions/legion-supervisor-frontdoor-v1-su-cancel-repair-integration-scope.md
+  accepted_config_sha256: c8032728888d3652ce0987a94cb7ca84557c9ecf53bb3f27bb3f0df6d6b9e7b2
+  accepted_design_sha256: 9f6628178502f5167b641c6bfe76d7e9b223ceb780f4ff79ba6dfa622cf5b0a1
+  permission_source: legion-supervisor-frontdoor-v1-authorization.md
+  new_application_paths: []
+su_frontdoor_memory_race_repair_integration:
+  state: AUTHORIZED_ONLY_WITHIN_ACCEPTED_79_FILE_CONFIG
+  conditional_record: docs/scheduling/legion-supervisor-frontdoor-v1-role-memory-race-repair-integration.md
+  scope_reference: .ans/decisions/legion-supervisor-frontdoor-v1-role-memory-race-repair-integration-scope.md
+  accepted_config_sha256: c8032728888d3652ce0987a94cb7ca84557c9ecf53bb3f27bb3f0df6d6b9e7b2
+  accepted_design_sha256: 9f6628178502f5167b641c6bfe76d7e9b223ceb780f4ff79ba6dfa622cf5b0a1
+  permission_source: legion-supervisor-frontdoor-v1-authorization.md
+  new_application_paths: []
+su_frontdoor_delivery_doc_close:
+  state: AUTHORIZED_DOC_ONLY_WITHIN_ACCEPTED_CONFIG
+  conditional_record: docs/scheduling/legion-supervisor-frontdoor-v1-delivery-doc-close.md
+  scope_reference: .ans/decisions/legion-supervisor-frontdoor-v1-delivery-doc-close-scope.md
+  accepted_config_sha256: c8032728888d3652ce0987a94cb7ca84557c9ecf53bb3f27bb3f0df6d6b9e7b2
+  accepted_design_sha256: 9f6628178502f5167b641c6bfe76d7e9b223ceb780f4ff79ba6dfa622cf5b0a1
+  permission_source: legion-supervisor-frontdoor-v1-authorization.md
+  new_application_paths: []

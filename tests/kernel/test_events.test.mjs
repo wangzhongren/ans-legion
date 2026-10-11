@@ -1,17 +1,25 @@
+import { makeTestOwners, testLeaseContext } from "./test_control_memory.test.mjs";
+const kernelOwners = makeTestOwners("Backend", ["backend/a.txt"]);
 import test from "node:test";
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import nodeFs from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+function tmpdir() {
+  const path = fileURLToPath(new URL("../../.ans/runtime/legion-cli-role-owned-v2/KernelEngineer/tmp/", import.meta.url));
+  mkdirSync(path, { recursive: true });
+  return path;
+}
 import { createMutationService, MutationError } from "../../src/kernel/services/public/mutation.mjs";
 import { AgentSession, ActionProposal, RoleBoundary, PolicyDecision, Outcome, Event, _createRuntimeAuthority } from "../../src/kernel/models/core.mjs";
 async function fixture(t) {
   const workspace = await fs.mkdtemp(join(tmpdir(), "legion-events-"));
   const session = new AgentSession({ sessionId: "s", roleId: "Backend", taskId: "task", organizationVersion: "v3" });
   const boundary = new RoleBoundary({ roleId: "Backend", writeScope: ["backend/"], tools: ["legion_write_file"], capabilities: ["write_file"] });
-  const authority = _createRuntimeAuthority({ sessions: [session], boundaries: [boundary], organizationVersion: "v3" });
-  const service = createMutationService({ workspace, _authority: authority });
+  const authority = _createRuntimeAuthority({ fileOwners: kernelOwners, sessions: [session], boundaries: [boundary], organizationVersion: "v3" });
+  const service = createMutationService({ workspace, _authority: authority, leaseContext: testLeaseContext(workspace, kernelOwners) });
   const proposal = new ActionProposal({ proposalId: "p", action: "write_file", resource: "backend/a.txt", content: "secret-body", tool: "legion_write_file", capability: "write_file", session });
   const permit = () => authority.issue(proposal, new PolicyDecision({ outcome: Outcome.ALLOW, reason: "ok", proposalDigest: proposal.digest, organizationVersion: "v3", boundaryDigest: boundary.digest }));
   t.after(async () => { t.mock.restoreAll(); await service.close(); await fs.rm(workspace, { recursive: true }); });

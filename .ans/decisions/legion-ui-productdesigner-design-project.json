@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion UI design handoff, existing behavior preserved",
+  "authorizationSource": ".ans/decisions/legion-ui-productdesigner-role-v1.md",
+  "designFiles": [
+    ".ans/decisions/legion-ui-productdesigner-role-v1.md"
+  ],
+  "maxConcurrentWorkers": 1,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "ProductDesigner": {
+      "autoDispatch": true,
+      "card": ".ans/roles/ProductDesigner/role-card.md",
+      "boundary": ".ans/roles/ProductDesigner/boundary.md",
+      "operations": [
+        "implement",
+        "review"
+      ],
+      "writeFiles": [
+        "docs/roles/ProductDesigner/feature-map.md",
+        "docs/roles/ProductDesigner/functional-description.md",
+        "docs/roles/ProductDesigner/api-spec.md",
+        "docs/roles/ProductDesigner/changelog.md",
+        "docs/roles/ProductDesigner/docs/design/2026-10-08_design_legion-ui.md",
+        "docs/roles/ProductDesigner/prototypes/legion-ui.html"
+      ],
+      "checks": {
+        "design-deliverables": {
+          "argv": [
+            "python3",
+            "-c",
+            "from html.parser import HTMLParser\nfrom pathlib import Path\nimport re\nimport subprocess\nroot = Path('.')\nfiles = [\n    'docs/roles/ProductDesigner/feature-map.md',\n    'docs/roles/ProductDesigner/functional-description.md',\n    'docs/roles/ProductDesigner/api-spec.md',\n    'docs/roles/ProductDesigner/changelog.md',\n    'docs/roles/ProductDesigner/docs/design/2026-10-08_design_legion-ui.md',\n    'docs/roles/ProductDesigner/prototypes/legion-ui.html',\n]\nmissing = [name for name in files if not (root / name).is_file() or (root / name).stat().st_size == 0]\nassert not missing, f'missing or empty design deliverables: {missing}'\nassert all(Path(name).parts[:3] == ('docs', 'roles', 'ProductDesigner') for name in files), 'design write scope escaped ProductDesigner docs'\n\nclass PrototypeParser(HTMLParser):\n    def __init__(self):\n        super().__init__()\n        self.inline_scripts = []\n        self.script_depth = 0\n        self.current_script = []\n        self.errors = []\n\n    def handle_starttag(self, tag, attrs):\n        values = dict(attrs)\n        if tag in {'iframe', 'object', 'embed'}:\n            self.errors.append(f'embedded active content: {tag}')\n        if tag == 'script':\n            if 'src' in values:\n                self.errors.append('script src must be inline in the scoped prototype')\n            self.script_depth += 1\n            self.current_script = []\n        for name in ('src', 'href', 'action', 'formaction', 'poster', 'data', 'xlink:href'):\n            value = values.get(name, '').strip()\n            if value and (value.startswith('//') or re.match(r'^[a-z][a-z0-9+.-]*:', value, re.I)):\n                if not (name == 'src' and value.lower().startswith('data:image/')):\n                    self.errors.append(f'external or file resource in {name}')\n\n    def handle_endtag(self, tag):\n        if tag == 'script' and self.script_depth:\n            self.inline_scripts.append(''.join(self.current_script))\n            self.current_script = []\n            self.script_depth -= 1\n\n    def handle_data(self, data):\n        if self.script_depth:\n            self.current_script.append(data)\n\nhtml = (root / files[-1]).read_text(encoding='utf-8')\nparser = PrototypeParser()\nparser.feed(html)\nparser.close()\nassert not parser.errors, f'prototype includes out-of-scope external/embedded resources: {parser.errors}'\nsource = '\\n'.join(parser.inline_scripts)\nfor pattern, label in [\n    (r'\\bfetch\\s*\\(', 'fetch'),\n    (r'\\bXMLHttpRequest\\b', 'XMLHttpRequest'),\n    (r'\\b(WebSocket|EventSource)\\b', 'network stream API'),\n    (r'\\b(sendBeacon|ipcRenderer|contextBridge)\\b', 'network or IPC API'),\n    (r'window\\s*\\.\\s*(legionDesktop|api)\\b', 'desktop bridge'),\n    (r'\\b(require|import)\\s*\\(?\\s*[\\\"\\']electron\\b', 'Electron runtime access'),\n]:\n    assert not re.search(pattern, source, re.I), f'prototype inline JavaScript references {label}'\nfor script in parser.inline_scripts:\n    result = subprocess.run(['node', '--check', '--input-type=module'], input=script, text=True, capture_output=True, check=False)\n    assert result.returncode == 0, f'prototype JavaScript syntax check failed: {result.stderr.strip()}'\nprint('Six scoped design deliverables exist and are nonempty; prototype local UI JavaScript syntax checked without execution, with bounded static checks for external resources and direct desktop/network APIs.')"
+          ],
+          "timeoutSeconds": 60
+        }
+      }
+    }
+  }
+}

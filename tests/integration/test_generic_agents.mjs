@@ -1,8 +1,10 @@
+import { ProjectFileOwners } from "../../workbench.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import { dirname, join, relative, resolve, isAbsolute, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash, randomUUID } from "node:crypto";
 import { AgentSession as ActualPiSession } from "@earendil-works/pi-coding-agent";
 import { createRuntime, RoleBoundary, TaskDispatchContext } from "../../runtime.mjs";
 import { MutationError } from "../../src/kernel/services/public/mutation.mjs";
@@ -11,7 +13,7 @@ import { createControlledModel, controlledTool, createResponseBarrier, fauxAssis
 const PROJECT = fileURLToPath(new URL("../../", import.meta.url));
 const TEST_ROLE = process.env.LEGION_NODE_TEST_ROLE ?? "Tester";
 assert.ok(["ProjectManager", "Reviewer", "Tester"].includes(TEST_ROLE), "unknown Node test role");
-const TEMP_ROOT = resolve(PROJECT, ".ans/runtime/legion-desktop-workbench-v2", TEST_ROLE, "node/tmp");
+const TEMP_ROOT = resolve(PROJECT, ".ans/runtime/legion-cli-role-owned-v2", TEST_ROLE, "tmp");
 const SECRET_A = "private-body-A";
 const SECRET_B = "private-body-B";
 const CONTROLLED_TOOL = "legion_write_file";
@@ -43,6 +45,19 @@ async function cleanup(workspace) {
   await assert.rejects(fs.stat(target), { code: "ENOENT" });
 }
 
+async function ownerLease(t, workspace, owners) {
+  const base = await fs.mkdtemp(join(TEMP_ROOT, "legion-test-owner-lease-"));
+  const leaseRoot=join(base,"leases"),catalogDir=join(base,"catalog");
+  await fs.mkdir(leaseRoot,{mode:0o700});await fs.mkdir(catalogDir,{mode:0o700});
+  const identity=async path=>{const s=await fs.lstat(path,{bigint:true});return {deviceId:String(s.dev),fileId:String(s.ino)};};
+  const workspaceIdentity={canonicalPath:await fs.realpath(workspace),...await identity(workspace)};
+  const key=createHash("sha256").update(workspaceIdentity.deviceId+":"+workspaceIdentity.fileId).digest("hex");
+  const lock=join(leaseRoot,key);await fs.mkdir(lock,{mode:0o700});const holder=join(lock,"holder"),nonce=randomUUID();await fs.writeFile(holder,nonce,{flag:"wx",mode:0o600});
+  await fs.writeFile(join(catalogDir,"workbench-projects.json"),JSON.stringify({schemaVersion:2,projects:[{schemaVersion:2,id:owners.projectId,workspaceIdentity,fileOwners:owners,plan:null,tasks:[],legacyHistory:[]}]}),{flag:"wx",mode:0o600});
+  const sourceId=await identity(catalogDir);await fs.writeFile(join(leaseRoot,key+".owner-source.json"),JSON.stringify({schemaVersion:1,workspace:workspaceIdentity,source:{catalogDirCanonicalPath:catalogDir,dirDeviceId:sourceId.deviceId,dirFileId:sourceId.fileId,filename:"workbench-projects.json",projectId:owners.projectId}}),{flag:"wx",mode:0o600});
+  t.after(()=>cleanup(base));return {leaseRoot,nonce,leaseIdentity:await identity(lock),holderIdentity:await identity(holder)};
+}
+
 async function fixture(t, scripts) {
   await prepareTemporaryRoot();
   for (const dependency of ["pi-ai", "pi-coding-agent"]) {
@@ -53,9 +68,11 @@ async function fixture(t, scripts) {
   const model = createControlledModel(scripts);
   const boundary = new RoleBoundary({ roleId: "Backend", writeScope: ["backend/"], denyScope: ["backend/private/"],
     capabilities: ["write_file"], tools: [CONTROLLED_TOOL] });
+  const owners = new ProjectFileOwners({projectId:"tester-fixture",version:"1",owners:["backend/a.txt","backend/b.txt"].map(resource=>({resource,roleId:"Backend"}))});
+  const leaseContext=await ownerLease(t,workspace,owners);
   const context = new TaskDispatchContext({ roleId: "Backend", taskId: "integration-task", organizationVersion: "v3",
-    writeSet: ["backend/a.txt", "backend/b.txt"], tools: [CONTROLLED_TOOL] });
-  const runtime = createRuntime({ workspace, boundaries: [boundary], organizationVersion: "v3",
+    fileOwnersDigest: owners.digest, ownerGeneration: owners.version, tools: [CONTROLLED_TOOL] });
+  const runtime = createRuntime({ workspace, fileOwners:owners, leaseContext, boundaries: [boundary], organizationVersion: "v3",
     dispatchContext: context, modelProviders: [model.config] });
   const prompts = []; const disposed = [];
   const prompt = ActualPiSession.prototype.prompt;
@@ -77,7 +94,7 @@ async function fixture(t, scripts) {
   });
   function config(name, resource = "backend/a.txt") {
     return { name, proxy: { provider: model.config.provider, model: "offline" },
-      scope: { write: [resource], deny: [".ans/"], tools: [CONTROLLED_TOOL] } };
+      scope: { write: ["backend/a.txt","backend/b.txt"], deny: [".ans/"], tools: [CONTROLLED_TOOL] } };
   }
   return { workspace, runtime, boundary, context, model, prompts, disposed, fetch, config };
 }
@@ -136,8 +153,8 @@ function assertResponse(f, result, callIndex, expectedStatus, resource) {
 
 test("two real Pi Sessions on same provider isolate transcripts tool requests results and exact scopes", { timeout: 20000 }, async (t) => {
   const f = await fixture(t, {
-    "prompt-A": [controlledTool("backend/a.txt", SECRET_A), controlledTool("backend/b.txt", "A forbidden B", "cross-A"), fauxAssistantMessage("A final")],
-    "prompt-B": [controlledTool("backend/b.txt", SECRET_B), controlledTool("backend/a.txt", "B forbidden A", "cross-B"), fauxAssistantMessage("B final")],
+    "prompt-A": [controlledTool("backend/a.txt", SECRET_A), controlledTool("backend/foreign-A.txt", "A forbidden B", "cross-A"), fauxAssistantMessage("A final")],
+    "prompt-B": [controlledTool("backend/b.txt", SECRET_B), controlledTool("backend/foreign-B.txt", "B forbidden A", "cross-B"), fauxAssistantMessage("B final")],
   });
   const [a, b] = await Promise.all([f.runtime.createAgent(f.config("A")), f.runtime.createAgent(f.config("B", "backend/b.txt"))]);
   assert.notEqual(a.instanceId, b.instanceId); assert.notEqual(a.sessionId, b.sessionId);
@@ -149,8 +166,8 @@ test("two real Pi Sessions on same provider isolate transcripts tool requests re
   assert.equal(ar.assistantText, "A final"); assert.equal(br.assistantText, "B final");
   assert.notEqual(ar.runId, br.runId);
   assert.equal(ar.toolResults.length, 2); assert.equal(br.toolResults.length, 2);
-  assertResponse(f, ar, 0, "written", "backend/a.txt"); assertResponse(f, ar, 1, "denied", "backend/b.txt");
-  assertResponse(f, br, 0, "written", "backend/b.txt"); assertResponse(f, br, 1, "denied", "backend/a.txt");
+  assertResponse(f, ar, 0, "written", "backend/a.txt"); assertResponse(f, ar, 1, "denied", "backend/foreign-A.txt");
+  assertResponse(f, br, 0, "written", "backend/b.txt"); assertResponse(f, br, 1, "denied", "backend/foreign-B.txt");
   assert.equal(ar.toolResults[1].decision.reason, "outside_instance_or_task_scope");
   assert.equal(br.toolResults[1].decision.reason, "outside_instance_or_task_scope");
   assert.equal(new Set([...ar.toolResults, ...br.toolResults].map((response) => response.requestId)).size, 4);
@@ -210,7 +227,7 @@ test("model role task and version claims cannot overwrite trusted context or sch
   assert.equal(result.status, "completed");
   assert.equal(result.toolResults.length, 1, "invalid schema never becomes a trusted Kernel proposal");
   assertResponse(f, result, 0, "denied", "frontend/login.vue");
-  assert.equal(result.toolResults[0].decision.reason, "outside_task_scope");
+  assert.equal(result.toolResults[0].decision.reason, "outside_instance_or_task_scope");
   assert.ok(f.model.calls.some((call) => call.transcript.includes('"isError":true')));
   await assert.rejects(fs.stat(join(f.workspace, "backend")), { code: "ENOENT" });
   await assert.rejects(fs.stat(join(f.workspace, "frontend")), { code: "ENOENT" });
@@ -336,4 +353,138 @@ test("one run and Runtime close release real sessions and suppress late response
   assert.equal(stopped.status, "cancelled", JSON.stringify({ status: stopped.status, errorCode: stopped.errorCode,
     toolResults: stopped.toolResults.length }));
   assert.equal(stopped.errorCode, "kernel_run_cancelled");
+});
+
+test("opted-in public Runtime lets a worker read ordinary files but keeps exact writes and credentials separate", { timeout: 20000 }, async (t) => {
+  await prepareTemporaryRoot();
+  const workspace = await fs.mkdtemp(join(TEMP_ROOT, "legion-test-project-read-"));
+  const readTools = ["legion_list_files", "legion_read_file"];
+  const tools = [CONTROLLED_TOOL, ...readTools];
+  const modelTool = (tool, parameters, id) => fauxAssistantMessage(fauxToolCall(tool, parameters, { id }), { stopReason: "toolUse" });
+  const model = createControlledModel({ "project-read-prompt": [
+    modelTool("legion_list_files", { resource: "" }, "list-root"),
+    modelTool("legion_read_file", { resource: "src/ordinary.txt", maxBytes: 32 }, "read-ordinary"),
+    modelTool("legion_read_file", { resource: "src/ordinary.txt", startLine: 2, maxBytes: 32 }, "read-next-line"),
+    modelTool("legion_read_file", { resource: "src/ordinary.txt", maxBytes: 1 }, "deny-line-budget"),
+    modelTool("legion_read_file", { resource: "src/.ssh/id_rsa" }, "deny-key"),
+    modelTool("legion_read_file", { resource: "oversized.txt" }, "deny-file-budget"),
+    modelTool(CONTROLLED_TOOL, { resource: "out/approved.txt", content: "approved body" }, "write-approved"),
+    modelTool(CONTROLLED_TOOL, { resource: "out/other.txt", content: "outside write set" }, "write-denied"),
+    fauxAssistantMessage("Finished after tool results"),
+  ] });
+  await fs.mkdir(join(workspace, "src/.ssh"), { recursive: true });
+  await fs.writeFile(join(workspace, "src/ordinary.txt"), "ordinary line\nsecond line\n");
+  await fs.writeFile(join(workspace, "src/.ssh/id_rsa"), "nested-credential-marker");
+  await fs.writeFile(join(workspace, "oversized.txt"), "x".repeat(2097153));
+  const boundary = new RoleBoundary({ roleId: "Backend", readScope: ["."], writeScope: ["out/"],
+    capabilities: ["read_project", "write_file"], tools });
+  const owners = new ProjectFileOwners({projectId:"tester-fixture",version:"1",owners:["out/approved.txt"].map(resource=>({resource,roleId:"Backend"}))});
+  const leaseContext=await ownerLease(t,workspace,owners);
+  const context = new TaskDispatchContext({ roleId: "Backend", taskId: "read-task", organizationVersion: "v3",
+    fileOwnersDigest: owners.digest, ownerGeneration: owners.version, tools });
+  const legacy = createRuntime({ workspace, fileOwners:owners, leaseContext, boundaries: [boundary], organizationVersion: "v3",
+    dispatchContext: context, modelProviders: [model.config] });
+  await assert.rejects(legacy.createAgent({ name: "Legacy", proxy: { provider: model.config.provider, model: "offline" },
+    scope: { write: ["out/approved.txt"], tools } }), /project_read_not_enabled/);
+  assert.deepEqual(await legacy.events(), []); await legacy.close();
+  const runtime = createRuntime({ workspace, fileOwners:owners, leaseContext, boundaries: [boundary], organizationVersion: "v3",
+    dispatchContext: context, modelProviders: [model.config], projectRead: true });
+  t.after(async () => { await runtime.close(); await cleanup(workspace); });
+  const agent = await runtime.createAgent({ name: "Reader", proxy: { provider: model.config.provider, model: "offline" },
+    scope: { write: ["out/approved.txt"], tools } });
+  const result = await agent.run({ taskId: "read-task", prompt: "project-read-prompt" });
+  assert.equal(result.status, "completed");
+  assert.equal(result.toolResults.length, 8);
+  const [listing, ordinary, continued, shortLine, credential, oversized, approved, denied] = result.toolResults;
+  assert.equal(listing.result.status, "listed");
+  assert.deepEqual(listing.result.entries.map(entry => entry.name).sort(), ["oversized.txt", "src"]);
+  assert.equal(ordinary.result.status, "read"); assert.equal(ordinary.result.text, "ordinary line\nsecond line\n");
+  assert.equal(continued.result.status, "read"); assert.equal(continued.result.text, "second line\n");
+  assert.equal(shortLine.result.status, "denied"); assert.equal(shortLine.result.reason, "line_exceeds_budget");
+  assert.equal(credential.result.status, "denied"); assert.equal(credential.result.reason, "restricted_resource");
+  assert.equal(credential.result.text, ""); assert.deepEqual(credential.result.entries, []);
+  assert.equal(oversized.result.status, "denied"); assert.equal(oversized.result.reason, "file_too_large");
+  assert.equal(approved.result.status, "written"); assert.equal(denied.result.status, "denied");
+  assert.equal(denied.decision.reason, "outside_instance_or_task_scope");
+  assert.equal(await fs.readFile(join(workspace, "out/approved.txt"), "utf8"), "approved body");
+  await assert.rejects(fs.stat(join(workspace, "out/other.txt")), { code: "ENOENT" });
+  const events = await runtime.events();
+  assert.equal(events.filter(event => event.kind === "proposal").length, 2);
+  assert.equal(events.filter(event => event.kind === "mutation_success").length, 1);
+  const audit = await fs.readFile(join(workspace, ".ans/events/index.jsonl"), "utf8");
+  assert.ok(!audit.includes("ordinary line") && !audit.includes("nested-credential-marker"));
+  assert.ok(!JSON.stringify(result).includes("nested-credential-marker"));
+  assert.equal(model.calls.at(-1).transcript.includes("ordinary line"), true);
+  assert.equal(model.calls.at(-1).transcript.includes("nested-credential-marker"), false);
+});
+
+test("real task Agent reads full-file SHA and sends bounded edit; stale and ambiguous edits leave bytes intact", { timeout: 20000 }, async (t) => {
+  await prepareTemporaryRoot();
+  const workspace = await fs.mkdtemp(join(TEMP_ROOT, "legion-test-agent-edit-"));
+  const resource = "src/edit.txt";
+  const original = "alpha beta\nrepeat repeat\n";
+  const edited = "omega beta\nrepeat repeat\n";
+  const sha = value => createHash("sha256").update(value, "utf8").digest("hex");
+  await fs.mkdir(join(workspace, "src")); await fs.writeFile(join(workspace, resource), original);
+  const tool = (name, parameters, id) => fauxAssistantMessage(fauxToolCall(name, parameters, { id }), { stopReason: "toolUse" });
+  const model = createControlledModel({ "agent-edit-prompt": [
+    tool("legion_read_file", { resource }, "edit-read"),
+    tool("legion_edit_file", { resource, expectedSha256: sha(original), replacements: [{ oldText: "alpha", newText: "omega" }] }, "edit-success"),
+    tool("legion_edit_file", { resource, expectedSha256: sha(original), replacements: [{ oldText: "beta", newText: "changed" }] }, "edit-stale"),
+    tool("legion_edit_file", { resource, expectedSha256: sha(edited), replacements: [{ oldText: "repeat", newText: "once" }] }, "edit-ambiguous"),
+    tool("legion_edit_file", { resource: "src/outside.txt", expectedSha256: sha(edited), replacements: [{ oldText: "omega", newText: "outside" }] }, "edit-outside"),
+    fauxAssistantMessage("Agent edit finished"),
+  ] });
+  const tools = ["legion_write_file", "legion_edit_file", "legion_list_files", "legion_read_file"];
+  const boundary = new RoleBoundary({ roleId: "Backend", readScope: ["."], writeScope: [resource],
+    capabilities: ["read_project", "write_file"], tools });
+  const owners = new ProjectFileOwners({projectId:"tester-fixture",version:"1",owners:[resource].map(resource=>({resource,roleId:"Backend"}))});
+  const leaseContext=await ownerLease(t,workspace,owners);
+  const context = new TaskDispatchContext({ roleId: "Backend", taskId: "edit-task", organizationVersion: "v3",
+    fileOwnersDigest: owners.digest, ownerGeneration: owners.version, tools });
+  const runtime = createRuntime({ workspace, fileOwners:owners, leaseContext, boundaries: [boundary], organizationVersion: "v3",
+    dispatchContext: context, modelProviders: [model.config], projectRead: true });
+  t.after(async () => { await runtime.close(); await cleanup(workspace); });
+  const agent = await runtime.createAgent({ name: "Editor", proxy: { provider: model.config.provider, model: "offline" },
+    scope: { write: [resource], tools } });
+  const run = await agent.run({ taskId: "edit-task", prompt: "agent-edit-prompt" });
+  assert.equal(run.status, "completed"); assert.equal(run.toolResults.length, 5);
+  const [read, success, stale, ambiguous, outside] = run.toolResults;
+  assert.equal(read.result.status, "read"); assert.equal(read.result.text, original); assert.equal(read.result.sha256, sha(original));
+  assert.equal(success.result.status, "written"); assert.equal(success.result.contentDigest, sha(edited));
+  assert.equal(stale.result.status, "denied"); assert.equal(stale.result.reason, "edit_sha_mismatch");
+  assert.equal(ambiguous.result.status, "denied"); assert.equal(ambiguous.result.reason, "edit_ambiguous_old_text");
+  assert.equal(outside.result.status, "denied"); assert.equal(outside.decision.reason, "outside_instance_or_task_scope");
+  assert.equal(await fs.readFile(join(workspace, resource), "utf8"), edited);
+  await assert.rejects(fs.stat(join(workspace, "src/outside.txt")), { code: "ENOENT" });
+  const events = await runtime.events();
+  assert.equal(events.filter(event => event.kind === "mutation_success").length, 1);
+  assert.equal(events.filter(event => event.kind === "proposal").length, 4);
+  const audit = await fs.readFile(join(workspace, ".ans/events/index.jsonl"), "utf8");
+  assert.ok(!audit.includes(original) && !audit.includes(edited));
+  assert.ok(model.calls.at(-1).transcript.includes(sha(original)));
+});
+
+test('independent public Adapter seeds one fresh single_run with bound text and rejects old authority and later restore', { timeout: 20000 }, async () => {
+  const { createPiAgentService } = await import('../../src/adapters/services/public/pi_agent.mjs');
+  const { AgentInstance, AgentScope, PiConnection, PiConversationCheckpoint, PiConversationHistory } = await import('../../src/kernel/models/agent.mjs');
+  await prepareTemporaryRoot(); const workspace = await fs.mkdtemp(join(TEMP_ROOT, 'legion-test-role-seed-'));
+  const model = createControlledModel({ 'seed-history-marker': [fauxAssistantMessage('Fresh task remembers text only')] });
+  const instance = new AgentInstance({ instanceId:'independent-seed',name:'Builder',sessionId:'seed-session',roleId:'Builder',taskId:'new-task',organizationVersion:'current-v1' });
+  const options = { instance, proxy:new PiConnection({provider:model.config.provider,model:'offline'}), scope:new AgentScope({write:[],tools:['legion_write_file']}), cwd:workspace, lifecycle:'single_run', modelProviders:{[model.config.provider]:Object.fromEntries(Object.entries(model.config).filter(([key])=>key!=='provider'))} };
+  const agent = await createPiAgentService(options);
+  const history = new PiConversationHistory({messages:[{role:'user',text:'seed-history-marker: previous Human said yes; old write/check grant are historical only'},{role:'assistant',text:'Earlier task reported a pass; verify the new task again'}]});
+  const checkpoint = changes => new PiConversationCheckpoint({instance,profileId:'legacy:'+model.config.provider+'/offline',profileVersion:'current-v1',history,...changes});
+  try {
+    for (const changes of [{profileId:'different-profile'},{profileVersion:'old-v0'},{instance:new AgentInstance({...instance,instanceId:'old-instance',taskId:'old-task'})}]) await assert.rejects(agent.restore_history(checkpoint(changes)),/history_binding_mismatch/);
+    assert.throws(()=>new PiConversationHistory({messages:[{role:'tool',text:'old tool reply'}]}),/text_history_only/);
+    await agent.restore_history(checkpoint({})); await assert.rejects(agent.restore_history(checkpoint({})),/single_run_history_restore_unavailable/);
+    agent.start_run('fresh-run','Current Host task new-task grants no tools'); await assert.rejects(agent.restore_history(checkpoint({})),/single_run_history_restore_unavailable/);
+    const events=[]; for(;;){const event=await agent.next_event('fresh-run');events.push(event);if(['run_finished','run_failed','run_cancelled'].includes(event.type)){assert.equal(event.result.status,'completed');break;}}
+    assert.equal(events.some(event=>event.type==='tool_request'),false); assert.equal(model.calls.length,1);
+    const transcript=JSON.parse(model.calls[0].transcript); assert.deepEqual(transcript.messages.slice(0,2).map(message=>message.role),['user','assistant']);assert.equal(transcript.messages.at(-1).role,'user');assert.ok(transcript.messages.every(message=>['user','assistant','system'].includes(message.role)));
+    assert.ok(model.calls[0].transcript.includes('seed-history-marker'));assert.ok(model.calls[0].transcript.includes('Current Host task new-task'));assert.equal(transcript.messages.some(message=>message.role==='tool'),false);
+    await assert.rejects(agent.restore_history(checkpoint({})),/single_run_history_restore_unavailable/);await agent.cancel();await assert.rejects(agent.restore_history(checkpoint({})),/single_run_history_restore_unavailable/);
+    assert.deepEqual(await fs.readdir(workspace),[], 'restoring old yes/history cannot write or create audit authority');
+  } finally { await agent.close(); await cleanup(workspace); }
 });

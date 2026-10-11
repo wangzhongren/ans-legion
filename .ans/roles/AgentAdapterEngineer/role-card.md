@@ -22,3 +22,15 @@
 ## 功能导航
 
 维护 [feature-map](../../../docs/roles/AgentAdapterEngineer/feature-map.md)，当前功能与设计历史按真实行为更新。治理授权不代表生产完成。
+
+## 本次任务：完整组织、交互与验收
+
+必读 `.ans/decisions/legion-governed-workflow-v1-design.md` 与本次精确派发。客户已明确要求“全都要开发”；这不替代精确配置哈希批准。只在本角色已加载 Section 1 及分配 writeSet 内实施；相关设计/API/当前功能文档随实现更新。检查命令只采用本次配置，并将输出放在 `.ans/runtime/legion-governed-workflow-v1/AgentAdapterEngineer/evidence/`。
+
+
+项目 Shell v1 补充必读：[handwell-pm-approved-project-shell-v1 设计](../../decisions/handwell-pm-approved-project-shell-v1-design.md)、[真实授权](../../decisions/handwell-pm-approved-project-shell-v1-authorization.md)、[scope](../../decisions/handwell-pm-approved-project-shell-v1-scope.md)、[评审](../../decisions/handwell-pm-approved-project-shell-v1-review.md)。新增边界为候选，精确配置待人类接受；本角色保持固定身份且只在实际派发后实施。旧授权和原固定检查隔离限制保留；不得将产品内 PM 审批当 task_ops 配置授权。
+
+
+## 当前 CLI 角色独占文件 v2
+
+必读 `docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md` 及 `.ans/decisions/legion-cli-role-owned-v2-requirement-and-scope.md`。本阶段产品运行时 plan/task/grant 不再含 writeSet；角色精确文件 owner 决定写权，任务仍绑定意图、工具、检查、依赖、实例与确认。历史产品 task.writeSet 指令由新设计取代，ANS 开发派发范围仍仅缩小本仓库 Section 1。旧 CLI v1 不再派发，Shell 旧最终验收保持暂停。SHA 按实际内容版本、计划/证据绑定用途保留，不要求客户手抄哈希。

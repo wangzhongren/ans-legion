@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('legionDesktop', Object.freeze({
   assignProfile: (input) => ipcRenderer.invoke('legion-desktop:assignProfile', input),
   sendMessage: (input) => ipcRenderer.invoke('legion-desktop:sendMessage', input),
   selectContext: (input) => ipcRenderer.invoke('legion-desktop:selectContext', input),
+  answerInteraction: (input) => ipcRenderer.invoke('legion-desktop:answerInteraction', input),
+  closeInteraction: (input) => ipcRenderer.invoke('legion-desktop:closeInteraction', input),
   confirmPlan: (input) => ipcRenderer.invoke('legion-desktop:confirmPlan', input),
   cancelTurn: (input) => ipcRenderer.invoke('legion-desktop:cancelTurn', input),
   stopExecution: (input) => ipcRenderer.invoke('legion-desktop:stopExecution', input),

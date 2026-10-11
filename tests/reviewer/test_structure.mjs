@@ -7,11 +7,16 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import * as publicApi from "../../runtime.mjs";
-import { createRuntime, AgentSession, ActionProposal, RoleBoundary, Outcome, AgentScope,
+import { createRuntime as publicCreateRuntime, AgentSession, ActionProposal, RoleBoundary, Outcome, AgentScope,
   TaskDispatchContext } from "../../runtime.mjs";
-import { ExecutionPermit, PolicyDecision, Event, MutationResult } from "../../src/kernel/models/core.mjs";
+import { ExecutionPermit, PolicyDecision, Event, MutationResult,
+  assertDistinctRoleWriteScopes } from "../../src/kernel/models/core.mjs";
+import { ProjectFileOwners, FileOwnershipPlan, applyFileOwnershipPlan,
+  assertFileOwner } from "../../workbench.mjs";
 import { AgentInstance, PiConnection, PiToolResult, PiToolRequest } from "../../src/kernel/models/agent.mjs";
 import { createMutationService, MutationError } from "../../src/kernel/services/public/mutation.mjs";
+import { createReadService } from "../../src/kernel/services/public/read.mjs";
+import { ProjectReadRequest } from "../../src/kernel/models/agent.mjs";
 import { createStorageProvider, StorageError } from "../../src/kernel/providers/public/storage.mjs";
 import { createProposalService } from "../../src/adapters/services/public/proposal.mjs";
 import { createPiSessionProvider } from "../../src/adapters/providers/public/pi_session.mjs";
@@ -21,10 +26,24 @@ import { createFauxCore, fauxAssistantMessage, fauxToolCall } from "@earendil-wo
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const testRole = process.env.LEGION_NODE_TEST_ROLE ?? "Reviewer";
 assert.ok(["ProjectManager", "Reviewer", "Tester"].includes(testRole), "unknown Node test role");
-const temporaryRoot = resolve(project, ".ans/runtime/legion-desktop-workbench-v2", testRole, "node", "tmp");
+const temporaryRoot = resolve(project, ".ans/runtime/legion-cli-role-owned-v2", testRole, "tmp");
 const publicNames = ["createRuntime", "AgentSession", "ActionProposal", "RoleBoundary", "Outcome",
   "AgentScope", "PiConnection", "TaskDispatchContext"].sort();
 const workspaceResources = new Map();
+const reviewerOwners = resources => new ProjectFileOwners({projectId:'reviewer',version:'1',owners:resources.map(resource=>({resource,roleId:'Backend'}))});
+const ownerResources = ['backend/new/file.txt','backend/approved.txt','backend/private/key','backend/after/x','backend/second.txt','backend/other.txt','backend/a','backend/a.txt','backend/b.txt'];
+function createRuntime(options) {
+  const fileOwners=options.fileOwners??reviewerOwners(options.dispatchContext? ["backend/a.txt","backend/b.txt"]:ownerResources);
+  const state=join(options.workspace,'review-owner-state');nodeFs.mkdirSync(state,{recursive:true,mode:0o700});
+  const leases=join(state,'leases'),catalog=join(state,'catalog');for(const p of [leases,catalog])nodeFs.mkdirSync(p,{recursive:true,mode:0o700});
+  const id=p=>{const st=nodeFs.lstatSync(p,{bigint:true});return {deviceId:String(st.dev),fileId:String(st.ino)};};
+  const workspaceIdentity={canonicalPath:nodeFs.realpathSync(options.workspace),...id(options.workspace)};
+  const key=createHash('sha256').update(workspaceIdentity.deviceId+':'+workspaceIdentity.fileId).digest('hex'),lock=join(leases,key);nodeFs.mkdirSync(lock,{recursive:true,mode:0o700});
+  const holder=join(lock,'holder');if(!nodeFs.existsSync(holder))nodeFs.writeFileSync(holder,'reviewer-fixture',{mode:0o600});
+  nodeFs.writeFileSync(join(catalog,'workbench-projects.json'),JSON.stringify({schemaVersion:2,projects:[{schemaVersion:2,id:fileOwners.projectId,workspaceIdentity,fileOwners}]}),{mode:0o600});
+  const cid=id(catalog),marker=join(leases,key+'.owner-source.json');if(!nodeFs.existsSync(marker))nodeFs.writeFileSync(marker,JSON.stringify({schemaVersion:1,workspace:workspaceIdentity,source:{catalogDirCanonicalPath:catalog,dirDeviceId:cid.deviceId,dirFileId:cid.fileId,filename:'workbench-projects.json',projectId:fileOwners.projectId}}),{mode:0o600});
+  return publicCreateRuntime({...options,fileOwners,leaseContext:{leaseRoot:leases,nonce:'reviewer-fixture',leaseIdentity:id(lock),holderIdentity:id(holder)}});
+}
 function trackClose(root, resource) { workspaceResources.get(root).push(resource); }
 
 async function sourceFiles(directory) {
@@ -122,13 +141,31 @@ test("actual source ownership, three-part structure and adjacent import/public e
   assert.equal(createHash("sha256").update(policyBytes).digest("hex"),
     "87808cec2739fdbbc9520631637b4ddcb2adc2f8680a6e849ec8885d01a35187", "frozen primary ownership snapshot");
   const configuration = JSON.parse(policyBytes.toString("utf8"));
+  const currentReadConfiguration = JSON.parse(await fs.readFile(join(project,
+    ".ans/decisions/legion-project-wide-read-v1-project.json"), "utf8"));
+  const kernelReadBoundary = await fs.readFile(join(project,
+    currentReadConfiguration.roles.KernelEngineer.boundary), "utf8");
   const paths = await sourceFiles(join(project, "src"));
-  assert.equal(paths.length, 24);
+  assert.equal(paths.length, 41);
+  const governed = JSON.parse(await fs.readFile(join(project, ".ans/decisions/handwell-pm-approved-project-shell-v1-project.json"), "utf8"));
+  const projectReadFiles = new Set(["src/kernel/services/abstract/read.mjs",
+    "src/kernel/services/public/read.mjs", "src/kernel/services/impl/read.mjs"]);
+  assert.deepEqual(currentReadConfiguration.roles.KernelEngineer.writeFiles.filter((name) =>
+    name.includes("/services/") && name.endsWith("/read.mjs")).sort(), [...projectReadFiles].sort());
   for (const path of paths) {
     const name = relative(project, path).replaceAll("\\", "/");
     let expectedOwner = "AgentAdapterEngineer";
     if (name.startsWith("src/kernel/")) expectedOwner = "KernelEngineer";
-    assert.equal(configuration.files[name].primaryOwner, expectedOwner, name);
+    if (projectReadFiles.has(name)) {
+      assert.ok(kernelReadBoundary.split("\n").some((line) => line.startsWith("| 文件 |") &&
+        line.includes("`" + name + "`")), "approved Kernel boundary must own " + name);
+    }
+    else if (configuration.files[name]) assert.equal(configuration.files[name].primaryOwner, expectedOwner, name);
+    else {
+      assert.ok(governed.roles[expectedOwner].writeFiles.includes(name), "current approved owner: " + name);
+      const boundaryText = await fs.readFile(join(project, governed.roles[expectedOwner].boundary), "utf8");
+      assert.ok(boundaryText.split("\n").some((line) => line.startsWith("| 文件 |") && line.includes("`" + name + "`")), name);
+    }
     const source = await fs.readFile(path, "utf8");
     assert.doesNotMatch(source, /export\s+\*/);
     const imports = [...source.matchAll(/(?:\bfrom\s+|\bimport\s*)["']([^"']+)["']/g)].map((item) => item[1]);
@@ -165,30 +202,63 @@ test("actual source ownership, three-part structure and adjacent import/public e
 test("Model pure imports, callback-free invariant responsibility and immutable collection copies", async () => {
   for (const path of await sourceFiles(join(project, "src/kernel/models"))) {
     const source = await fs.readFile(path, "utf8");
-    assert.doesNotMatch(source, /randomUUID|randomBytes|Math\.random|Date\.|new Date|process\.|fetch\(|node:(fs|os|path)|pi-coding-agent|pi-ai/);
+    assert.doesNotMatch(source, /randomUUID|randomBytes|Math\.random|Date\.now|new Date\(\)|process\.|fetch\(|node:(fs|os|path)|pi-coding-agent|pi-ai/);
     assert.doesNotMatch(source, /\/(services|providers|pipelines|interface)\//);
     if (source.includes("node:crypto")) assert.match(source, /import\s*\{\s*createHash\s*\}/);
   }
   const writes = ["backend/a.txt"]; const denies = ["backend/private/"];
   const accepted = boundary({ writeScope: writes, denyScope: denies });
   const context = new TaskDispatchContext({ roleId: "Backend", taskId: "task", organizationVersion: "v3",
-    writeSet: writes, tools: ["legion_write_file"] });
+    fileOwnersDigest: reviewerOwners(writes).digest, ownerGeneration: "1", tools: ["legion_write_file"] });
   const scope = new AgentScope({ write: writes, deny: denies, tools: ["legion_write_file"] });
   writes.push("frontend/x"); denies.length = 0;
-  for (const value of [accepted.writeScope, accepted.denyScope, accepted.tools, context.writeSet, context.tools,
+  for (const value of [accepted.writeScope, accepted.denyScope, accepted.tools, context.tools,
     scope.write, scope.deny, scope.tools]) {
     assert.ok(Array.isArray(value) && Object.isFrozen(value));
     assert.throws(() => value.push("expanded"), TypeError);
   }
   assert.deepEqual(accepted.writeScope, ["backend/a.txt"]);
-  assert.deepEqual(context.writeSet, ["backend/a.txt"]);
+  assert.equal(context.ownerGeneration,"1"); assert.equal(Object.hasOwn(context,"writeSet"),false);
   assert.deepEqual(scope.deny, ["backend/private/"]);
+});
+
+test("public owner model rejects cross-role aliases and requires explicit versioned transfer", () => {
+  const backend = new RoleBoundary({ roleId: "Backend", writeScope: ["src/"] });
+  for (const resource of ["SRC/A.ts", "src/sub/", "SRC/"]) {
+    assert.throws(() => assertDistinctRoleWriteScopes([backend,
+      new RoleBoundary({ roleId: "Frontend", writeScope: [resource] })]),
+    /cross_role_write_scope_overlap/, resource);
+  }
+  assert.doesNotThrow(() => assertDistinctRoleWriteScopes([backend,
+    new RoleBoundary({ roleId: "Frontend", writeScope: ["docs/"] })]));
+  assert.throws(() => new ProjectFileOwners({ projectId: "customer", version: "owners-v1",
+    owners: [{ resource: "src/a.ts", roleId: "Backend" },
+      { resource: "SRC/A.ts", roleId: "Frontend" }] }), /duplicate_owner_alias/);
+  const current = new ProjectFileOwners({ projectId: "customer", version: "owners-v1",
+    owners: [{ resource: "src/a.ts", roleId: "Backend" }] });
+  const fields = { projectId: "customer", baseVersion: current.version, baseDigest: current.digest,
+    nextVersion: "owners-v2", claims: [{ resource: "SRC/A.ts", roleId: "Frontend" }] };
+  assert.throws(() => applyFileOwnershipPlan(current, new FileOwnershipPlan(fields)),
+    /file_owned_by_other_role/);
+  const plan = new FileOwnershipPlan({ ...fields,
+    transfers: [{ resource: "src/a.ts", fromRoleId: "Backend", toRoleId: "Frontend" }] });
+  const transferred = applyFileOwnershipPlan(current, plan);
+  assert.equal(current.ownerOf("src/a.ts"), "Backend");
+  assert.equal(transferred.ownerOf("src/a.ts"), "Frontend");
+  assert.throws(() => assertFileOwner(transferred, { projectId: "customer", version: "owners-v2",
+    resource: "src/a.ts", roleId: "Backend" }), /file_owned_by_other_role/);
+  assert.throws(() => assertFileOwner(transferred, { projectId: "customer", version: "owners-v1",
+    resource: "src/a.ts", roleId: "Frontend" }), /stale_file_owners/);
+  assert.throws(() => applyFileOwnershipPlan(transferred, plan), /stale_file_owners/);
 });
 
 test("Service public exports are own contracts/factories; Provider admits no Kernel callback", async () => {
   const entries = {
     "src/kernel/services/public/policy.mjs": ["PolicyService", "createPolicyService"],
     "src/kernel/services/public/mutation.mjs": ["MutationError", "MutationService", "createMutationService"],
+    "src/kernel/services/public/read.mjs": ["ReadService", "createReadService"],
+    "src/kernel/services/public/check.mjs": ["CheckService", "createCheckService"],
+    "src/kernel/providers/public/check.mjs": ["CheckProvider", "CheckProviderError", "createCheckProvider"],
     "src/kernel/providers/public/storage.mjs": ["StorageError", "StorageProvider", "createStorageProvider"],
     "src/adapters/services/public/pi_agent.mjs": ["PiAgentService", "createPiAgentService"],
     "src/adapters/providers/public/pi_session.mjs": ["PiSessionProvider", "createPiSessionProvider"],
@@ -319,6 +389,32 @@ test("control plane, traversal, absolute and reserved paths hard deny", async (t
   await absent(join(f.root, "backend"));
 });
 
+test("project read never lists or returns common credential files and directories", async (t) => {
+  const root = await workspace(t);
+  const read = createReadService({ workspace: root });
+  trackClose(root, read);
+  const credentials = [".npmrc", ".netrc", ".pypirc", ".ssh/config",
+    ".docker/config.json", ".kube/config", ".gnupg/private-keys-v1.d/key",
+    "nested/.NPMRC", "nested/.NetRC"];
+  for (const resource of credentials) {
+    await fs.mkdir(dirname(join(root, resource)), { recursive: true });
+    await fs.writeFile(join(root, resource), "FAKE_REVIEW_CREDENTIAL\n");
+  }
+  const listed = await read.listFiles(new ProjectReadRequest({ requestId: "list", runId: "run",
+    tool: "legion_list_files", resource: "" }));
+  assert.equal(listed.status, "listed");
+  for (const name of [".npmrc", ".netrc", ".pypirc", ".ssh", ".docker", ".kube", ".gnupg"]) {
+    assert.equal(listed.entries.some((entry) => entry.name === name), false, name);
+  }
+  for (const resource of credentials) {
+    const result = await read.readFile(new ProjectReadRequest({ requestId: resource, runId: "run",
+      tool: "legion_read_file", resource }));
+    assert.equal(result.status, "denied", resource);
+    assert.equal(result.reason, "restricted_resource", resource);
+    assert.equal(result.text, "", resource);
+  }
+});
+
 test("shared workspace Runtime writes have a consistent sequence and matching daily audit", async (t) => {
   const f = await fixture(t);
   const second = createRuntime({ workspace: f.root, boundaries: [f.accepted], sessions: [f.identity],
@@ -398,7 +494,7 @@ test("public modelProviders array rejects records, execution callbacks and unkno
   const root = await workspace(t); const local = inference("contract", [fauxAssistantMessage("unused")]);
   const options = { workspace: root, boundaries: [boundary()], organizationVersion: "v3",
     dispatchContext: { roleId: "Backend", taskId: "task", organizationVersion: "v3",
-      writeSet: ["backend/a.txt"], tools: ["legion_write_file"] } };
+      fileOwnersDigest: reviewerOwners(["backend/a.txt","backend/b.txt"]).digest, ownerGeneration:"1", tools: ["legion_write_file"] } };
   for (const modelProviders of [{ contract: local.config }, [local.config, local.config],
     [{ ...local.config, submit: () => {} }], [{ ...local.config, streamSimple: null }]]) {
     assert.throws(() => createRuntime({ ...options, modelProviders }), TypeError);
@@ -417,7 +513,7 @@ test("real Pi SDK instances isolate models, credentials, sessions, scopes and em
   const b = inference("review-B", [tool("backend/b.txt", "B", "call-B"), fauxAssistantMessage("finished B")]);
   const runtime = createRuntime({ workspace: root, boundaries: [boundary()], organizationVersion: "v3",
     dispatchContext: { roleId: "Backend", taskId: "task", organizationVersion: "v3",
-      writeSet: ["backend/a.txt", "backend/b.txt"], tools: ["legion_write_file"] },
+      fileOwnersDigest: reviewerOwners(["backend/a.txt","backend/b.txt"]).digest, ownerGeneration:"1", tools: ["legion_write_file"] },
     modelProviders: [a.config, b.config] });
   trackClose(root, runtime);
   const prompt = SdkSession.prototype.prompt; const dispose = SdkSession.prototype.dispose;
@@ -436,9 +532,9 @@ test("real Pi SDK instances isolate models, credentials, sessions, scopes and em
   const disposeSpy = mock.method(SdkSession.prototype, "dispose", function () { disposed += 1; return dispose.call(this); });
   try {
     const [aa, bb] = await Promise.all([runtime.createAgent({ name: "A", proxy: { provider: "review-A", model: "model-review-A" },
-      scope: { write: ["backend/a.txt"], deny: [".ans/"], tools: ["legion_write_file"] } }),
+      scope: { write: ["backend/a.txt","backend/b.txt"], deny: [".ans/"], tools: ["legion_write_file"] } }),
     runtime.createAgent({ name: "B", proxy: { provider: "review-B", model: "model-review-B" },
-      scope: { write: ["backend/b.txt"], deny: [".ans/"], tools: ["legion_write_file"] } })]);
+      scope: { write: ["backend/a.txt","backend/b.txt"], deny: [".ans/"], tools: ["legion_write_file"] } })]);
     assert.notEqual(aa.instanceId, bb.instanceId); assert.notEqual(aa.sessionId, bb.sessionId);
     assert.ok(Object.isFrozen(aa));
     assert.deepEqual(Object.keys(aa).sort(), ["instanceId", "name", "sessionId", "roleId", "taskId", "organizationVersion", "run", "cancel", "close"].sort());
@@ -451,10 +547,10 @@ test("real Pi SDK instances isolate models, credentials, sessions, scopes and em
     assert.notEqual(a.calls[0].sessionId, b.calls[0].sessionId);
     for (const call of a.calls) {
       assert.equal(call.model, "model-review-A"); assert.equal(call.apiKey, "review-key-review-A");
-      assert.doesNotMatch(call.transcript, /exclusive review B|backend\/b\.txt/);
+      assert.doesNotMatch(call.transcript, /exclusive review B/);
       assert.ok(!call.optionKeys.some((key) => /runtime|permit|submit|writeFile/i.test(key)));
     }
-    for (const call of b.calls) { assert.equal(call.model, "model-review-B"); assert.equal(call.apiKey, "review-key-review-B"); assert.doesNotMatch(call.transcript, /exclusive review A|backend\/a\.txt/); }
+    for (const call of b.calls) { assert.equal(call.model, "model-review-B"); assert.equal(call.apiKey, "review-key-review-B"); assert.doesNotMatch(call.transcript, /exclusive review A/); }
     assert.equal(fetchSpy.mock.callCount(), 0);
     assert.doesNotMatch(JSON.stringify(await runtime.events()), /review-key-|exclusive review|"content"/);
     await assert.rejects(aa.run({ taskId: "task", prompt: "again" }), TypeError);
@@ -488,7 +584,7 @@ test("actual Pi queue rejects foreign and late requests; proposal retains truste
   assert.throws(() => new PiToolRequest({ ...ea.request, parameters: { ...ea.request.parameters, roleId: "Admin" } }), TypeError);
   function response(request) { return new PiToolResult({ requestId: request.requestId, runId: request.runId,
     decision: new PolicyDecision({ outcome: Outcome.DENY, reason: "test-deny", proposalDigest: "digest", organizationVersion: "v3" }),
-    result: new MutationResult({ success: false, status: "denied", reason: "test-deny", proposalDigest: "digest" }) }); }
+    result: new MutationResult({ success: false, status: "denied", reason: "test-deny", resource: request.parameters.resource, proposalDigest: "digest" }) }); }
   assert.throws(() => pa.respond_tool(eb.request, response(eb.request)), /invalid_or_late/);
   assert.throws(() => pa.respond_tool(new PiToolRequest({ ...ea.request }), response(ea.request)), /invalid_or_late/);
   pa.respond_tool(ea.request, response(ea.request));
@@ -501,13 +597,13 @@ test("actual Pi queue rejects foreign and late requests; proposal retains truste
 test("real Pi cannot expand exact task or instance grants; invalid scope fails before inference", async (t) => {
   const root = await workspace(t);
   const local = inference("intersection", [tool("backend/outside.txt", "outside task", "outside-task"),
-    tool("backend/b.txt", "outside instance", "outside-instance"), fauxAssistantMessage("denials observed")]);
+    tool("frontend/b.txt", "outside owner", "outside-instance"), fauxAssistantMessage("denials observed")]);
   const runtime = createRuntime({ workspace: root, boundaries: [boundary()], organizationVersion: "v3",
     dispatchContext: { roleId: "Backend", taskId: "task", organizationVersion: "v3",
-      writeSet: ["backend/a.txt", "backend/b.txt"], tools: ["legion_write_file"] }, modelProviders: [local.config] });
+      fileOwnersDigest: reviewerOwners(["backend/a.txt","backend/b.txt"]).digest, ownerGeneration:"1", tools: ["legion_write_file"] }, modelProviders: [local.config] });
   trackClose(root, runtime);
   const config = { name: "intersection", proxy: { provider: "intersection", model: "model-intersection" },
-    scope: { write: ["backend/a.txt"], deny: [".ans/"], tools: ["legion_write_file"] } };
+    scope: { write: ["backend/a.txt","backend/b.txt"], deny: [".ans/"], tools: ["legion_write_file"] } };
   for (const scope of [{ ...config.scope, write: ["backend/"] }, { ...config.scope, write: ["backend/outside.txt"] },
     { ...config.scope, tools: ["bash"] }, { ...config.scope, deny: ["backend/a.txt"] }]) {
     await assert.rejects(runtime.createAgent({ ...config, scope }), TypeError);
@@ -517,7 +613,7 @@ test("real Pi cannot expand exact task or instance grants; invalid scope fails b
   const result = await agent.run({ taskId: "task", prompt: "Attempt the two controlled fixture writes." });
   assert.equal(result.status, "completed"); assert.equal(result.toolResults.length, 2);
   assert.deepEqual(result.toolResults.map((response) => response.decision.reason),
-    ["outside_task_scope", "outside_instance_or_task_scope"]);
+    ["outside_instance_or_task_scope", "outside_instance_or_task_scope"]);
   assert.ok(result.toolResults.every((response) => response.decision.outcome === Outcome.DENY && !response.result.observedMutation));
   assert.equal(local.core.state.callCount, 3); await absent(join(root, "backend"));
 });
@@ -525,7 +621,7 @@ test("real Pi cannot expand exact task or instance grants; invalid scope fails b
 test("late real SDK creation is disposed after cancellation and never published", async (t) => {
   const root = await workspace(t); const local = inference("late", [fauxAssistantMessage("unused")]);
   const runtime = createRuntime({ workspace: root, boundaries: [boundary()], organizationVersion: "v3",
-    dispatchContext: { roleId: "Backend", taskId: "task", organizationVersion: "v3", writeSet: ["backend/a"], tools: ["legion_write_file"] },
+    dispatchContext: { roleId: "Backend", taskId: "task", organizationVersion: "v3", fileOwnersDigest: reviewerOwners(["backend/a.txt","backend/b.txt"]).digest, ownerGeneration:"1", tools: ["legion_write_file"] },
     modelProviders: [local.config] }); trackClose(root, runtime);
   const loadout = SdkSession.prototype.getActiveToolNames; const dispose = SdkSession.prototype.dispose;
   let stopping; let disposed = 0;
@@ -537,19 +633,21 @@ test("late real SDK creation is disposed after cancellation and never published"
   const disposeSpy = mock.method(SdkSession.prototype, "dispose", function () { disposed += 1; return dispose.call(this); });
   try {
     await assert.rejects(runtime.createAgent({ name: "late", proxy: { provider: "late", model: "model-late" },
-      scope: { write: ["backend/a"], deny: [], tools: ["legion_write_file"] } }), { name: "AbortError" });
+      scope: { write: ["backend/a.txt","backend/b.txt"], deny: [], tools: ["legion_write_file"] } }), { name: "AbortError" });
     await stopping; assert.equal(disposed, 1); assert.equal(local.calls.length, 0);
     await absent(join(root, "backend"));
   } finally { toolsSpy.mock.restore(); disposeSpy.mock.restore(); }
 });
 
 test("stable tarball exact whitelist and product bytes exclude internal development artifacts", async () => {
-  const packaging = join(project, ".ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging");
+  const packaging = join(project, ".ans/runtime/legion-cli-role-owned-v2/ProjectManager/packaging/su-frontdoor-memory-repair-v1");
   const descriptor = JSON.parse(await fs.readFile(join(packaging, "package-smoke.json"), "utf8"));
-  assert.equal(resolve(descriptor.tarball), join(packaging, "legion-runtime-0.4.0.tgz"));
+  assert.equal(resolve(descriptor.tarball), join(packaging, "legion-runtime-1.1.3.tgz"));
   assert.match(descriptor.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(descriptor.sha256, "e0ac5ebaee7caabc52175fe28e229c6fbc195d02890ec5bffe6ba76d80a6f73a");
   const tarball = await fs.readFile(descriptor.tarball);
   assert.equal(createHash("sha256").update(tarball).digest("hex"), descriptor.sha256);
+  assert.equal(descriptor.integrity, "sha512-" + createHash("sha512").update(tarball).digest("base64"));
   const archive = gunzipSync(tarball); const entries = new Map();
   for (let offset = 0; offset + 512 <= archive.length;) {
     const header = archive.subarray(offset, offset + 512);
@@ -564,16 +662,45 @@ test("stable tarball exact whitelist and product bytes exclude internal developm
     offset += 512 + Math.ceil(size / 512) * 512;
   }
   const expected = ["package.json", "README.md", "runtime.mjs", "workbench.mjs", "bin/legion.mjs",
-    ...(await sourceFiles(join(project, "src"))).map((path) => relative(project, path).replaceAll("\\", "/"))].sort();
-  assert.equal(expected.length, 29); assert.deepEqual([...entries.keys()].sort(), expected);
+    "bin/chat.mjs","apps/desktop/README.md",...(await sourceFiles(join(project, "src"))).map((path) => relative(project, path).replaceAll("\\", "/")),...JSON.parse(await fs.readFile(join(project,'package.json'),'utf8')).files.filter(path=>path.startsWith('apps/'))].sort();
+  assert.equal(expected.length, 102); assert.deepEqual([...entries.keys()].sort(), expected);
+  const sourceNames = expected.filter((path) => !["package.json", "README.md", "apps/desktop/README.md"].includes(path));
+  assert.equal(sourceNames.length, 99); assert.deepEqual(Object.keys(descriptor.sourceHashes).sort(), sourceNames);
   for (const [path, bytes] of entries) {
     assert.ok(!/\.py$|^\.ans\/|^tests\/|node_modules|task_ops/.test(path));
     assert.equal(createHash("sha256").update(bytes).digest("hex"), createHash("sha256").update(await fs.readFile(join(project, path))).digest("hex"), path);
+    if (Object.hasOwn(descriptor.sourceHashes, path)) assert.equal(createHash("sha256").update(bytes).digest("hex"), descriptor.sourceHashes[path], "pinned current source " + path);
   }
   const metadata = JSON.parse(entries.get("package.json").toString());
-  assert.equal(metadata.version, "0.4.0");
+  assert.equal(metadata.version, "1.1.3");
   assert.deepEqual(metadata.exports, { ".": "./runtime.mjs", "./workbench-models": "./workbench.mjs",
     "./services/policy": "./src/kernel/services/public/policy.mjs", "./services/mutation": "./src/kernel/services/public/mutation.mjs",
-    "./services/proposal": "./src/adapters/services/public/proposal.mjs", "./services/pi-agent": "./src/adapters/services/public/pi_agent.mjs" }); assert.deepEqual(metadata.bin, { legion: "./bin/legion.mjs" });
+    "./services/read": "./src/kernel/services/public/read.mjs",
+    "./services/check": "./src/kernel/services/public/check.mjs",
+    "./services/proposal": "./src/adapters/services/public/proposal.mjs", "./services/pi-agent": "./src/adapters/services/public/pi_agent.mjs", "./services/shell": "./src/kernel/services/public/shell.mjs", "./headless-workbench":"./apps/desktop/src/pipelines/workbench.mjs" }); assert.deepEqual(metadata.bin, { legion: "./bin/legion.mjs" });
   assert.ok(Object.values(metadata.dependencies).every((version) => version === "1.0.4"));
+  const desktop=JSON.parse(await fs.readFile(join(project,'apps/desktop/package.json'),'utf8'));
+  const lock=JSON.parse(await fs.readFile(join(project,'apps/desktop/package-lock.json'),'utf8'));
+  const expectedSpec='file:../../.ans/runtime/legion-cli-role-owned-v2/ProjectManager/packaging/su-frontdoor-memory-repair-v1/legion-runtime-1.1.3.tgz';
+  assert.equal(desktop.dependencies['legion-runtime'],expectedSpec);const installed=lock.packages['node_modules/legion-runtime'];assert.equal(installed.version,'1.1.3');assert.equal(installed.resolved,expectedSpec);assert.equal(installed.integrity,descriptor.integrity);
+  for(const [path,hash] of Object.entries(descriptor.sourceHashes))assert.equal(createHash('sha256').update(await fs.readFile(join(project,'apps/desktop/node_modules/legion-runtime',path))).digest('hex'),hash,'current installed Desktop dependency '+path);
+
+});
+
+test('final Provider commit rejects legacy active fields, transferred owner, replaced source and occupied mutex',async(t)=>{
+ for(const scenario of ['legacy','transfer','marker','mutex']){
+  await t.test(scenario,async(t)=>{
+   const f=await fixture(t),state=join(f.root,'review-owner-state'),catalogPath=join(state,'catalog','workbench-projects.json');
+   const warm=await f.runtime.submit(proposal(f.identity,{proposalId:'positive',resource:'backend/approved.txt'}));assert.equal(warm.result.success,true);
+   const catalog=JSON.parse(await fs.readFile(catalogPath,'utf8'));
+   const key=createHash('sha256').update(catalog.projects[0].workspaceIdentity.deviceId+':'+catalog.projects[0].workspaceIdentity.fileId).digest('hex');
+   if(scenario==='legacy'){catalog.projects[0].plan={schemaVersion:1,tasks:[{writeSet:['backend/new/file.txt']}]};await fs.writeFile(catalogPath,JSON.stringify(catalog));}
+   if(scenario==='transfer'){catalog.projects[0].fileOwners={...catalog.projects[0].fileOwners,version:'2',owners:catalog.projects[0].fileOwners.owners.map(item=>item.resource===f.action.resource?{...item,roleId:'Frontend'}:item)};await fs.writeFile(catalogPath,JSON.stringify(catalog));}
+   if(scenario==='marker'){const marker=join(state,'leases',key+'.owner-source.json'),bytes=await fs.readFile(marker);await fs.rename(marker,marker+'.old');await fs.writeFile(marker,bytes,{mode:0o600});}
+   if(scenario==='mutex')await fs.mkdir(join(state,'leases',key,'commit.lock'),{mode:0o700});
+   const result=await f.runtime.submit(f.action);assert.equal(result.result.success,false);assert.equal(result.result.observedMutation,false);
+   const reasons={legacy:'invalid_or_stale_authorization',transfer:'invalid_or_stale_authorization',marker:'invalid_or_stale_authorization',mutex:'commit_lock_busy'};
+   assert.equal(result.result.reason,reasons[scenario]);await absent(join(f.root,f.action.resource));
+  });
+ }
 });

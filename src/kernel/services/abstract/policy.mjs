@@ -3,7 +3,9 @@ export class PolicyService {
   constructor() { if (new.target === PolicyService) throw new TypeError("abstract_policy_service"); }
   static assert(value) {
     if (!(value instanceof PolicyService) || typeof value.evaluate !== "function" ||
-        typeof value.validateScope !== "function") throw new TypeError("invalid_policy_service");
+        typeof value.validateScope !== "function" || typeof value.evaluateRead !== "function") {
+      throw new TypeError("invalid_policy_service");
+    }
     return value;
   }
 }

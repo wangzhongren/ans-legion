@@ -1,3 +1,5 @@
+import { createHash, randomUUID } from "node:crypto";
+import { ProjectFileOwners } from "../../workbench.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
@@ -14,7 +16,7 @@ const { createRuntime, AgentSession, ActionProposal, RoleBoundary, Outcome } = p
 const PROJECT = fileURLToPath(new URL("../../", import.meta.url));
 const TEST_ROLE = process.env.LEGION_NODE_TEST_ROLE ?? "Tester";
 assert.ok(["ProjectManager", "Reviewer", "Tester"].includes(TEST_ROLE), "unknown Node test role");
-const TEMP_ROOT = resolve(PROJECT, ".ans/runtime/legion-desktop-workbench-v2", TEST_ROLE, "node/tmp");
+const TEMP_ROOT = resolve(PROJECT, ".ans/runtime/legion-cli-role-owned-v2", TEST_ROLE, "tmp");
 const CONTENT = "integration-private-body-秘密";
 const ALLOWED = ["proposal", "decision", "mutation_intent", "mutation_success"];
 const DENIED = ["proposal", "decision", "mutation_failure"];
@@ -47,6 +49,19 @@ async function cleanup(workspace) {
   await assert.rejects(fs.stat(target), { code: "ENOENT" });
 }
 
+async function ownerLease(t, workspace, owners) {
+  const base = await fs.mkdtemp(join(TEMP_ROOT, "legion-test-owner-lease-"));
+  const leaseRoot=join(base,"leases"),catalogDir=join(base,"catalog");
+  await fs.mkdir(leaseRoot,{mode:0o700});await fs.mkdir(catalogDir,{mode:0o700});
+  const identity=async path=>{const s=await fs.lstat(path,{bigint:true});return {deviceId:String(s.dev),fileId:String(s.ino)};};
+  const workspaceIdentity={canonicalPath:await fs.realpath(workspace),...await identity(workspace)};
+  const key=createHash("sha256").update(workspaceIdentity.deviceId+":"+workspaceIdentity.fileId).digest("hex");
+  const lock=join(leaseRoot,key);await fs.mkdir(lock,{mode:0o700});const holder=join(lock,"holder"),nonce=randomUUID();await fs.writeFile(holder,nonce,{flag:"wx",mode:0o600});
+  await fs.writeFile(join(catalogDir,"workbench-projects.json"),JSON.stringify({schemaVersion:2,projects:[{schemaVersion:2,id:owners.projectId,workspaceIdentity,fileOwners:owners,plan:null,tasks:[],legacyHistory:[]}]}),{flag:"wx",mode:0o600});
+  const sourceId=await identity(catalogDir);await fs.writeFile(join(leaseRoot,key+".owner-source.json"),JSON.stringify({schemaVersion:1,workspace:workspaceIdentity,source:{catalogDirCanonicalPath:catalogDir,dirDeviceId:sourceId.deviceId,dirFileId:sourceId.fileId,filename:"workbench-projects.json",projectId:owners.projectId}}),{flag:"wx",mode:0o600});
+  t.after(()=>cleanup(base));return {leaseRoot,nonce,leaseIdentity:await identity(lock),holderIdentity:await identity(holder)};
+}
+
 async function fixture(t) {
   await prepareTemporaryRoot();
   const workspace = await fs.mkdtemp(join(TEMP_ROOT, "legion-test-permission-"));
@@ -55,11 +70,13 @@ async function fixture(t) {
   const unknown = new AgentSession({ sessionId: "unknown", roleId: "Unknown", taskId: "unknown-task", organizationVersion: "v3" });
   const boundary = new RoleBoundary({ roleId: "Backend", writeScope: ["backend/"], denyScope: ["backend/private/"],
     tools: ["legion_write_file"], capabilities: ["write_file"] });
-  const runtime = createRuntime({ workspace, organizationVersion: "v3", boundaries: [boundary,
+  const owners=new ProjectFileOwners({projectId:"tester-permission",version:"1",owners:[...["backend/new/file.txt","backend/approved.txt","backend/private/key.txt","backend/after/file.txt"].map(resource=>({resource,roleId:"Backend"})),{resource:"frontend/login.vue",roleId:"Frontend"}]});
+  const leaseContext=await ownerLease(t,workspace,owners);
+  const runtime = createRuntime({ workspace, fileOwners:owners,leaseContext, organizationVersion: "v3", boundaries: [boundary,
     new RoleBoundary({ roleId: "Frontend", writeScope: ["frontend/"], tools: ["legion_write_file"], capabilities: ["write_file"] })],
     sessions: [backend, frontend, unknown] });
   t.after(async () => { t.mock.restoreAll(); await runtime.close(); await cleanup(workspace); });
-  return { workspace, runtime, backend, frontend, unknown, boundary };
+  return { workspace, runtime, backend, frontend, unknown, boundary,owners,leaseContext };
 }
 
 function proposal(session, resource = "backend/new/file.txt", extra = {}) {
@@ -130,7 +147,7 @@ test("root API and both adapters complete backend write while preserving fronten
     assert.equal(await f.runtime.readFile(p.resource), CONTENT);
     assert.equal(await fs.readFile(join(f.workspace, p.resource), "utf8"), CONTENT);
     const denied = proposal(f.backend, "frontend/login.vue", { proposalId: "denied" });
-    assertDenied(await f.runtime.submit(denied), Outcome.DENY, "outside_write_scope");
+    assertDenied(await f.runtime.submit(denied), Outcome.DENY, "file_owner_mismatch");
     assert.equal(await f.runtime.readFile(seed.resource), "original frontend");
     assert.equal(await fs.readFile(join(f.workspace, seed.resource), "utf8"), "original frontend");
     await assertAudit(f, [{ proposal: seed, kinds: ALLOWED }, { proposal: p, kinds: ALLOWED }, { proposal: denied, kinds: DENIED }]);
@@ -149,6 +166,20 @@ test("identity copies unknown roles and unsupported tools cannot obtain write au
   for (const [index, p] of cases.entries()) assertDenied(await f.runtime.submit(p), Outcome.DENY, reasons[index]);
   await assert.rejects(fs.stat(join(f.workspace, "backend")), { code: "ENOENT" });
   await assertAudit(f, cases.map((p) => ({ proposal: p, kinds: DENIED })));
+});
+
+test("public Runtime rejects cross-role case aliases and directory descendants before an Agent runs", async (t) => {
+  const f = await fixture(t);
+  const writer = new RoleBoundary({ roleId: "Writer", readScope: ["."], writeScope: ["src/API.ts"],
+    capabilities: ["read_project", "write_file"], tools: ["legion_write_file", "legion_read_file", "legion_list_files"] });
+  const other = scope => new RoleBoundary({ roleId: "Other", readScope: ["."], writeScope: [scope],
+    capabilities: ["read_project", "write_file"], tools: ["legion_write_file", "legion_read_file", "legion_list_files"] });
+  for (const scope of ["SRC/api.ts", "src/"]) {
+    assert.throws(() => createRuntime({ workspace: f.workspace, fileOwners:f.owners,leaseContext:f.leaseContext,organizationVersion: "v3",
+      boundaries: [writer, other(scope)] }), /cross_role_write_scope_overlap/);
+  }
+  assert.deepEqual(await f.runtime.events(), []);
+  await assert.rejects(fs.stat(join(f.workspace, "src")), { code: "ENOENT" });
 });
 
 test("original approval path aliases action approvals and deny precedence remain strict", async (t) => {
@@ -201,14 +232,14 @@ test("control plane and traversal proposals preserve sentinel and create no busi
 
 test("handoff scope expansion and unknown handoff outcomes do not execute", async (t) => {
   const f = await fixture(t);
-  const cases = [[{ handoffTargets: ["Frontend"], allowScopeExpansion: true }, Outcome.REQUIRE_HANDOFF, "Frontend"],
-    [{ allowScopeExpansion: true }, Outcome.REQUIRE_SCOPE_EXPANSION, ""], [{ handoffTargets: ["Absent"] }, Outcome.DENY, ""]];
+  const cases = [[{ handoffTargets: ["Frontend"], allowScopeExpansion: true }, Outcome.DENY, ""],
+    [{ allowScopeExpansion: true }, Outcome.DENY, ""], [{ handoffTargets: ["Absent"] }, Outcome.DENY, ""]];
   const expected = [];
   for (const [extra, outcome, target] of cases) {
     await f.runtime.updateBoundary(new RoleBoundary({ ...f.boundary, ...extra }));
     const p = proposal(f.backend, "frontend/login.vue");
     const result = await f.runtime.submit(p);
-    assertDenied(result, outcome);
+    assertDenied(result, outcome,"file_owner_mismatch");
     assert.equal(result.decision.handoffTarget, target);
     expected.push({ proposal: p, kinds: DENIED });
   }
@@ -231,7 +262,7 @@ test("opaque prepared permit binds content resource identity and ID and is singl
     const result = await f.runtime.execute(altered, prepared.permit);
     assert.equal(result.observedMutation, false);
     let kinds = ["mutation_failure"];
-    if (changes.session !== undefined) kinds = ["decision", "mutation_failure"];
+    if (changes.session !== undefined || changes.resource !== undefined) kinds = ["decision", "mutation_failure"];
     expected.push({ proposal: altered, kinds });
   }
   for (const fake of [undefined, Object.freeze({}), Object.freeze({ outcome: Outcome.ALLOW })]) {
@@ -335,7 +366,7 @@ test("commit followed by result audit failure reports observed write and blocks 
 
 test("original Node Interface demo preserves one success five denials and 23 events", () => {
   const result = spawnSync(process.execPath, [join(PROJECT, "bin/legion.mjs"), "demo"],
-    { cwd: PROJECT, encoding: "utf8", timeout: 20000, env: { ...process.env, TEMP: TEMP_ROOT, TMP: TEMP_ROOT } });
+    { cwd: PROJECT, encoding: "utf8", timeout: 20000, env: { ...process.env, TEMP: TEMP_ROOT, TMP: TEMP_ROOT, TMPDIR: TEMP_ROOT } });
   assert.equal(result.error, undefined);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /backendWritten=true frontendPreserved=true/);

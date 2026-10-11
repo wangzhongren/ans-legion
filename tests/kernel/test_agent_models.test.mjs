@@ -1,3 +1,5 @@
+import { makeTestOwners, testLeaseContext } from "./test_control_memory.test.mjs";
+const kernelOwners = makeTestOwners("Backend", ["backend/a.txt"]);
 import test from "node:test";
 import assert from "node:assert/strict";
 import { AgentSession, ActionProposal, RoleBoundary, PolicyDecision, MutationResult, Outcome,
@@ -10,7 +12,7 @@ function fixture() {
   const boundary = new RoleBoundary({ roleId: "Backend", writeScope: ["backend/"], denyScope: ["backend/private/"],
     capabilities: ["write_file"], tools: ["legion_write_file"] });
   const context = new TaskDispatchContext({ roleId: "Backend", taskId: "task", organizationVersion: "v1",
-    writeSet: ["backend/a.txt", "backend/b.txt"], tools: ["legion_write_file"] });
+    fileOwnersDigest: kernelOwners.digest, ownerGeneration: kernelOwners.version, tools: ["legion_write_file"] });
   const scope = new AgentScope({ write: ["backend/a.txt"], deny: [".ans/"], tools: ["legion_write_file"] });
   return { boundary, context, scope };
 }
@@ -115,10 +117,9 @@ test("TaskDispatchContext only accepts an immutable exact-file writeSet", () => 
     assert.throws(() => new TaskDispatchContext({ ...context, writeSet }), TypeError);
   }
   assert.throws(() => new TaskDispatchContext({ ...context, tools: "legion_write_file" }), TypeError);
-  const raw = ["backend/a.txt"];
-  const copied = new TaskDispatchContext({ ...context, writeSet: raw });
-  raw.push("frontend/login.vue");
-  assert.deepEqual(copied.writeSet, ["backend/a.txt"]);
+  const copied = new TaskDispatchContext({ ...context, ownerGeneration: "2" });
+  assert.equal(copied.ownerGeneration, "2");
+  assert.equal(Object.hasOwn(copied, "writeSet"), false);
   assert.equal(context.digest.length, 64);
   assert.notEqual(context.digest, copied.digest);
 });
@@ -136,25 +137,25 @@ test("AgentInstance is frozen identity with no operational callback or authority
 
 test("instance grant is the exact role/task/request intersection and is defensively immutable", () => {
   const { boundary, context, scope } = fixture();
-  const grant = validateInstanceGrant(boundary, context, scope);
+  const grant = validateInstanceGrant(boundary, context, scope, kernelOwners);
   assert.deepEqual(grant.write, ["backend/a.txt"]);
-  assert.deepEqual(grant.writeSet, ["backend/a.txt", "backend/b.txt"]);
+  assert.deepEqual(grant.fileOwners.owners.map(item => item.resource), ["backend/a.txt"]);
   assert.deepEqual(grant.deny, [".ans/"]);
-  assert.throws(() => grant.writeSet.push("frontend/a"), TypeError);
+  assert.throws(() => grant.fileOwners.owners.push({ resource: "frontend/a", roleId: "Backend" }), TypeError);
   const aliases = new AgentScope({ ...scope, write: ["BACKEND\\A.TXT"] });
-  assert.equal(validateInstanceGrant(boundary, context, aliases).write[0], "BACKEND/A.TXT");
+  assert.equal(validateInstanceGrant(boundary, context, aliases, kernelOwners).write[0], "BACKEND/A.TXT");
 });
 
 test("creation rejects directory inference, role/task widening, deny, and missing tools/capability", () => {
   const { boundary, context, scope } = fixture();
   for (const write of [["backend/"], ["backend/other.txt"], ["frontend/login.vue"], ["backend/private/key"]]) {
-    assert.throws(() => validateInstanceGrant(boundary, context, new AgentScope({ ...scope, write })));
+    assert.throws(() => validateInstanceGrant(boundary, context, new AgentScope({ ...scope, write }), kernelOwners));
   }
-  assert.throws(() => validateInstanceGrant(boundary, context, new AgentScope({ ...scope, deny: ["backend/"] })), /explicit_deny/);
-  assert.throws(() => validateInstanceGrant(boundary, context, new AgentScope({ ...scope, tools: ["bash"] })), /outside_tool_grant/);
-  assert.throws(() => validateInstanceGrant(boundary, new TaskDispatchContext({ ...context, tools: [] }), scope), /outside_tool_grant/);
-  assert.throws(() => validateInstanceGrant(new RoleBoundary({ ...boundary, capabilities: [] }), context, scope), /missing_capability/);
-  assert.throws(() => validateInstanceGrant(boundary, new TaskDispatchContext({ ...context, roleId: "Admin" }), scope), /dispatch_role_mismatch/);
+  assert.throws(() => validateInstanceGrant(boundary, context, new AgentScope({ ...scope, deny: ["backend/"] }), kernelOwners), /explicit_deny/);
+  assert.throws(() => validateInstanceGrant(boundary, context, new AgentScope({ ...scope, tools: ["bash"] }), kernelOwners), /outside_tool_grant/);
+  assert.throws(() => validateInstanceGrant(boundary, new TaskDispatchContext({ ...context, tools: [] }), scope, kernelOwners), /outside_tool_grant/);
+  assert.throws(() => validateInstanceGrant(new RoleBoundary({ ...boundary, capabilities: [] }), context, scope, kernelOwners), /missing_capability/);
+  assert.throws(() => validateInstanceGrant(boundary, new TaskDispatchContext({ ...context, roleId: "Admin" }), scope, kernelOwners), /dispatch_role_mismatch/);
 });
 
 test("PiToolRequest freezes the canonical payload without granting a claimed role", () => {
@@ -169,6 +170,21 @@ test("PiToolRequest freezes the canonical payload without granting a claimed rol
   const deniedResource = new PiToolRequest({ ...request, parameters: { resource: "../outside", content: "" } });
   assert.equal(deniedResource.parameters.resource, "../outside");
   assert.deepEqual(new PiToolRequest(JSON.parse(JSON.stringify(request))), request);
+});
+
+test("Pi edit tool request copies SHA-bound bounded replacements", () => {
+  const replacements = [{ oldText: "before", newText: "after" }];
+  const options = { requestId: "edit", runId: "run", toolCallId: "sdk", tool: "legion_edit_file",
+    parameters: { resource: "backend/a.txt", expectedSha256: "a".repeat(64), replacements } };
+  const request = new PiToolRequest(options);
+  replacements[0].newText = "changed";
+  assert.equal(request.parameters.replacements[0].newText, "after");
+  assert.ok(Object.isFrozen(request.parameters.replacements));
+  assert.throws(() => new PiToolRequest({ ...options, parameters: { ...options.parameters,
+    expectedSha256: "bad" } }), /expected_sha256/);
+  assert.throws(() => new PiToolRequest({ ...options, parameters: { ...options.parameters,
+    replacements: [{ oldText: "x", newText: "a" }, { oldText: "x", newText: "b" }] } }),
+  /duplicate_old_text/);
 });
 
 test("PiToolResult and PiRunResult preserve typed results and reject duplicate/foreign responses", () => {
@@ -197,7 +213,7 @@ test("Pi event type values match the fixed pull protocol", () => {
 
 test("registered instance binds exact Session, current task/version, and single-run lifecycle", () => {
   const { boundary, context, scope } = fixture();
-  const authority = _createRuntimeAuthority({ boundaries: [boundary], organizationVersion: "v1" });
+  const authority = _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [boundary], organizationVersion: "v1" });
   const session = new AgentSession({ sessionId: "s", roleId: "Backend", taskId: "task", organizationVersion: "v1" });
   const snapshot = authority.registerInstance({ instanceId: "i", session, dispatchContext: context, scope });
   assert.equal(snapshot.status, "ready");
@@ -212,9 +228,14 @@ test("registered instance binds exact Session, current task/version, and single-
 
 test("instance permits bind independent task/scope/session/run and cannot cross workers", () => {
   const { boundary, context } = fixture();
-  const authority = _createRuntimeAuthority({ boundaries: [boundary], organizationVersion: "v1" });
-  const first = instanceSetup(authority, context, "first", "backend/a.txt");
-  const second = instanceSetup(authority, context, "second", "backend/b.txt");
+  const owners = new (kernelOwners.constructor)({ projectId: "kernel-fixture", version: "1", owners: [
+    { resource: "backend/a.txt", roleId: "Backend" }, { resource: "frontend/b.txt", roleId: "Frontend" }] });
+  const authority = _createRuntimeAuthority({ fileOwners: owners, boundaries: [new RoleBoundary({ ...boundary, writeScope: ["backend/a.txt"] }),
+    new RoleBoundary({ roleId: "Frontend", writeScope: ["frontend/b.txt"], tools: ["legion_write_file"], capabilities: ["write_file"] })], organizationVersion: "v1" });
+  const firstContext = new TaskDispatchContext({ ...context, fileOwnersDigest: owners.digest });
+  const secondContext = new TaskDispatchContext({ ...context, fileOwnersDigest: owners.digest, roleId: "Frontend" });
+  const first = instanceSetup(authority, firstContext, "first", "backend/a.txt");
+  const second = instanceSetup(authority, secondContext, "second", "frontend/b.txt");
   const firstPermit = authority.issue(first.proposal, first.decision);
   assert.throws(() => authority.consume(second.proposal, firstPermit), /identity/);
   assert.throws(() => authority.consume(first.proposal, firstPermit), /replayed/);
@@ -230,9 +251,14 @@ test("instance permits bind independent task/scope/session/run and cannot cross 
 
 test("cancelling one instance revokes its permits and receipts without cancelling another instance", () => {
   const { boundary, context } = fixture();
-  const authority = _createRuntimeAuthority({ boundaries: [boundary], organizationVersion: "v1" });
-  const first = instanceSetup(authority, context, "first", "backend/a.txt");
-  const second = instanceSetup(authority, context, "second", "backend/b.txt");
+  const owners = new (kernelOwners.constructor)({ projectId: "kernel-fixture", version: "1", owners: [
+    { resource: "backend/a.txt", roleId: "Backend" }, { resource: "frontend/b.txt", roleId: "Frontend" }] });
+  const authority = _createRuntimeAuthority({ fileOwners: owners, boundaries: [new RoleBoundary({ ...boundary, writeScope: ["backend/a.txt"] }),
+    new RoleBoundary({ roleId: "Frontend", writeScope: ["frontend/b.txt"], tools: ["legion_write_file"], capabilities: ["write_file"] })], organizationVersion: "v1" });
+  const firstContext = new TaskDispatchContext({ ...context, fileOwnersDigest: owners.digest });
+  const secondContext = new TaskDispatchContext({ ...context, fileOwnersDigest: owners.digest, roleId: "Frontend" });
+  const first = instanceSetup(authority, firstContext, "first", "backend/a.txt");
+  const second = instanceSetup(authority, secondContext, "second", "frontend/b.txt");
   const permit = authority.issue(first.proposal, first.decision);
   const receipt = authority.consume(first.proposal, authority.issue(first.proposal, first.decision));
   const otherPermit = authority.issue(second.proposal, second.decision);
@@ -247,7 +273,7 @@ test("cancelling one instance revokes its permits and receipts without cancellin
 test("task/role/version/grant changes cancel old instance writes permanently after roundtrip", () => {
   for (const transition of ["task", "role", "version", "grant"]) {
     const { boundary, context } = fixture();
-    const authority = _createRuntimeAuthority({ boundaries: [boundary], organizationVersion: "v1" });
+    const authority = _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [boundary], organizationVersion: "v1" });
     const first = instanceSetup(authority, context, "first", "backend/a.txt");
     const permit = authority.issue(first.proposal, first.decision);
     if (transition === "task") {
@@ -263,7 +289,7 @@ test("task/role/version/grant changes cancel old instance writes permanently aft
       authority.updateVersion("v1");
     }
     if (transition === "grant") {
-      authority.updateTaskGrant(new TaskDispatchContext({ ...context, writeSet: ["backend/b.txt"] }));
+      authority.updateTaskGrant(new TaskDispatchContext({ ...context, fileOwnersDigest: kernelOwners.digest, ownerGeneration: kernelOwners.version }));
       authority.updateTaskGrant(context);
     }
     assert.throws(() => authority.consume(first.proposal, permit), /replayed/);
@@ -274,12 +300,12 @@ test("task/role/version/grant changes cancel old instance writes permanently aft
 test("instance registration fails closed on mismatched role/task/version and stopped tasks", () => {
   const { boundary, context, scope } = fixture();
   for (const changes of [{ roleId: "Admin" }, { taskId: "other" }, { organizationVersion: "v0" }]) {
-    const authority = _createRuntimeAuthority({ boundaries: [boundary], organizationVersion: "v1" });
+    const authority = _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [boundary], organizationVersion: "v1" });
     const session = new AgentSession({ sessionId: "s", roleId: "Backend", taskId: "task",
       organizationVersion: "v1", ...changes });
     assert.throws(() => authority.registerInstance({ instanceId: "i", session, dispatchContext: context, scope }), /identity_mismatch/);
   }
-  const authority = _createRuntimeAuthority({ boundaries: [boundary], organizationVersion: "v1" });
+  const authority = _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [boundary], organizationVersion: "v1" });
   authority.setTaskStatus("task", "cancelled");
   const session = new AgentSession({ sessionId: "s", roleId: "Backend", taskId: "task", organizationVersion: "v1" });
   assert.throws(() => authority.registerInstance({ instanceId: "i", session, dispatchContext: context, scope }), /task_inactive/);
@@ -287,15 +313,69 @@ test("instance registration fails closed on mismatched role/task/version and sto
 
 test("instance authority stores defensive grant copies even when internal wiring receives plain records", () => {
   const { boundary, context } = fixture();
-  const authority = _createRuntimeAuthority({ boundaries: [boundary], organizationVersion: "v1" });
+  const authority = _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [boundary], organizationVersion: "v1" });
   const session = new AgentSession({ sessionId: "s", roleId: "Backend", taskId: "task", organizationVersion: "v1" });
   const rawScope = { write: ["backend/a.txt"], deny: [".ans/"], tools: ["legion_write_file"] };
-  const rawContext = { ...context, writeSet: ["backend/a.txt"], tools: ["legion_write_file"] };
+  const rawContext = { ...context, fileOwnersDigest: kernelOwners.digest, ownerGeneration: kernelOwners.version, tools: ["legion_write_file"] };
   authority.registerInstance({ instanceId: "i", session, dispatchContext: rawContext, scope: rawScope });
   rawScope.write.push("backend/b.txt");
-  rawContext.writeSet.push("backend/b.txt");
+  rawContext.ownerGeneration = "new";
   const snapshot = authority.instanceSnapshot("i");
   assert.deepEqual(snapshot.grant.write, ["backend/a.txt"]);
-  assert.deepEqual(snapshot.grant.writeSet, ["backend/a.txt"]);
+  assert.deepEqual(snapshot.grant.fileOwners.owners.map(item => item.resource), ["backend/a.txt"]);
   assert.throws(() => snapshot.grant.tools.push("bash"), TypeError);
+});
+
+test("thirteen workflow tools use bounded pure payloads and host-matched typed results", async () => {
+  const { AgentControlTools, AgentTools, AgentControlDecision, AgentControlResult } = await import("../../src/kernel/models/agent.mjs");
+  const { CheckDecision, CheckResult } = await import("../../src/kernel/models/check.mjs");
+  assert.equal(AgentControlTools.length, 13);
+  assert.equal(AgentTools.length, 19);
+  const base = { requestId: "q", runId: "r", toolCallId: "sdk" };
+  for (const tool of AgentControlTools.filter(tool=>tool!=="legion_review_shell")) {
+    let raw = { roles: [{ roleId: "Backend", responsibility: "code" }] };
+    if (tool === "legion_delegate_pm") raw = { action: "start", purpose: "plan", instruction: "work", sourceRefs: ["human:h"] };
+    if (["legion_query_role_activity", "legion_query_role_log"].includes(tool)) raw = { roleId: "Backend" };
+    const request = new PiToolRequest({ ...base, tool, parameters: { payload: raw } });
+    if (tool === "legion_delegate_pm") {
+      raw.sourceRefs.push("human:later"); assert.deepEqual(request.parameters.payload.sourceRefs, ["human:h"]);
+    } else if (["legion_query_role_activity", "legion_query_role_log"].includes(tool)) {
+      raw.roleId = "Other"; assert.equal(request.parameters.payload.roleId, "Backend");
+    } else {
+      raw.roles[0].responsibility = "changed"; assert.equal(request.parameters.payload.roles[0].responsibility, "code");
+    }
+    assert.deepEqual(new PiToolRequest(JSON.parse(JSON.stringify(request))), request);
+    const decision = new AgentControlDecision({ requestId: "q", runId: "r", tool, allowed: true, reason: "host_validated" });
+    const value = new AgentControlResult({ requestId: "q", runId: "r", tool, status: "completed", reason: "done",
+      payload: { proposalId: "proposal" } });
+    const response = new PiToolResult({ requestId: "q", runId: "r", decision, result: value });
+    assert.equal(new PiRunResult({ runId: "r", status: "completed", toolResults: [response] }).toolResults[0], response);
+    assert.throws(() => new PiToolResult({ ...response, runId: "foreign" }), /identity/);
+    assert.throws(() => new PiToolResult({ ...response, decision: new AgentControlDecision({ ...decision, allowed: false }) }), /denied/);
+    assert.throws(() => new PiToolResult({ ...response, result: { ...value } }), TypeError);
+    for (const payload of [{ callback() {} }, { callerRoleId: "PM" }, { token: "secret" },
+      { nested: { apiKey: "secret" } }, { text: "x".repeat(65537) }, { values: Array(4096).fill(0) }]) {
+      assert.throws(() => new PiToolRequest({ ...base, tool, parameters: { payload } }), TypeError);
+    }
+    assert.throws(() => new PiToolRequest({ ...base, tool, parameters: { payload: {}, roleId: "PM" } }), TypeError);
+    const getter = {}; Object.defineProperty(getter, "get", { enumerable: true, get() { throw new Error("must_not_invoke"); } });
+    assert.throws(() => new PiToolRequest({ ...base, tool, parameters: { payload: getter } }), /secret_effect/);
+    const arrayGetter = [0];
+    Object.defineProperty(arrayGetter, "0", { enumerable: true, get() { throw new Error("must_not_invoke"); } });
+    assert.throws(() => new PiToolRequest({ ...base, tool, parameters: { payload: { values: arrayGetter } } }), /secret_effect/);
+  }
+  const check = new PiToolRequest({ ...base, tool: "legion_run_check", parameters: { checkId: "unit" } });
+  assert.deepEqual(check.parameters, { checkId: "unit" });
+  assert.throws(() => new PiToolRequest({ ...check, parameters: { checkId: "unit", argv: ["node"] } }), TypeError);
+  const authorizationDigest = "a".repeat(64);
+  const decision = new CheckDecision({ requestId: "q", runId: "r", checkId: "unit", allowed: false,
+    reason: "no_approval", authorizationDigest });
+  const value = new CheckResult({ requestId: "q", runId: "r", checkId: "unit", authorizationDigest,
+    specDigest: "b".repeat(64), status: "error", reason: "no_approval", executed: false, actualArgv: [], exitCode: null,
+    testCount: 0, stdout: "", stderr: "", logsTruncated: false, inputVersions: [], environment: null,
+    startedAt: "2026-10-08T00:00:00.000Z", finishedAt: "2026-10-08T00:00:00.000Z" });
+  const response = new PiToolResult({ requestId: "q", runId: "r", decision, result: value });
+  assert.equal(response.result.status, "error");
+  assert.throws(() => new PiToolResult({ ...response, decision: new CheckDecision({ ...decision, checkId: "foreign" }) }), /binding/);
+  assert.throws(() => new PiToolResult({ ...response, result: new MutationResult({ success: false, status: "denied", reason: "no" }) }), TypeError);
 });

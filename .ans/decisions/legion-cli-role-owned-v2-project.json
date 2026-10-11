@@ -1,0 +1,402 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion CLI with persistent role-owned files v2",
+  "authorizationSource": ".ans/decisions/legion-cli-role-owned-v2-authorization.md",
+  "designFiles": [
+    "docs/roles/ProjectManager/docs/design/2026-10-10_design_cli-role-owned-files-v2.md"
+  ],
+  "maxConcurrentWorkers": 3,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "KernelEngineer": {
+      "card": ".ans/roles/KernelEngineer/role-card.md",
+      "boundary": ".ans/roles/KernelEngineer/boundary.md",
+      "writeFiles": [
+        "docs/roles/KernelEngineer/api-spec.md",
+        "docs/roles/KernelEngineer/changelog.md",
+        "docs/roles/KernelEngineer/docs/design/2026-10-10_design_cli-controls.md",
+        "docs/roles/KernelEngineer/docs/feature/cli-controls.md",
+        "docs/roles/KernelEngineer/docs/feature/generic-agents.md",
+        "docs/roles/KernelEngineer/docs/feature/permission.md",
+        "docs/roles/KernelEngineer/feature-map.md",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/models/core.mjs",
+        "src/kernel/models/shell.mjs",
+        "src/kernel/models/workbench.mjs",
+        "src/kernel/pipelines/permission.mjs",
+        "src/kernel/providers/abstract/storage.mjs",
+        "src/kernel/providers/impl/shell.mjs",
+        "src/kernel/providers/impl/storage.mjs",
+        "src/kernel/providers/public/storage.mjs",
+        "src/kernel/services/abstract/mutation.mjs",
+        "src/kernel/services/abstract/policy.mjs",
+        "src/kernel/services/impl/mutation.mjs",
+        "src/kernel/services/impl/policy.mjs",
+        "src/kernel/services/public/mutation.mjs",
+        "tests/kernel/test_agent_models.test.mjs",
+        "tests/kernel/test_agent_runtime.test.mjs",
+        "tests/kernel/test_agent_scope.test.mjs",
+        "tests/kernel/test_check_models.test.mjs",
+        "tests/kernel/test_check_provider.test.mjs",
+        "tests/kernel/test_check_service.test.mjs",
+        "tests/kernel/test_control_memory.test.mjs",
+        "tests/kernel/test_demo.test.mjs",
+        "tests/kernel/test_events.test.mjs",
+        "tests/kernel/test_models.test.mjs",
+        "tests/kernel/test_mutation.test.mjs",
+        "tests/kernel/test_policy.test.mjs",
+        "tests/kernel/test_project_read.test.mjs",
+        "tests/kernel/test_shell_models.test.mjs",
+        "tests/kernel/test_shell_provider.test.mjs",
+        "tests/kernel/test_shell_service.test.mjs",
+        "tests/kernel/test_workbench_models.test.mjs"
+      ],
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/kernel/test_agent_models.test.mjs",
+            "tests/kernel/test_agent_runtime.test.mjs",
+            "tests/kernel/test_agent_scope.test.mjs",
+            "tests/kernel/test_check_models.test.mjs",
+            "tests/kernel/test_check_provider.test.mjs",
+            "tests/kernel/test_check_service.test.mjs",
+            "tests/kernel/test_demo.test.mjs",
+            "tests/kernel/test_events.test.mjs",
+            "tests/kernel/test_models.test.mjs",
+            "tests/kernel/test_mutation.test.mjs",
+            "tests/kernel/test_policy.test.mjs",
+            "tests/kernel/test_project_read.test.mjs",
+            "tests/kernel/test_shell_models.test.mjs",
+            "tests/kernel/test_shell_provider.test.mjs",
+            "tests/kernel/test_shell_service.test.mjs",
+            "tests/kernel/test_workbench_models.test.mjs",
+            "tests/kernel/test_control_memory.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "AgentAdapterEngineer": {
+      "card": ".ans/roles/AgentAdapterEngineer/role-card.md",
+      "boundary": ".ans/roles/AgentAdapterEngineer/boundary.md",
+      "writeFiles": [
+        "docs/roles/AgentAdapterEngineer/api-spec.md",
+        "docs/roles/AgentAdapterEngineer/changelog.md",
+        "docs/roles/AgentAdapterEngineer/docs/design/2026-10-10_design_cli-controls.md",
+        "docs/roles/AgentAdapterEngineer/docs/feature/cli-controls.md",
+        "src/adapters/providers/impl/pi_session.mjs",
+        "tests/adapters/test_control_tools.mjs",
+        "tests/adapters/test_memory_supervision_tools.mjs",
+        "tests/adapters/test_pi_provider.mjs",
+        "tests/adapters/test_pi_service.mjs",
+        "tests/adapters/test_proposal.mjs"
+      ],
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "checks": {
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/adapters/test_control_tools.mjs",
+            "tests/adapters/test_pi_provider.mjs",
+            "tests/adapters/test_pi_service.mjs",
+            "tests/adapters/test_proposal.mjs",
+            "tests/adapters/test_memory_supervision_tools.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "ProjectManager": {
+      "card": ".ans/roles/ProjectManager/role-card.md",
+      "boundary": ".ans/roles/ProjectManager/boundary.md",
+      "writeFiles": [
+        "README.md",
+        "apps/desktop/package-lock.json",
+        "apps/desktop/package.json",
+        "apps/desktop/scripts/verify-dependencies.mjs",
+        "apps/desktop/tests/package/desktop-package.test.mjs",
+        "bin/chat.mjs",
+        "bin/legion.mjs",
+        "docs/roles/ProjectManager/api-spec.md",
+        "docs/roles/ProjectManager/changelog.md",
+        "docs/roles/ProjectManager/docs/architecture.md",
+        "docs/roles/ProjectManager/docs/change/2026-10-10_change_cli-first.md",
+        "docs/roles/ProjectManager/docs/feature/cli-project-workflow.md",
+        "docs/roles/ProjectManager/feature-map.md",
+        "package-lock.json",
+        "package.json",
+        "tests/cli/test_chat.test.mjs",
+        "tests/package/test_package.mjs"
+      ],
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "checks": {
+        "cli": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/package/test_package.mjs",
+            "tests/cli/test_chat.test.mjs",
+            "apps/desktop/tests/package/desktop-package.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "runtime_package": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/package/test_package.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "desktop_dependency": {
+          "argv": [
+            "node",
+            "apps/desktop/scripts/verify-dependencies.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "DesktopEngineer": {
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "writeFiles": [
+        "apps/desktop/src/interface/renderer.mjs",
+        "apps/desktop/src/models/desktop.mjs",
+        "apps/desktop/src/models/interaction.mjs",
+        "apps/desktop/src/models/memory.mjs",
+        "apps/desktop/src/models/organization.mjs",
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/providers/abstract/environment_profile.mjs",
+        "apps/desktop/src/providers/abstract/memory.mjs",
+        "apps/desktop/src/providers/abstract/organization.mjs",
+        "apps/desktop/src/providers/abstract/project.mjs",
+        "apps/desktop/src/providers/abstract/project_lease.mjs",
+        "apps/desktop/src/providers/impl/environment_profile.mjs",
+        "apps/desktop/src/providers/impl/memory.mjs",
+        "apps/desktop/src/providers/impl/organization.mjs",
+        "apps/desktop/src/providers/impl/project.mjs",
+        "apps/desktop/src/providers/impl/project_lease.mjs",
+        "apps/desktop/src/providers/public/environment_profile.mjs",
+        "apps/desktop/src/providers/public/memory.mjs",
+        "apps/desktop/src/providers/public/organization.mjs",
+        "apps/desktop/src/providers/public/project.mjs",
+        "apps/desktop/src/providers/public/project_lease.mjs",
+        "apps/desktop/src/services/abstract/environment_profiles.mjs",
+        "apps/desktop/src/services/abstract/memory.mjs",
+        "apps/desktop/src/services/abstract/organization.mjs",
+        "apps/desktop/src/services/abstract/project.mjs",
+        "apps/desktop/src/services/impl/environment_profiles.mjs",
+        "apps/desktop/src/services/impl/memory.mjs",
+        "apps/desktop/src/services/impl/organization.mjs",
+        "apps/desktop/src/services/impl/project.mjs",
+        "apps/desktop/src/services/public/environment_profiles.mjs",
+        "apps/desktop/src/services/public/memory.mjs",
+        "apps/desktop/src/services/public/organization.mjs",
+        "apps/desktop/src/services/public/project.mjs",
+        "apps/desktop/tests/unit/acceptance.test.mjs",
+        "apps/desktop/tests/unit/environment-profiles.test.mjs",
+        "apps/desktop/tests/unit/interaction-model.test.mjs",
+        "apps/desktop/tests/unit/ipc.test.mjs",
+        "apps/desktop/tests/unit/memory.test.mjs",
+        "apps/desktop/tests/unit/organization-model.test.mjs",
+        "apps/desktop/tests/unit/organization.test.mjs",
+        "apps/desktop/tests/unit/parallel-scheduler.test.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "apps/desktop/tests/unit/project-lease.test.mjs",
+        "apps/desktop/tests/unit/project.test.mjs",
+        "apps/desktop/tests/unit/shell-publication.test.mjs",
+        "apps/desktop/tests/unit/shell-review.test.mjs",
+        "apps/desktop/tests/unit/workbench-model.test.mjs",
+        "apps/desktop/tests/unit/workbench.test.mjs",
+        "docs/roles/DesktopEngineer/api-spec.md",
+        "docs/roles/DesktopEngineer/changelog.md",
+        "docs/roles/DesktopEngineer/docs/change/2026-10-10_change_cli-host.md",
+        "docs/roles/DesktopEngineer/docs/design/2026-10-10_design_cli-host.md",
+        "docs/roles/DesktopEngineer/docs/feature/cli-project-host.md",
+        "docs/roles/DesktopEngineer/feature-map.md"
+      ],
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "checks": {
+        "host": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/organization-model.test.mjs",
+            "apps/desktop/tests/unit/interaction-model.test.mjs",
+            "apps/desktop/tests/unit/organization.test.mjs",
+            "apps/desktop/tests/unit/workbench-model.test.mjs",
+            "apps/desktop/tests/unit/workbench.test.mjs",
+            "apps/desktop/tests/unit/acceptance.test.mjs",
+            "apps/desktop/tests/unit/memory.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "headless": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/environment-profiles.test.mjs",
+            "apps/desktop/tests/unit/project-lease.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "parallel": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/parallel-scheduler.test.mjs",
+            "apps/desktop/tests/unit/workbench.test.mjs",
+            "apps/desktop/tests/unit/project.test.mjs",
+            "apps/desktop/tests/unit/pipeline.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "owner": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/workbench-model.test.mjs",
+            "apps/desktop/tests/unit/organization-model.test.mjs",
+            "apps/desktop/tests/unit/organization.test.mjs",
+            "apps/desktop/tests/unit/project.test.mjs",
+            "apps/desktop/tests/unit/pipeline.test.mjs",
+            "apps/desktop/tests/unit/workbench.test.mjs",
+            "apps/desktop/tests/unit/acceptance.test.mjs",
+            "apps/desktop/tests/unit/ipc.test.mjs",
+            "apps/desktop/tests/unit/shell-publication.test.mjs",
+            "apps/desktop/tests/unit/shell-review.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Tester": {
+      "card": ".ans/roles/Tester/role-card.md",
+      "boundary": ".ans/roles/Tester/boundary.md",
+      "writeFiles": [
+        "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs",
+        "apps/desktop/tests/e2e/workbench-ui.test.mjs",
+        "apps/desktop/tests/integration/governed-workflow.test.mjs",
+        "apps/desktop/tests/integration/shell-workflow.test.mjs",
+        "apps/desktop/tests/integration/workbench-flow.test.mjs",
+        "docs/roles/Tester/changelog.md",
+        "docs/roles/Tester/docs/design/2026-10-10_design_cli-verification.md",
+        "docs/roles/Tester/docs/verification-cli-v1.md",
+        "tests/integration/test_check_flow.mjs",
+        "tests/integration/test_cli_installed_flow.mjs",
+        "tests/integration/test_generic_agents.mjs",
+        "tests/integration/test_permission_flow.mjs",
+        "tests/integration/test_shell_flow.mjs"
+      ],
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "checks": {
+        "installed": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/integration/test_cli_installed_flow.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "regression": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/integration/test_generic_agents.mjs",
+            "tests/integration/test_permission_flow.mjs",
+            "tests/integration/test_check_flow.mjs",
+            "tests/integration/test_shell_flow.mjs",
+            "apps/desktop/tests/integration/workbench-flow.test.mjs",
+            "apps/desktop/tests/integration/governed-workflow.test.mjs",
+            "apps/desktop/tests/integration/shell-workflow.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Reviewer": {
+      "card": ".ans/roles/Reviewer/role-card.md",
+      "boundary": ".ans/roles/Reviewer/boundary.md",
+      "writeFiles": [
+        "apps/desktop/tests/reviewer/governed-workflow-boundaries.test.mjs",
+        "apps/desktop/tests/reviewer/shell-workflow-boundaries.test.mjs",
+        "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs",
+        "docs/roles/Reviewer/changelog.md",
+        "docs/roles/Reviewer/docs/review-cli-v1.md",
+        "tests/reviewer/test_cli_boundaries.mjs",
+        "tests/reviewer/test_shell_boundaries.mjs",
+        "tests/reviewer/test_structure.mjs"
+      ],
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "checks": {
+        "structure": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/reviewer/test_cli_boundaries.mjs",
+            "tests/reviewer/test_structure.mjs",
+            "tests/reviewer/test_shell_boundaries.mjs",
+            "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs",
+            "apps/desktop/tests/reviewer/governed-workflow-boundaries.test.mjs",
+            "apps/desktop/tests/reviewer/shell-workflow-boundaries.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

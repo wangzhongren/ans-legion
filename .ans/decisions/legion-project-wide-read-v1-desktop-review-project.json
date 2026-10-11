@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion current desktop Reviewer boundary",
+  "authorizationSource": ".ans/decisions/legion-project-wide-read-v1-authorization.md",
+  "designFiles": [
+    "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-project-wide-read.md"
+  ],
+  "maxConcurrentWorkers": 1,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "Reviewer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Reviewer/role-card.md",
+      "boundary": ".ans/roles/Reviewer/boundary.md",
+      "operations": [
+        "review"
+      ],
+      "writeFiles": [
+        "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs"
+      ],
+      "checks": {
+        "review": {
+          "argv": [
+            "node",
+            "--test",
+            "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

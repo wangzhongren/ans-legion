@@ -1,16 +1,18 @@
+import { makeTestOwners, testLeaseContext } from "./test_control_memory.test.mjs";
+const kernelOwners = makeTestOwners("Backend", ["backend/file.txt"]);
 import test from "node:test";
 import assert from "node:assert/strict";
 import { AgentSession, ActionProposal, RoleBoundary, PolicyDecision, Outcome, ExecutionPermit,
-  MutationResult, Event, normalizeResource, normalizeScope, scopeContains, requiresApproval,
-  _createRuntimeAuthority, _isRuntimeAuthority } from "../../src/kernel/models/core.mjs";
+  MutationResult, Event, normalizeResource, normalizeProjectReadResource, normalizeScope, scopeContains, requiresApproval,
+  assertDistinctRoleWriteScopes, _createRuntimeAuthority, _isRuntimeAuthority } from "../../src/kernel/models/core.mjs";
 
-function fixture() {
+function fixture(ownerFiles = ["backend/file.txt"]) {
   const session = new AgentSession({ sessionId: "session", roleId: "Backend", taskId: "task", organizationVersion: "v1" });
   const boundary = new RoleBoundary({ roleId: "Backend", writeScope: ["backend/"], denyScope: ["backend/private/"],
     capabilities: ["write_file"], tools: ["legion_write_file"] });
   const proposal = new ActionProposal({ proposalId: "proposal", action: "write_file", resource: "backend/file.txt",
     content: "body", tool: "legion_write_file", capability: "write_file", session });
-  const authority = _createRuntimeAuthority({ sessions: [session], boundaries: [boundary], organizationVersion: "v1" });
+  const authority = _createRuntimeAuthority({ fileOwners: makeTestOwners("Backend", ownerFiles), sessions: [session], boundaries: [boundary], organizationVersion: "v1" });
   const decision = new PolicyDecision({ outcome: Outcome.ALLOW, reason: "within_boundary",
     proposalDigest: proposal.digest, organizationVersion: "v1", boundaryDigest: boundary.digest });
   return { session, boundary, proposal, authority, decision };
@@ -71,6 +73,21 @@ test("resource gate rejects control planes, traversal, absolute/UNC, devices, an
   assert.throws(() => normalizeScope("backend//"), TypeError);
 });
 
+test("project read path gate excludes known credential files and directories at every depth", () => {
+  const blocked = [".npmrc", "src/.NPMRC", "nested\\.netrc", "_netrc", ".pypirc",
+    "pkg/.GIT-CREDENTIALS", ".authinfo", ".authinfo.gpg", ".pgpass", ".my.cnf", ".s3cfg", ".boto",
+    ".ssh/id_rsa", "src/.DOCKER/config.json", ".kube/config", "pkg/.GNUPG/private-keys-v1.d/key",
+    ".azure/profile", "src/.GCLOUD/credentials.db", ".terraform/terraform.tfstate", ".terraform.d/token"];
+  for (const resource of blocked) {
+    assert.throws(() => normalizeProjectReadResource(resource), /restricted_resource/, resource);
+  }
+  for (const resource of ["package.json", "src/index.mjs", ".editorconfig", "src/id_report.txt",
+    "nested/notes.md"]) assert.equal(normalizeProjectReadResource(resource), resource);
+  assert.equal(normalizeProjectReadResource("", { allowRoot: true }), "");
+  assert.throws(() => normalizeProjectReadResource(""), TypeError);
+  assert.equal(normalizeResource(".npmrc"), ".npmrc");
+});
+
 test("scope identity preserves directory versus exact-file semantics", () => {
   assert.equal(scopeContains("BACKEND/", "backend/file.txt"), true);
   assert.equal(scopeContains("backend\\", "BACKEND/file.txt"), true);
@@ -80,11 +97,68 @@ test("scope identity preserves directory versus exact-file semantics", () => {
   assert.equal(scopeContains("backend/", "backend"), false);
 });
 
+test("different roles cannot overlap write scopes, and rejected update preserves permits", () => {
+  const backend = new RoleBoundary({ roleId: "Backend", writeScope: ["src/"] });
+  const frontend = new RoleBoundary({ roleId: "Frontend", writeScope: ["web/"] });
+  for (const overlapping of ["SRC/a.ts", "SRC/sub/", "src/"]) {
+    const other = new RoleBoundary({ roleId: "Frontend", writeScope: [overlapping] });
+    assert.throws(() => _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [backend, other], organizationVersion: "v1" }),
+      /cross_role_write_scope_overlap/);
+  }
+  assert.doesNotThrow(() => _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [backend,
+    new RoleBoundary({ roleId: "Frontend", writeScope: ["SRC"] })], organizationVersion: "v1" }));
+  assert.throws(() => _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [
+    new RoleBoundary({ roleId: "A", writeScope: ["src/A.ts"] }),
+    new RoleBoundary({ roleId: "B", writeScope: ["SRC/a.TS"] }),
+  ], organizationVersion: "v1" }), /cross_role_write_scope_overlap/);
+  assert.equal(assertDistinctRoleWriteScopes([backend,
+    new RoleBoundary({ roleId: "Backend", writeScope: ["src/a.ts"] })]), undefined);
+  assert.doesNotThrow(() => _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [new RoleBoundary({ roleId: "Backend",
+    writeScope: ["src/", "SRC/a.ts"] })], organizationVersion: "v1" }));
+  const session = new AgentSession({ sessionId: "s", roleId: "Backend", taskId: "task",
+    organizationVersion: "v1" });
+  const authority = _createRuntimeAuthority({ fileOwners: makeTestOwners("Backend", ["src/a.ts"]), sessions: [session], boundaries: [backend, frontend],
+    organizationVersion: "v1" });
+  const proposal = new ActionProposal({ proposalId: "p", action: "write_file", resource: "src/a.ts",
+    content: "body", tool: "legion_write_file", capability: "write_file", session });
+  const allow = new PolicyDecision({ outcome: Outcome.ALLOW, reason: "allow", proposalDigest: proposal.digest,
+    organizationVersion: "v1", boundaryDigest: backend.digest });
+  authority.updateBoundary(new RoleBoundary({ ...backend, tools: ["legion_write_file"], capabilities: ["write_file"] }));
+  const current = authority.boundary("Backend");
+  const currentAllow = new PolicyDecision({ ...allow, boundaryDigest: current.digest });
+  const permit = authority.issue(proposal, currentAllow);
+  assert.throws(() => authority.updateBoundary(new RoleBoundary({ roleId: "Frontend",
+    writeScope: ["SRC/a.ts"] })), /cross_role_write_scope_overlap/);
+  assert.equal(authority.boundary("Frontend"), frontend);
+  assert.equal(authority.boundary("Backend"), current);
+  const receipt = authority.consume(proposal, permit);
+  assert.equal(authority.recheck(proposal, receipt), undefined);
+});
+
+test("edit proposal binds expected file SHA and ordered unambiguous replacements", () => {
+  const { session } = fixture();
+  const options = { proposalId: "edit", action: "edit_file", resource: "backend/file.txt",
+    tool: "legion_edit_file", capability: "write_file", session, expectedSha256: "a".repeat(64),
+    replacements: [{ oldText: "one", newText: "two" }, { oldText: "three", newText: "four" }] };
+  const proposal = new ActionProposal(options);
+  assert.equal(Object.isFrozen(proposal.replacements[0]), true);
+  for (const change of [{ expectedSha256: "b".repeat(64) },
+    { replacements: [{ oldText: "one", newText: "changed" }, options.replacements[1]] },
+    { resource: "backend/other.txt" }]) {
+    assert.notEqual(new ActionProposal({ ...options, ...change }).digest, proposal.digest);
+  }
+  assert.throws(() => new ActionProposal({ ...options, expectedSha256: "old" }), /expected_sha256/);
+  assert.throws(() => new ActionProposal({ ...options, replacements: [] }), /replacement_budget/);
+  assert.throws(() => new ActionProposal({ ...options, replacements: [options.replacements[0], options.replacements[0]] }),
+    /duplicate_old_text/);
+  assert.throws(() => new ActionProposal({ ...options, content: "precomputed" }), /omitted/);
+});
+
 test("pure grant normalizes task path separators before storing exact resource checks", () => {
   const { authority, session, boundary } = fixture();
   authority.registerInstance({ instanceId: "i", session,
     dispatchContext: { roleId: session.roleId, taskId: session.taskId, organizationVersion: "v1",
-      writeSet: ["BACKEND\\FILE.TXT"], tools: ["legion_write_file"] },
+      fileOwnersDigest: kernelOwners.digest, ownerGeneration: kernelOwners.version, tools: ["legion_write_file"] },
     scope: { write: ["backend/file.txt"], deny: [], tools: ["legion_write_file"] } });
   authority.beginRun("i", "run");
   const p = new ActionProposal({ proposalId: "path", action: "write_file", resource: "backend/file.txt",
@@ -178,7 +252,7 @@ test("pure permit validation independently rejects claimed ALLOW outside scope, 
 });
 
 test("pure permit approval revalidation blocks canonical aliases even with matching forged ALLOW", () => {
-  const { authority, proposal, boundary } = fixture();
+  const { authority, proposal, boundary } = fixture(["backend/file.txt", "backend/approved.txt"]);
   for (const condition of ["backend/approved.txt", "BACKEND\\APPROVED.TXT", "write_file"]) {
     const approved = new RoleBoundary({ ...boundary, requiredApprovals: [condition] });
     authority.updateBoundary(approved);
@@ -217,8 +291,8 @@ test("authority snapshots expose immutable copies and reject duplicate or invali
   assert.throws(() => snapshot.sessions.push(session), TypeError);
   assert.throws(() => { snapshot.taskStatuses[0].status = "completed"; }, TypeError);
   assert.equal(authority.taskStatus("task"), "active");
-  assert.throws(() => _createRuntimeAuthority({ sessions: [session, session], boundaries: [boundary], organizationVersion: "v1" }));
-  assert.throws(() => _createRuntimeAuthority({ sessions: [{ ...session }], organizationVersion: "v1" }));
-  assert.throws(() => _createRuntimeAuthority({ boundaries: [boundary, boundary], organizationVersion: "v1" }));
+  assert.throws(() => _createRuntimeAuthority({ fileOwners: kernelOwners, sessions: [session, session], boundaries: [boundary], organizationVersion: "v1" }));
+  assert.throws(() => _createRuntimeAuthority({ fileOwners: kernelOwners, sessions: [{ ...session }], organizationVersion: "v1" }));
+  assert.throws(() => _createRuntimeAuthority({ fileOwners: kernelOwners, boundaries: [boundary, boundary], organizationVersion: "v1" }));
   assert.throws(() => authority.setTaskStatus("task", "unknown"));
 });

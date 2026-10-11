@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "projectName": "及时雨 / Handwell — approved v2 desktop UI implementation",
+  "authorizationSource": ".ans/decisions/legion-ui-handwell-implementation-v1-scope.md",
+  "designFiles": [
+    "docs/roles/ProductDesigner/docs/design/2026-10-08_design_legion-ui.md"
+  ],
+  "maxConcurrentWorkers": 3,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "DesktopEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "repair"
+      ],
+      "writeFiles": [
+        "apps/desktop/src/interface/index.html",
+        "apps/desktop/src/interface/renderer.mjs",
+        "apps/desktop/src/interface/styles.css",
+        "apps/desktop/src/interface/main.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "apps/desktop/tests/unit/ipc.test.mjs",
+        "docs/roles/DesktopEngineer/api-spec.md",
+        "docs/roles/DesktopEngineer/changelog.md",
+        "docs/roles/DesktopEngineer/docs/feature/desktop-console.md",
+        "docs/roles/DesktopEngineer/docs/feature/organization-and-acceptance.md",
+        "docs/roles/DesktopEngineer/docs/design/2026-10-08_design_governed-workbench.md"
+      ],
+      "checks": {
+        "model": {
+          "argv": [
+            "node",
+            "--test",
+            "apps/desktop/tests/unit/organization-model.test.mjs",
+            "apps/desktop/tests/unit/interaction-model.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "unit": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/workbench-model.test.mjs",
+            "apps/desktop/tests/unit/project.test.mjs",
+            "apps/desktop/tests/unit/workbench.test.mjs",
+            "apps/desktop/tests/unit/pipeline.test.mjs",
+            "apps/desktop/tests/unit/ipc.test.mjs",
+            "apps/desktop/tests/unit/organization-model.test.mjs",
+            "apps/desktop/tests/unit/interaction-model.test.mjs",
+            "apps/desktop/tests/unit/organization.test.mjs",
+            "apps/desktop/tests/unit/acceptance.test.mjs",
+            "apps/desktop/tests/unit/history.test.mjs",
+            "apps/desktop/tests/unit/profiles.test.mjs",
+            "apps/desktop/tests/unit/workspace.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Tester": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Tester/role-card.md",
+      "boundary": ".ans/roles/Tester/boundary.md",
+      "operations": [
+        "test"
+      ],
+      "writeFiles": [
+        "apps/desktop/tests/e2e/workbench-ui.test.mjs",
+        "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs",
+        "docs/roles/Tester/changelog.md",
+        "docs/roles/Tester/docs/design/2026-10-08_design_governed-workflow-verification.md",
+        "docs/roles/Tester/docs/verification-governed-workflow-v1.md"
+      ],
+      "checks": {
+        "integration": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/integration/test_permission_flow.mjs",
+            "tests/integration/test_generic_agents.mjs",
+            "tests/integration/test_check_flow.mjs",
+            "apps/desktop/tests/integration/workbench-flow.test.mjs",
+            "apps/desktop/tests/integration/governed-workflow.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "ui": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/e2e/workbench-ui.test.mjs",
+            "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Reviewer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/Reviewer/role-card.md",
+      "boundary": ".ans/roles/Reviewer/boundary.md",
+      "operations": [
+        "review"
+      ],
+      "writeFiles": [
+        "docs/roles/Reviewer/changelog.md",
+        "docs/roles/Reviewer/docs/review-governed-workflow-v1.md"
+      ],
+      "checks": {
+        "structure": {
+          "argv": [
+            "node",
+            "--test",
+            "tests/reviewer/test_structure.mjs",
+            "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs",
+            "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs",
+            "apps/desktop/tests/reviewer/governed-workflow-boundaries.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

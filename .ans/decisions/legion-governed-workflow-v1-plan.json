@@ -1,0 +1,463 @@
+{
+  "schemaVersion": 1,
+  "taskId": "legion-governed-workflow-v1",
+  "requirement": {
+    "path": ".ans/decisions/legion-governed-workflow-v1-authorization.md",
+    "version": "customer-all-v1"
+  },
+  "design": {
+    "path": ".ans/decisions/legion-governed-workflow-v1-design.md",
+    "version": "governed-workflow-v1"
+  },
+  "nodes": [
+    {
+      "nodeId": "pm-contract",
+      "roleId": "ProjectManager",
+      "stage": "canonical design contract",
+      "operation": "implement",
+      "writeSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md"
+      ],
+      "requiredOutputs": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md"
+      ],
+      "readSet": [
+        ".ans/decisions/legion-governed-workflow-v1-design.md"
+      ],
+      "checks": [
+        "contract"
+      ],
+      "dependsOn": []
+    },
+    {
+      "nodeId": "kernel-contract",
+      "roleId": "KernelEngineer",
+      "stage": "typed check/control model contract",
+      "operation": "implement",
+      "writeSet": [
+        "src/kernel/models/check.mjs",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/models/workbench.mjs",
+        "tests/kernel/test_check_models.test.mjs",
+        "tests/kernel/test_agent_models.test.mjs",
+        "tests/kernel/test_workbench_models.test.mjs",
+        "docs/roles/KernelEngineer/docs/design/2026-10-08_design_software-checks.md"
+      ],
+      "requiredOutputs": [
+        "src/kernel/models/check.mjs",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/models/workbench.mjs",
+        "tests/kernel/test_check_models.test.mjs",
+        "tests/kernel/test_agent_models.test.mjs",
+        "tests/kernel/test_workbench_models.test.mjs",
+        "docs/roles/KernelEngineer/docs/design/2026-10-08_design_software-checks.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md"
+      ],
+      "checks": [
+        "model"
+      ],
+      "dependsOn": [
+        "pm-contract"
+      ]
+    },
+    {
+      "nodeId": "kernel-checks",
+      "roleId": "KernelEngineer",
+      "stage": "actual isolated software check service/provider",
+      "operation": "implement",
+      "writeSet": [
+        "src/kernel/models/core.mjs",
+        "src/kernel/pipelines/permission.mjs",
+        "src/kernel/services/abstract/policy.mjs",
+        "src/kernel/services/impl/policy.mjs",
+        "src/kernel/services/abstract/mutation.mjs",
+        "src/kernel/services/impl/mutation.mjs",
+        "src/kernel/services/public/mutation.mjs",
+        "src/kernel/providers/abstract/storage.mjs",
+        "src/kernel/providers/impl/storage.mjs",
+        "tests/kernel/test_models.test.mjs",
+        "tests/kernel/test_policy.test.mjs",
+        "tests/kernel/test_mutation.test.mjs",
+        "tests/kernel/test_events.test.mjs",
+        "tests/kernel/test_demo.test.mjs",
+        "tests/kernel/test_agent_scope.test.mjs",
+        "tests/kernel/test_agent_runtime.test.mjs",
+        "tests/kernel/test_project_read.test.mjs",
+        "docs/roles/KernelEngineer/api-spec.md",
+        "docs/roles/KernelEngineer/changelog.md",
+        "docs/roles/KernelEngineer/docs/feature/permission.md",
+        "docs/roles/KernelEngineer/docs/feature/generic-agents.md",
+        "src/kernel/services/abstract/check.mjs",
+        "src/kernel/services/public/check.mjs",
+        "src/kernel/services/impl/check.mjs",
+        "src/kernel/providers/abstract/check.mjs",
+        "src/kernel/providers/public/check.mjs",
+        "src/kernel/providers/impl/check.mjs",
+        "tests/kernel/test_check_service.test.mjs",
+        "tests/kernel/test_check_provider.test.mjs",
+        "docs/roles/KernelEngineer/feature-map.md",
+        "docs/roles/KernelEngineer/docs/feature/software-checks.md"
+      ],
+      "requiredOutputs": [
+        "src/kernel/models/core.mjs",
+        "src/kernel/pipelines/permission.mjs",
+        "src/kernel/services/abstract/policy.mjs",
+        "src/kernel/services/impl/policy.mjs",
+        "src/kernel/services/abstract/mutation.mjs",
+        "src/kernel/services/impl/mutation.mjs",
+        "src/kernel/services/public/mutation.mjs",
+        "src/kernel/providers/abstract/storage.mjs",
+        "src/kernel/providers/impl/storage.mjs",
+        "tests/kernel/test_models.test.mjs",
+        "tests/kernel/test_policy.test.mjs",
+        "tests/kernel/test_mutation.test.mjs",
+        "tests/kernel/test_events.test.mjs",
+        "tests/kernel/test_demo.test.mjs",
+        "tests/kernel/test_agent_scope.test.mjs",
+        "tests/kernel/test_agent_runtime.test.mjs",
+        "tests/kernel/test_project_read.test.mjs",
+        "docs/roles/KernelEngineer/api-spec.md",
+        "docs/roles/KernelEngineer/changelog.md",
+        "docs/roles/KernelEngineer/docs/feature/permission.md",
+        "docs/roles/KernelEngineer/docs/feature/generic-agents.md",
+        "src/kernel/services/abstract/check.mjs",
+        "src/kernel/services/public/check.mjs",
+        "src/kernel/services/impl/check.mjs",
+        "src/kernel/providers/abstract/check.mjs",
+        "src/kernel/providers/public/check.mjs",
+        "src/kernel/providers/impl/check.mjs",
+        "tests/kernel/test_check_service.test.mjs",
+        "tests/kernel/test_check_provider.test.mjs",
+        "docs/roles/KernelEngineer/feature-map.md",
+        "docs/roles/KernelEngineer/docs/feature/software-checks.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md",
+        "src/kernel/models/check.mjs",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/models/workbench.mjs",
+        "tests/kernel/test_check_models.test.mjs",
+        "tests/kernel/test_agent_models.test.mjs",
+        "tests/kernel/test_workbench_models.test.mjs",
+        "docs/roles/KernelEngineer/docs/design/2026-10-08_design_software-checks.md"
+      ],
+      "checks": [
+        "unit"
+      ],
+      "dependsOn": [
+        "kernel-contract"
+      ]
+    },
+    {
+      "nodeId": "adapter-tools",
+      "roleId": "AgentAdapterEngineer",
+      "stage": "SDK check/control tools and waiting cancellation",
+      "operation": "implement",
+      "writeSet": [
+        "src/adapters/services/abstract/proposal.mjs",
+        "src/adapters/services/public/proposal.mjs",
+        "src/adapters/services/impl/proposal.mjs",
+        "src/adapters/services/impl/pi_agent.mjs",
+        "src/adapters/providers/impl/pi_session.mjs",
+        "tests/adapters/test_proposal.mjs",
+        "tests/adapters/test_pi_provider.mjs",
+        "tests/adapters/test_pi_service.mjs",
+        "docs/roles/AgentAdapterEngineer/api-spec.md",
+        "docs/roles/AgentAdapterEngineer/changelog.md",
+        "docs/roles/AgentAdapterEngineer/docs/feature/pi-agent.md",
+        "src/adapters/services/abstract/pi_agent.mjs",
+        "src/adapters/services/public/pi_agent.mjs",
+        "src/adapters/providers/abstract/pi_session.mjs",
+        "src/adapters/providers/public/pi_session.mjs",
+        "tests/adapters/test_control_tools.mjs",
+        "docs/roles/AgentAdapterEngineer/feature-map.md",
+        "docs/roles/AgentAdapterEngineer/docs/design/2026-10-08_design_governed-agent-tools.md"
+      ],
+      "requiredOutputs": [
+        "src/adapters/services/abstract/proposal.mjs",
+        "src/adapters/services/public/proposal.mjs",
+        "src/adapters/services/impl/proposal.mjs",
+        "src/adapters/services/impl/pi_agent.mjs",
+        "src/adapters/providers/impl/pi_session.mjs",
+        "tests/adapters/test_proposal.mjs",
+        "tests/adapters/test_pi_provider.mjs",
+        "tests/adapters/test_pi_service.mjs",
+        "docs/roles/AgentAdapterEngineer/api-spec.md",
+        "docs/roles/AgentAdapterEngineer/changelog.md",
+        "docs/roles/AgentAdapterEngineer/docs/feature/pi-agent.md",
+        "src/adapters/services/abstract/pi_agent.mjs",
+        "src/adapters/services/public/pi_agent.mjs",
+        "src/adapters/providers/abstract/pi_session.mjs",
+        "src/adapters/providers/public/pi_session.mjs",
+        "tests/adapters/test_control_tools.mjs",
+        "docs/roles/AgentAdapterEngineer/feature-map.md",
+        "docs/roles/AgentAdapterEngineer/docs/design/2026-10-08_design_governed-agent-tools.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md",
+        "src/kernel/models/check.mjs",
+        "src/kernel/models/agent.mjs",
+        "src/kernel/models/workbench.mjs",
+        "tests/kernel/test_check_models.test.mjs",
+        "tests/kernel/test_agent_models.test.mjs",
+        "tests/kernel/test_workbench_models.test.mjs",
+        "docs/roles/KernelEngineer/docs/design/2026-10-08_design_software-checks.md"
+      ],
+      "checks": [
+        "unit"
+      ],
+      "dependsOn": [
+        "kernel-contract"
+      ]
+    },
+    {
+      "nodeId": "pm-runtime-release",
+      "roleId": "ProjectManager",
+      "stage": "public runtime 0.7 exports and actual desktop dependency",
+      "operation": "implement",
+      "writeSet": [
+        "package.json",
+        "package-lock.json",
+        "workbench.mjs",
+        "README.md",
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json",
+        "apps/desktop/README.md",
+        "apps/desktop/scripts/verify-dependencies.mjs",
+        "tests/package/test_package.mjs",
+        "apps/desktop/tests/package/desktop-package.test.mjs",
+        "docs/roles/ProjectManager/api-spec.md",
+        "docs/roles/ProjectManager/changelog.md",
+        "docs/roles/ProjectManager/docs/architecture.md",
+        "docs/roles/ProjectManager/docs/feature/distribution.md",
+        "docs/roles/ProjectManager/docs/feature/desktop-distribution.md",
+        "docs/roles/ProjectManager/feature-map.md",
+        "docs/roles/ProjectManager/docs/feature/governed-workflow.md"
+      ],
+      "requiredOutputs": [
+        "package.json",
+        "package-lock.json",
+        "workbench.mjs",
+        "README.md",
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json",
+        "apps/desktop/README.md",
+        "apps/desktop/scripts/verify-dependencies.mjs",
+        "tests/package/test_package.mjs",
+        "apps/desktop/tests/package/desktop-package.test.mjs",
+        "docs/roles/ProjectManager/api-spec.md",
+        "docs/roles/ProjectManager/changelog.md",
+        "docs/roles/ProjectManager/docs/architecture.md",
+        "docs/roles/ProjectManager/docs/feature/distribution.md",
+        "docs/roles/ProjectManager/docs/feature/desktop-distribution.md",
+        "docs/roles/ProjectManager/feature-map.md",
+        "docs/roles/ProjectManager/docs/feature/governed-workflow.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md"
+      ],
+      "checks": [
+        "package"
+      ],
+      "dependsOn": [
+        "kernel-checks",
+        "adapter-tools"
+      ]
+    },
+    {
+      "nodeId": "desktop-workflow",
+      "roleId": "DesktopEngineer",
+      "stage": "persistent roles/interactions and complete self-test acceptance workflow",
+      "operation": "implement",
+      "writeSet": [
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/providers/abstract/project.mjs",
+        "apps/desktop/src/providers/public/project.mjs",
+        "apps/desktop/src/providers/impl/project.mjs",
+        "apps/desktop/src/services/abstract/project.mjs",
+        "apps/desktop/src/services/public/project.mjs",
+        "apps/desktop/src/services/impl/project.mjs",
+        "apps/desktop/src/interface/main.mjs",
+        "apps/desktop/src/interface/index.html",
+        "apps/desktop/src/interface/renderer.mjs",
+        "apps/desktop/src/interface/styles.css",
+        "apps/desktop/tests/unit/workbench-model.test.mjs",
+        "apps/desktop/tests/unit/project.test.mjs",
+        "apps/desktop/tests/unit/workbench.test.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "apps/desktop/tests/unit/ipc.test.mjs",
+        "docs/roles/DesktopEngineer/api-spec.md",
+        "docs/roles/DesktopEngineer/changelog.md",
+        "docs/roles/DesktopEngineer/docs/feature/desktop-console.md",
+        "apps/desktop/src/models/organization.mjs",
+        "apps/desktop/src/models/interaction.mjs",
+        "apps/desktop/src/services/abstract/organization.mjs",
+        "apps/desktop/src/services/public/organization.mjs",
+        "apps/desktop/src/services/impl/organization.mjs",
+        "apps/desktop/src/providers/abstract/organization.mjs",
+        "apps/desktop/src/providers/public/organization.mjs",
+        "apps/desktop/src/providers/impl/organization.mjs",
+        "apps/desktop/src/providers/abstract/history.mjs",
+        "apps/desktop/src/providers/public/history.mjs",
+        "apps/desktop/src/providers/impl/history.mjs",
+        "apps/desktop/src/services/abstract/history.mjs",
+        "apps/desktop/src/services/public/history.mjs",
+        "apps/desktop/src/services/impl/history.mjs",
+        "apps/desktop/src/interface/preload.cjs",
+        "apps/desktop/tests/unit/organization-model.test.mjs",
+        "apps/desktop/tests/unit/interaction-model.test.mjs",
+        "apps/desktop/tests/unit/organization.test.mjs",
+        "apps/desktop/tests/unit/acceptance.test.mjs",
+        "apps/desktop/tests/unit/history.test.mjs",
+        "apps/desktop/tests/unit/profiles.test.mjs",
+        "apps/desktop/tests/unit/workspace.test.mjs",
+        "docs/roles/DesktopEngineer/feature-map.md",
+        "docs/roles/DesktopEngineer/docs/feature/organization-and-acceptance.md",
+        "docs/roles/DesktopEngineer/docs/design/2026-10-08_design_governed-workbench.md"
+      ],
+      "requiredOutputs": [
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/src/providers/abstract/project.mjs",
+        "apps/desktop/src/providers/public/project.mjs",
+        "apps/desktop/src/providers/impl/project.mjs",
+        "apps/desktop/src/services/abstract/project.mjs",
+        "apps/desktop/src/services/public/project.mjs",
+        "apps/desktop/src/services/impl/project.mjs",
+        "apps/desktop/src/interface/main.mjs",
+        "apps/desktop/src/interface/index.html",
+        "apps/desktop/src/interface/renderer.mjs",
+        "apps/desktop/src/interface/styles.css",
+        "apps/desktop/tests/unit/workbench-model.test.mjs",
+        "apps/desktop/tests/unit/project.test.mjs",
+        "apps/desktop/tests/unit/workbench.test.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "apps/desktop/tests/unit/ipc.test.mjs",
+        "docs/roles/DesktopEngineer/api-spec.md",
+        "docs/roles/DesktopEngineer/changelog.md",
+        "docs/roles/DesktopEngineer/docs/feature/desktop-console.md",
+        "apps/desktop/src/models/organization.mjs",
+        "apps/desktop/src/models/interaction.mjs",
+        "apps/desktop/src/services/abstract/organization.mjs",
+        "apps/desktop/src/services/public/organization.mjs",
+        "apps/desktop/src/services/impl/organization.mjs",
+        "apps/desktop/src/providers/abstract/organization.mjs",
+        "apps/desktop/src/providers/public/organization.mjs",
+        "apps/desktop/src/providers/impl/organization.mjs",
+        "apps/desktop/src/providers/abstract/history.mjs",
+        "apps/desktop/src/providers/public/history.mjs",
+        "apps/desktop/src/providers/impl/history.mjs",
+        "apps/desktop/src/services/abstract/history.mjs",
+        "apps/desktop/src/services/public/history.mjs",
+        "apps/desktop/src/services/impl/history.mjs",
+        "apps/desktop/src/interface/preload.cjs",
+        "apps/desktop/tests/unit/organization-model.test.mjs",
+        "apps/desktop/tests/unit/interaction-model.test.mjs",
+        "apps/desktop/tests/unit/organization.test.mjs",
+        "apps/desktop/tests/unit/acceptance.test.mjs",
+        "apps/desktop/tests/unit/history.test.mjs",
+        "apps/desktop/tests/unit/profiles.test.mjs",
+        "apps/desktop/tests/unit/workspace.test.mjs",
+        "docs/roles/DesktopEngineer/feature-map.md",
+        "docs/roles/DesktopEngineer/docs/feature/organization-and-acceptance.md",
+        "docs/roles/DesktopEngineer/docs/design/2026-10-08_design_governed-workbench.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md",
+        "docs/roles/KernelEngineer/api-spec.md",
+        "docs/roles/AgentAdapterEngineer/api-spec.md"
+      ],
+      "checks": [
+        "model",
+        "unit"
+      ],
+      "dependsOn": [
+        "pm-runtime-release"
+      ]
+    },
+    {
+      "nodeId": "tester-acceptance",
+      "roleId": "Tester",
+      "stage": "independent full flow and real-window regression",
+      "operation": "test",
+      "writeSet": [
+        "tests/integration/test_permission_flow.mjs",
+        "tests/integration/test_generic_agents.mjs",
+        "apps/desktop/tests/integration/workbench-flow.test.mjs",
+        "apps/desktop/tests/e2e/workbench-ui.test.mjs",
+        "apps/desktop/tests/integration/governed-workflow.test.mjs",
+        "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs",
+        "tests/integration/test_check_flow.mjs",
+        "docs/roles/Tester/feature-map.md",
+        "docs/roles/Tester/api-spec.md",
+        "docs/roles/Tester/changelog.md",
+        "docs/roles/Tester/docs/design/2026-10-08_design_governed-workflow-verification.md",
+        "docs/roles/Tester/docs/verification-governed-workflow-v1.md"
+      ],
+      "requiredOutputs": [
+        "tests/integration/test_permission_flow.mjs",
+        "tests/integration/test_generic_agents.mjs",
+        "apps/desktop/tests/integration/workbench-flow.test.mjs",
+        "apps/desktop/tests/e2e/workbench-ui.test.mjs",
+        "apps/desktop/tests/integration/governed-workflow.test.mjs",
+        "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs",
+        "tests/integration/test_check_flow.mjs",
+        "docs/roles/Tester/feature-map.md",
+        "docs/roles/Tester/api-spec.md",
+        "docs/roles/Tester/changelog.md",
+        "docs/roles/Tester/docs/design/2026-10-08_design_governed-workflow-verification.md",
+        "docs/roles/Tester/docs/verification-governed-workflow-v1.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md",
+        "docs/roles/DesktopEngineer/api-spec.md"
+      ],
+      "checks": [
+        "integration",
+        "ui"
+      ],
+      "dependsOn": [
+        "desktop-workflow"
+      ]
+    },
+    {
+      "nodeId": "reviewer-acceptance",
+      "roleId": "Reviewer",
+      "stage": "independent architecture and authority review",
+      "operation": "test",
+      "writeSet": [
+        "tests/reviewer/test_structure.mjs",
+        "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs",
+        "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs",
+        "apps/desktop/tests/reviewer/governed-workflow-boundaries.test.mjs",
+        "docs/roles/Reviewer/feature-map.md",
+        "docs/roles/Reviewer/api-spec.md",
+        "docs/roles/Reviewer/changelog.md",
+        "docs/roles/Reviewer/docs/review-governed-workflow-v1.md"
+      ],
+      "requiredOutputs": [
+        "tests/reviewer/test_structure.mjs",
+        "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs",
+        "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs",
+        "apps/desktop/tests/reviewer/governed-workflow-boundaries.test.mjs",
+        "docs/roles/Reviewer/feature-map.md",
+        "docs/roles/Reviewer/api-spec.md",
+        "docs/roles/Reviewer/changelog.md",
+        "docs/roles/Reviewer/docs/review-governed-workflow-v1.md"
+      ],
+      "readSet": [
+        "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md",
+        "docs/roles/DesktopEngineer/api-spec.md"
+      ],
+      "checks": [
+        "structure"
+      ],
+      "dependsOn": [
+        "desktop-workflow"
+      ]
+    }
+  ]
+}

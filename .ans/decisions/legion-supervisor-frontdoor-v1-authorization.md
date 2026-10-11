@@ -1,0 +1,20 @@
+# Su customer entry configuration: Human accepted
+
+Status: Human accepted the reviewed design v0.3 and this exact configuration on 2026-10-11 (Asia/Shanghai), answering “确认方案和范围并实施（推荐）” to questionItemId `["request_user_input_async","call_wzazIYXPHHDbcoYcW2zkIvTc",0]` in this conversation. The matching reply authorizes the accepted fixed ANS Supervisor to initialize scoped task_ops tasks, automatically dispatch the six existing fixed owner roles within the 79 exact authored paths, and complete real npm installation and independent verification. Old GUI final acceptance remains paused.
+
+The Human requested Supervisor project-file reads without increasing business mutation or grant authority, and a continuous customer conversation with Su. The follow-up asks for visibility into each role’s work state and work log. The initial requests authorized investigation and concrete proposal preparation; the later matching reply explicitly confirms the reviewed material design and exact implementation configuration required by ans-governed-construction.
+
+- Reviewed design v0.3: `docs/roles/ProjectManager/docs/design/2026-10-11_design_supervisor-frontdoor-global-read.md`; SHA-256 `9f6628178502f5167b641c6bfe76d7e9b223ceb780f4ff79ba6dfa622cf5b0a1`.
+- Accepted configuration: `.ans/decisions/legion-supervisor-frontdoor-v1-project.json`; SHA-256 `c8032728888d3652ce0987a94cb7ca84557c9ecf53bb3f27bb3f0df6d6b9e7b2`.
+- Exact implementation scope: 79 authored paths across the six existing fixed owner roles, at most three concurrent workers; original fixed checks and automatic dispatch settings retained.
+- The design itself is a frozen input in designFiles, outside implementation writeFiles. The one new PM change-document path is now covered by the accepted configuration; actual task_ops dispatch must narrow its owner’s permitted paths.
+- Approved main scheduling record: `docs/scheduling/legion-supervisor-frontdoor-v1.md`; the fixed ANS Supervisor may create it through task_ops. Old 1.0.3 artifacts and scheduling records remain unchanged.
+- Optional multi-delegation concurrency, new pages, project indexing and recurring background monitoring are excluded.
+
+## Review and scope verification
+
+The accepted ANS Supervisor coordinated the existing ProjectManager, DesktopEngineer, AgentAdapterEngineer and KernelEngineer in separate fixed-role contexts for read-only impact assessment and proposal preparation. ProjectManager produced the v0.3 proposal; the Supervisor's management review recommends the design and exact configuration together. Confirmed contracts include bounded PM delegation with real Human question/answer continuation, ongoing read-only customer dialogue that does not revoke active execution, public role-state/work-log projections, separate conversation channels, strict legacy Organization validation and CAS migration, and unchanged business mutation/grant authority.
+
+Governance independently rehashed both files after review and again after the Human reply, confirming both accepted identities. It compared each role's design array with configuration writeFiles and current Section 1. The arrays match exactly, with no overlapping authorship: KernelEngineer 9, AgentAdapterEngineer 9, ProjectManager 17, DesktopEngineer 26, Tester 10, Reviewer 8. All twelve fixed check definitions match the previously approved configuration. The new PM change document and main scheduling record have conditional boundaries; actual execution remains restricted by each current task_ops assignment.
+
+At the time of proposal review and Human confirmation, no application source or tests had been edited, no new task_ops execution task had been initialized, and no implementation checks had been run for this feature. The existing npm 1.0.3 delivery and its evidence remain historical baseline artifacts. The review and generated SHA identities were not Human acceptance; the separately recorded matching Human reply above is the implementation authorization. New successful execution evidence must be recorded by its actual role producer and verified against the accepted current inputs.

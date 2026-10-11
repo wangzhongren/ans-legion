@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Legion project-wide read UI copy",
+  "authorizationSource": ".ans/decisions/legion-project-wide-read-v1-authorization.md",
+  "designFiles": [
+    "docs/roles/ProjectManager/docs/design/2026-10-08_design_legion-project-wide-read.md"
+  ],
+  "maxConcurrentWorkers": 1,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "DesktopEngineer": {
+      "autoDispatch": true,
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "operations": [
+        "implement"
+      ],
+      "writeFiles": [
+        "apps/desktop/src/interface/index.html"
+      ],
+      "checks": {
+        "static": {
+          "argv": [
+            "git",
+            "diff",
+            "--check",
+            "--",
+            "apps/desktop/src/interface/index.html"
+          ],
+          "timeoutSeconds": 60
+        }
+      }
+    }
+  }
+}

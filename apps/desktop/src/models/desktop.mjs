@@ -6,6 +6,7 @@ export const LIMITS = Object.freeze({ profiles: 100, assignments: 2000, roles: 1
 export const TASK_STATES = Object.freeze(['pending', 'ready', 'running', 'awaiting-verification', 'verified', 'failed', 'blocked', 'cancelled']);
 export const AUDIT_STATES = Object.freeze(['recorded', 'running', 'completed', 'cancelled', 'failed', 'unavailable']);
 const ERROR_MESSAGES = Object.freeze({
+  lease_busy: '项目已由另一实例持有执行租约。', lease_lost: '项目执行租约或物理目录身份已改变。', lease_unavailable: '无法建立安全的共享项目执行租约。', profile_read_only: '环境连接配置只在本进程启动时设置。',
   invalid_input: '输入字段无效，请检查后重试。', not_found: '连接配置不存在。', profile_limit: '连接配置数量已达上限。',
   settings_unavailable: '无法读写桌面设置，请检查应用数据目录。', settings_corrupt: '桌面设置损坏，请重新配置。',
   encryption_unavailable: '本机加密不可用，请稍后重新配置密钥。', encryption_failed: '密钥加密失败，请重新配置。',

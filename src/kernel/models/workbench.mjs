@@ -1,7 +1,9 @@
 /** Pure confirmation values and opaque authority state. No infrastructure or callbacks. */
 import { AgentSession, RoleBoundary, ActionProposal, modelRecord, modelString, immutableStrings,
-  normalizeResource, digestValue, _createRuntimeAuthority } from "./core.mjs";
-import { AgentScope, TaskDispatchContext } from "./agent.mjs";
+  normalizeResource, normalizeProjectReadResource, digestValue, _createRuntimeAuthority, _shellPublicationBinding, PolicyDecision, Outcome } from "./core.mjs";
+import { shellArtifacts } from "./shell.mjs";
+import { checkSpecs } from "./check.mjs";
+import { AgentScope, TaskDispatchContext, AgentTools } from "./agent.mjs";
 
 const reads = new WeakMap();
 const mutationBrands = new WeakSet();
@@ -35,6 +37,154 @@ function identityDigest(value) {
   return digestValue({ ...normalized, canonicalPath: normalized.canonicalPath.toLowerCase() });
 }
 
+export class FileOwnershipError extends Error {
+  constructor(reason, resource = "", ownerRoleId = "") {
+    super(reason);
+    this.name = "FileOwnershipError";
+    this.reason = reason;
+    this.resource = resource;
+    this.ownerRoleId = ownerRoleId;
+  }
+}
+
+function ownerEntry(value, name) {
+  modelRecord(value, name, ["resource", "roleId"]);
+  const resource = normalizeProjectReadResource(value.resource);
+  if (resource.endsWith("/")) throw new TypeError("directory_owner_not_allowed");
+  return Object.freeze({ resource, roleId: modelString(value.roleId, "roleId") });
+}
+
+/** Versioned per-project exact-file ownership; no filesystem access or global state. */
+export class ProjectFileOwners {
+  constructor(options) {
+    modelRecord(options, "ProjectFileOwners", ["projectId", "version", "owners"]);
+    this.projectId = modelString(options.projectId, "projectId");
+    this.version = modelString(options.version, "version");
+    if (!Array.isArray(options.owners)) throw new TypeError("owners_must_be_array");
+    const seen = new Set();
+    this.owners = Object.freeze(options.owners.map((item) => {
+      const entry = ownerEntry(item, "file owner");
+      const key = entry.resource.toLowerCase();
+      if (seen.has(key)) throw new TypeError("duplicate_owner_alias");
+      seen.add(key);
+      return entry;
+    }).sort((a, b) => a.resource.toLowerCase().localeCompare(b.resource.toLowerCase())));
+    Object.freeze(this);
+  }
+  ownerOf(resource) {
+    const key = normalizeProjectReadResource(resource).toLowerCase();
+    return this.owners.find((item) => item.resource.toLowerCase() === key)?.roleId ?? "";
+  }
+  get digest() {
+    return digestValue({ projectId: this.projectId, version: this.version,
+      owners: this.owners.map((item) => ({ resource: item.resource.toLowerCase(), roleId: item.roleId })) });
+  }
+}
+
+export class FileOwnershipTransfer {
+  constructor(options) {
+    modelRecord(options, "FileOwnershipTransfer", ["resource", "fromRoleId", "toRoleId"]);
+    this.resource = normalizeProjectReadResource(options.resource);
+    if (this.resource.endsWith("/")) throw new TypeError("directory_transfer_not_allowed");
+    this.fromRoleId = modelString(options.fromRoleId, "fromRoleId");
+    this.toRoleId = modelString(options.toRoleId, "toRoleId");
+    if (this.fromRoleId === this.toRoleId) throw new TypeError("transfer_roles_must_differ");
+    Object.freeze(this);
+  }
+}
+
+/** Customer-visible claims and transfers bind a single atomic ownership transition. */
+export class FileOwnershipPlan {
+  constructor(options) {
+    modelRecord(options, "FileOwnershipPlan", ["projectId", "baseVersion", "baseDigest", "nextVersion",
+      "claims", "transfers"]);
+    this.projectId = modelString(options.projectId, "projectId");
+    this.baseVersion = modelString(options.baseVersion, "baseVersion");
+    this.baseDigest = sha(options.baseDigest, "baseDigest");
+    this.nextVersion = modelString(options.nextVersion, "nextVersion");
+    if (this.nextVersion === this.baseVersion) throw new TypeError("ownership_version_must_advance");
+    if (!Array.isArray(options.claims) || !Array.isArray(options.transfers ?? [])) {
+      throw new TypeError("ownership_collections_required");
+    }
+    const claims = new Map();
+    for (const item of options.claims) {
+      const entry = ownerEntry(item, "file claim");
+      const key = entry.resource.toLowerCase();
+      const prior = claims.get(key);
+      if (prior !== undefined && prior.roleId !== entry.roleId) {
+        throw new FileOwnershipError("cross_role_claim", entry.resource, prior.roleId);
+      }
+      if (prior === undefined) claims.set(key, entry);
+    }
+    this.claims = Object.freeze([...claims.values()].sort((a, b) =>
+      a.resource.toLowerCase().localeCompare(b.resource.toLowerCase())));
+    const transfers = new Map();
+    for (const item of options.transfers ?? []) {
+      const transfer = item instanceof FileOwnershipTransfer ? item : new FileOwnershipTransfer(item);
+      const key = transfer.resource.toLowerCase();
+      if (transfers.has(key)) throw new TypeError("duplicate_transfer_alias");
+      transfers.set(key, transfer);
+    }
+    this.transfers = Object.freeze([...transfers.values()].sort((a, b) =>
+      a.resource.toLowerCase().localeCompare(b.resource.toLowerCase())));
+    Object.freeze(this);
+  }
+  get digest() {
+    return digestValue({ projectId: this.projectId, baseVersion: this.baseVersion,
+      baseDigest: this.baseDigest, nextVersion: this.nextVersion,
+      claims: this.claims.map((item) => ({ resource: item.resource.toLowerCase(), roleId: item.roleId })),
+      transfers: this.transfers.map((item) => ({ resource: item.resource.toLowerCase(),
+        fromRoleId: item.fromRoleId, toRoleId: item.toRoleId })) });
+  }
+}
+
+export function applyFileOwnershipPlan(current, plan) {
+  if (!(current instanceof ProjectFileOwners) || !(plan instanceof FileOwnershipPlan)) {
+    throw new TypeError("typed_file_ownership_required");
+  }
+  if (current.projectId !== plan.projectId || current.version !== plan.baseVersion ||
+      current.digest !== plan.baseDigest) throw new FileOwnershipError("stale_file_owners");
+  const owners = new Map(current.owners.map((item) => [item.resource.toLowerCase(), item]));
+  const claims = new Map(plan.claims.map((item) => [item.resource.toLowerCase(), item]));
+  const transfers = new Map(plan.transfers.map((item) => [item.resource.toLowerCase(), item]));
+  for (const transfer of plan.transfers) {
+    const key = transfer.resource.toLowerCase();
+    const prior = owners.get(key);
+    if (prior === undefined) throw new FileOwnershipError("transfer_without_owner", transfer.resource);
+    if (prior.roleId !== transfer.fromRoleId) {
+      throw new FileOwnershipError("transfer_from_mismatch", transfer.resource, prior.roleId);
+    }
+    if (claims.get(key)?.roleId !== transfer.toRoleId) {
+      throw new FileOwnershipError("transfer_without_claim", transfer.resource, prior.roleId);
+    }
+  }
+  for (const claim of plan.claims) {
+    const key = claim.resource.toLowerCase();
+    const prior = owners.get(key);
+    const transfer = transfers.get(key);
+    if (prior !== undefined && prior.roleId !== claim.roleId && transfer === undefined) {
+      throw new FileOwnershipError("file_owned_by_other_role", claim.resource, prior.roleId);
+    }
+    if ((prior === undefined || prior.roleId === claim.roleId) && transfer !== undefined) {
+      throw new FileOwnershipError("unnecessary_transfer", claim.resource, prior?.roleId ?? "");
+    }
+    owners.set(key, Object.freeze({ resource: claim.resource, roleId: claim.roleId }));
+  }
+  return new ProjectFileOwners({ projectId: current.projectId, version: plan.nextVersion,
+    owners: [...owners.values()] });
+}
+
+export function assertFileOwner(snapshot, { projectId, version, resource, roleId }) {
+  if (!(snapshot instanceof ProjectFileOwners)) throw new TypeError("typed_file_owners_required");
+  if (snapshot.projectId !== projectId || snapshot.version !== version) {
+    throw new FileOwnershipError("stale_file_owners", resource);
+  }
+  const ownerRoleId = snapshot.ownerOf(resource);
+  if (ownerRoleId === "") throw new FileOwnershipError("unowned_file", resource);
+  if (ownerRoleId !== roleId) throw new FileOwnershipError("file_owned_by_other_role", resource, ownerRoleId);
+  return true;
+}
+
 function exactFiles(value, name, maximum = Infinity) {
   // Unlike legacy collections, aliases and repeated entries must not consume a hidden budget.
   if (!Array.isArray(value)) throw new TypeError(name + " must be an array");
@@ -59,7 +209,12 @@ function contextFiles(value) {
   let total = 0;
   const result = [];
   for (const file of value) {
-    modelRecord(file, "context file", ["resource", "byteLength", "sha256"]);
+    modelRecord(file, "context file", ["resource", "byteLength", "sha256", "state"]);
+    if(file.state==="absent") {
+      if(file.sha256!==null || file.byteLength!==0)throw new TypeError("absent_context_has_content");
+      const resource=normalizeProjectReadResource(file.resource);result.push(Object.freeze({resource,state:"absent",sha256:null,byteLength:0}));continue;
+    }
+    if(file.state!==undefined && file.state!=="present")throw new TypeError("invalid_context_baseline_state");
     const resource = normalizeResource(file.resource);
     if (!Number.isSafeInteger(file.byteLength) || file.byteLength < 0 || file.byteLength > 262144) {
       throw new TypeError("context_byte_budget");
@@ -132,23 +287,37 @@ export class ContextSnapshot {
 export class ConfirmedTaskGrant {
   constructor(options) {
     modelRecord(options, "ConfirmedTaskGrant", ["confirmationId", "workspaceIdentity", "planDigest",
-      "organizationVersion", "roleId", "taskId", "writeSet", "tools", "profileVersion", "contextSnapshotDigest"]);
+      "organizationVersion", "roleId", "taskId", "ownerGeneration", "tools", "profileVersion", "contextSnapshotDigest",
+      "fileOwnersDigest", "checks", "generatedEffects", "generationDigest", "artifactScopes"]);
     for (const field of ["confirmationId", "organizationVersion", "roleId", "taskId", "profileVersion"]) {
       this[field] = modelString(options[field], field);
     }
     this.workspaceIdentity = identity(options.workspaceIdentity);
     this.planDigest = sha(options.planDigest, "planDigest");
     this.contextSnapshotDigest = sha(options.contextSnapshotDigest, "contextSnapshotDigest");
-    this.writeSet = exactFiles(options.writeSet, "writeSet");
+    this.fileOwnersDigest = sha(options.fileOwnersDigest, "fileOwnersDigest");
+    this.ownerGeneration = modelString(options.ownerGeneration, "ownerGeneration");
+    this.generatedEffects=Object.freeze((options.generatedEffects ?? []).map(value=>{if(typeof value!=="string" || !value.endsWith("/"))throw new TypeError("exact_generated_directory_required");return normalizeProjectReadResource(value.slice(0,-1))+"/";}));
+    this.artifactScopes=shellArtifacts(options.artifactScopes);
+    if(this.generatedEffects.some(scope=>!this.artifactScopes.some(item=>item.scope===scope)))throw new TypeError("generated_effect_not_approved_artifact");
+    if(options.generationDigest!==undefined)this.generationDigest=sha(options.generationDigest,"generationDigest");
     this.tools = immutableStrings(options.tools, "tools");
-    if (this.tools.length !== 1 || this.tools[0] !== "legion_write_file") {
+    if (options.checks !== undefined) this.checks = checkSpecs(options.checks);
+    const readTools = ["legion_list_files", "legion_read_file"];
+    const readCount = readTools.filter((tool) => this.tools.includes(tool)).length;
+    const hasSourceTools=this.tools.some(tool=>["legion_write_file","legion_edit_file"].includes(tool));
+    const hasWrite=hasSourceTools || this.tools.includes("legion_request_shell");
+    if ((readCount !== 0 && readCount !== 2) || this.tools.some((tool) => !AgentTools.includes(tool))) {
       throw new TypeError("confirmed_execution_write_tool_required");
+    }
+    if (this.tools.includes("legion_run_check") && (this.checks === undefined || this.checks.length === 0)) {
+      throw new TypeError("confirmed_checks_required");
     }
     Object.freeze(this);
   }
   get digest() {
     return digestValue({ ...this, workspaceIdentity: identityDigest(this.workspaceIdentity),
-      writeSet: resourceKeys(this.writeSet), tools: [...this.tools].sort() });
+      tools: [...this.tools].sort() });
   }
 }
 
@@ -170,14 +339,19 @@ export function isWorkbenchMutationAuthority(value) { return mutationBrands.has(
 
 /** Trusted host calls controller; only the lower branded capability reaches Mutation/Storage. */
 export function createWorkbenchAuthority(options) {
-  modelRecord(options, "workbench authority", ["workspaceIdentity", "organizationVersion", "profileVersion", "boundaries"]);
+  modelRecord(options, "workbench authority", ["workspaceIdentity", "organizationVersion", "profileVersion",
+    "boundaries", "fileOwners"]);
   const workspaceIdentity = identity(options.workspaceIdentity);
   const organizationVersion = modelString(options.organizationVersion, "organizationVersion");
   const profileVersion = modelString(options.profileVersion, "profileVersion");
   if (!Array.isArray(options.boundaries) || options.boundaries.some((boundary) => !(boundary instanceof RoleBoundary))) {
     throw new TypeError("typed_boundaries_required");
   }
-  const inner = _createRuntimeAuthority({ boundaries: [...options.boundaries], organizationVersion });
+  const fileOwners = options.fileOwners;
+  if (!(fileOwners instanceof ProjectFileOwners)) {
+    throw new TypeError("typed_file_owners_required");
+  }
+  const inner = _createRuntimeAuthority({ boundaries: [...options.boundaries], organizationVersion, fileOwners });
   const state = { invalid: false };
   const readHandles = new Set();
   const usedConfirmationIds = new Set();
@@ -209,6 +383,8 @@ export function createWorkbenchAuthority(options) {
     if (!(proposal instanceof ActionProposal) || !sessions.has(proposal.session)) {
       throw new TypeError("confirmed_session_required");
     }
+    if (fileOwners !== undefined) assertFileOwner(fileOwners, { projectId: fileOwners.projectId,
+      version: fileOwners.version, resource: proposal.resource, roleId: proposal.session.roleId });
     return sessions.get(proposal.session);
   }
   function snapshot(instanceId) {
@@ -218,6 +394,15 @@ export function createWorkbenchAuthority(options) {
     return Object.freeze({ ...inner.instanceSnapshot(instanceId), workbenchGrant: binding.grant });
   }
   const controller = Object.freeze({
+    assertFileOwners(current) {
+      valid();
+      if (!(current instanceof ProjectFileOwners)) throw new TypeError("typed_file_owners_required");
+      if (fileOwners === undefined || current.digest !== fileOwners.digest) {
+        invalidate();
+        throw new FileOwnershipError("stale_file_owners");
+      }
+      return true;
+    },
     confirmContextRead(confirmation) {
       valid();
       if (!(confirmation instanceof ContextReadConfirmation)) throw new TypeError("typed_read_confirmation_required");
@@ -255,6 +440,12 @@ export function createWorkbenchAuthority(options) {
       const context = snapshots.get(grant.contextSnapshotDigest);
       if (context === undefined) throw new TypeError("bound_context_snapshot_required");
       if (inner.boundary(grant.roleId) === undefined) throw new TypeError("unknown_role");
+      if (grant.tools.some(tool => ["legion_write_file", "legion_edit_file"].includes(tool)) &&
+          !fileOwners.owners.some(item => item.roleId === grant.roleId)) throw new FileOwnershipError("file_owned_by_other_role");
+      if (fileOwners !== undefined) {
+        if (grant.fileOwnersDigest !== fileOwners.digest || grant.ownerGeneration !== fileOwners.version) throw new FileOwnershipError("stale_file_owners");
+
+      } else if (grant.fileOwnersDigest !== undefined) throw new FileOwnershipError("stale_file_owners");
       once(grant.confirmationId);
       const approval = Object.freeze({});
       approvals.set(approval, { grant, context });
@@ -270,7 +461,11 @@ export function createWorkbenchAuthority(options) {
           !(scope instanceof AgentScope) || session.roleId !== grant.roleId || session.taskId !== grant.taskId ||
           session.organizationVersion !== grant.organizationVersion || dispatchContext.roleId !== grant.roleId ||
           dispatchContext.taskId !== grant.taskId || dispatchContext.organizationVersion !== grant.organizationVersion ||
-          !sameFiles(dispatchContext.writeSet, grant.writeSet) ||
+          dispatchContext.fileOwnersDigest !== grant.fileOwnersDigest || dispatchContext.ownerGeneration !== grant.ownerGeneration ||
+          digestValue(dispatchContext.checks ?? []) !== digestValue(grant.checks ?? []) ||
+          digestValue(dispatchContext.generatedEffects ?? [])!==digestValue(grant.generatedEffects ?? []) ||
+          (scope.generatedEffects ?? []).some(effect=>!(grant.generatedEffects ?? []).includes(effect)) ||
+          (scope.checks ?? []).some((spec) => !(grant.checks ?? []).some((approved) => approved.digest === spec.digest)) ||
           digestValue([...dispatchContext.tools].sort()) !== digestValue([...grant.tools].sort())) {
         throw new TypeError("confirmed_task_binding_mismatch");
       }
@@ -282,23 +477,32 @@ export function createWorkbenchAuthority(options) {
     beginRun(instanceId, runId) { valid(); inner.beginRun(instanceId, runId); return snapshot(instanceId); },
     finishRun(instanceId, status) { valid(); inner.finishRun(instanceId, status); return snapshot(instanceId); },
     issue(proposal, decision) { registered(proposal); return inner.issue(proposal, decision); },
+    issueShellPublication(proposal,publicationReceipt,observedAtMs) {
+      const task=registered(proposal);const publication=_shellPublicationBinding(publicationReceipt,proposal,observedAtMs);
+      if(publication.authorization.planDigest!==task.grant.planDigest || publication.authorization.contextSnapshotDigest!==task.grant.contextSnapshotDigest || publication.authorization.fileOwnersDigest!==task.grant.fileOwnersDigest || identityDigest(publication.authorization.workspaceIdentity)!==identityDigest(workspaceIdentity))throw new TypeError("shell_publication_context_changed");
+      const boundary=inner.boundary(proposal.session.roleId);
+      const decision=new PolicyDecision({outcome:Outcome.ALLOW,reason:"host_shell_publication",proposalDigest:proposal.digest,organizationVersion,boundaryDigest:boundary.digest});
+      return inner.issue(proposal,decision,publicationReceipt,observedAtMs);
+    },
     revoke(reason) { modelString(reason, "revocation reason"); invalidate(); }
   });
   const mutationAuthority = Object.freeze({
-    consume(proposal, permit) {
+    invalidateOwnership(reason) { modelString(reason, "ownership reason"); invalidate(); },
+    ownerBinding(proposal) { registered(proposal); return Object.freeze({ ...inner.ownerBinding(proposal), workspaceIdentity }); },
+    consume(proposal, permit, observedAtMs) {
       valid();
-      const receipt = inner.consume(proposal, permit);
+      const receipt = inner.consume(proposal, permit, observedAtMs);
       const binding = registered(proposal);
       const grant = binding.grant;
       receipts.set(receipt, new MutationVerification({ workspaceIdentity, organizationVersion, profileVersion,
         planDigest: grant.planDigest, contextSnapshotDigest: grant.contextSnapshotDigest, contextFiles: binding.context.files }));
       return receipt;
     },
-    recheck(proposal, receipt) {
+    recheck(proposal, receipt, observedAtMs) {
       registered(proposal);
       const verification = receipts.get(receipt);
       if (verification === undefined) throw new TypeError("invalid_or_revoked_receipt");
-      inner.recheck(proposal, receipt);
+      inner.recheck(proposal, receipt, observedAtMs);
       return verification;
     },
     release(receipt, releaseOptions = {}) {

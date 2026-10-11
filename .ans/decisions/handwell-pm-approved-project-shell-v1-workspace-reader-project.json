@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Handwell project Shell v1 exact accepted governance tuple workspace reader compatibility",
+  "authorizationSource": ".ans/decisions/handwell-pm-approved-project-shell-v1-config-authorization.md",
+  "sourceAuthorization": [
+    ".ans/decisions/handwell-pm-approved-project-shell-v1-authorization.md",
+    ".ans/decisions/handwell-pm-approved-project-shell-v1-config-authorization.md"
+  ],
+  "designFiles": [
+    ".ans/decisions/handwell-pm-approved-project-shell-v1-design.md"
+  ],
+  "maxConcurrentWorkers": 1,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "roles": {
+    "DesktopEngineer": {
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "writeFiles": [
+        "apps/desktop/src/providers/impl/workspace.mjs",
+        "apps/desktop/tests/unit/workspace.test.mjs"
+      ],
+      "operations": [
+        "repair"
+      ],
+      "autoDispatch": true,
+      "checks": {
+        "workspace_reader": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/workspace.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "desktop_unit_regression": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/workbench-model.test.mjs",
+            "apps/desktop/tests/unit/project.test.mjs",
+            "apps/desktop/tests/unit/workbench.test.mjs",
+            "apps/desktop/tests/unit/pipeline.test.mjs",
+            "apps/desktop/tests/unit/ipc.test.mjs",
+            "apps/desktop/tests/unit/organization-model.test.mjs",
+            "apps/desktop/tests/unit/interaction-model.test.mjs",
+            "apps/desktop/tests/unit/organization.test.mjs",
+            "apps/desktop/tests/unit/acceptance.test.mjs",
+            "apps/desktop/tests/unit/history.test.mjs",
+            "apps/desktop/tests/unit/profiles.test.mjs",
+            "apps/desktop/tests/unit/workspace.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "desktop_shell_regression": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-reporter=tap",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/shell-review.test.mjs",
+            "apps/desktop/tests/unit/shell-publication.test.mjs",
+            "apps/desktop/tests/unit/organization-model.test.mjs",
+            "apps/desktop/tests/unit/interaction-model.test.mjs",
+            "apps/desktop/tests/unit/workbench-model.test.mjs",
+            "apps/desktop/tests/unit/organization.test.mjs",
+            "apps/desktop/tests/unit/project.test.mjs",
+            "apps/desktop/tests/unit/history.test.mjs",
+            "apps/desktop/tests/unit/workbench.test.mjs",
+            "apps/desktop/tests/unit/pipeline.test.mjs",
+            "apps/desktop/tests/unit/ipc.test.mjs",
+            "apps/desktop/tests/unit/acceptance.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

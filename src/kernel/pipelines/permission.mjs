@@ -1,12 +1,15 @@
 /** One cohesive permission/agent Pipeline; all infrastructure is reached through public Services. */
 import { createPolicyService } from "../services/public/policy.mjs";
 import { createMutationService, MutationError } from "../services/public/mutation.mjs";
+import { createReadService } from "../services/public/read.mjs";
 import { createProposalService } from "../../adapters/services/public/proposal.mjs";
 import { createPiAgentService } from "../../adapters/services/public/pi_agent.mjs";
 import { ActionProposal, AgentSession, RoleBoundary, PolicyDecision, MutationResult, Event, Outcome,
   modelRecord, modelString, _createRuntimeAuthority } from "../models/core.mjs";
 import { AgentConfig, AgentInstance, TaskDispatchContext, PiToolRequest, PiToolResult, PiRunResult,
-  PiEventType } from "../models/agent.mjs";
+  PiEventType, ProjectReadRequest, ProjectReadDecision, ProjectReadResult } from "../models/agent.mjs";
+
+import { ProjectFileOwners } from "../models/workbench.mjs";
 
 function providersFromArray(values) {
   if (!Array.isArray(values)) throw new TypeError("modelProviders_must_be_array");
@@ -47,11 +50,11 @@ function failedResult(proposal, status, reason, observedMutation = false, auditF
 }
 
 export class PermissionRuntime {
-  #authority; #policy; #mutation; #proposal; #providers; #dispatch;
-  #records = new Map(); #names = new Set(); #sessionInstances = new Map();
+  #authority; #policy; #mutation; #proposal; #providers; #dispatch; #read; #projectRead = false;
+  #roleTails = new Map(); #records = new Map(); #names = new Set(); #sessionInstances = new Map();
   #closed = false; #fault = false; #epoch = 0; #closePromise;
   constructor(options) {
-    modelRecord(options, "runtime options", ["workspace", "boundaries", "sessions", "organizationVersion", "dispatchContext", "modelProviders"]);
+    modelRecord(options, "runtime options", ["workspace", "boundaries", "sessions", "organizationVersion", "dispatchContext", "modelProviders", "projectRead", "fileOwners", "leaseContext", "isolatedOwnerLease"]);
     if (!Array.isArray(options.boundaries) || !Array.isArray(options.sessions ?? [])) {
       throw new TypeError("boundaries_and_sessions_must_be_arrays");
     }
@@ -70,13 +73,17 @@ export class PermissionRuntime {
       if (this.#dispatch.organizationVersion !== options.organizationVersion ||
           !boundaries.some((boundary) => boundary.roleId === this.#dispatch.roleId)) throw new TypeError("invalid_dispatch_context");
     }
-    this.#authority = _createRuntimeAuthority({ sessions, boundaries, organizationVersion: options.organizationVersion });
+    if (!(options.fileOwners instanceof ProjectFileOwners)) throw new TypeError("typed_file_owners_required");
+    this.#authority = _createRuntimeAuthority({ sessions, boundaries, organizationVersion: options.organizationVersion, fileOwners: options.fileOwners });
     this.#policy = createPolicyService();
     this.#proposal = createProposalService();
-    this.#mutation = createMutationService({ workspace: options.workspace, _authority: this.#authority });
+    this.#mutation = createMutationService({ workspace: options.workspace, _authority: this.#authority, leaseContext: options.leaseContext, isolatedOwnerLease: options.isolatedOwnerLease });
+    if (options.projectRead !== undefined && typeof options.projectRead !== "boolean") throw new TypeError("invalid_project_read_opt_in");
+    this.#projectRead = options.projectRead ?? false;
+    if (this.#projectRead) this.#read = createReadService({ workspace: this.#mutation.workspace() });
     Object.freeze(this);
   }
-  #evaluate(proposal) {
+  #evaluate(proposal, publicationReceipt) {
     const snapshot = this.#authority.snapshot();
     let session; let instance;
     if (proposal instanceof ActionProposal) {
@@ -87,7 +94,7 @@ export class PermissionRuntime {
     return this.#policy.evaluate(proposal, { boundary: this.#authority.boundary(session?.roleId),
       trustedSession: this.#authority.trustedSession(session?.sessionId), currentVersion: snapshot.organizationVersion,
       taskStatus: this.#authority.taskStatus(session?.taskId), knownRoles: snapshot.boundaries.map((b) => b.roleId),
-      instance, dispatchContext: this.#dispatch });
+      instance, dispatchContext: this.#dispatch, fileOwners: snapshot.fileOwners, publicationReceipt, observedAtMs:this.#mutation.observeTime() });
   }
   #deny(proposal, reason) {
     const prior = this.#evaluate(proposal);
@@ -105,8 +112,8 @@ export class PermissionRuntime {
       this.#fault = true; this.#revokeAll(); throw error;
     }
   }
-  async prepare(proposal) {
-    let decision = this.#evaluate(proposal);
+  async prepare(proposal, publicationReceipt) {
+    let decision = this.#evaluate(proposal, publicationReceipt);
     if (this.#closed || this.#fault) {
       let reason = "runtime_closed";
       if (this.#fault) reason = "audit_unavailable";
@@ -120,7 +127,7 @@ export class PermissionRuntime {
     if (decision.outcome !== Outcome.ALLOW) return Object.freeze({ decision, permit: undefined });
     try {
       if (this.#closed || this.#fault) throw new TypeError("authorization_changed");
-      const permit = this.#authority.issue(proposal, decision);
+      const permit = this.#authority.issue(proposal, decision, publicationReceipt, this.#mutation.observeTime());
       return Object.freeze({ decision, permit });
     } catch (error) {
       if (!(error instanceof TypeError)) throw error;
@@ -136,10 +143,10 @@ export class PermissionRuntime {
     }
     return result;
   }
-  async execute(proposal, permit) {
+  async execute(proposal, permit, publicationReceipt) {
     if (this.#fault) return failedResult(proposal, "audit_failed", "audit_unavailable", false, true);
     if (this.#closed) return failedResult(proposal, "denied", "runtime_closed");
-    const decision = this.#evaluate(proposal);
+    const decision = this.#evaluate(proposal, publicationReceipt);
     if (decision.outcome !== Outcome.ALLOW) {
       try { await this.#audit([eventFor(proposal, "decision", decision)]); }
       catch (error) {
@@ -153,11 +160,11 @@ export class PermissionRuntime {
     if (result.status === "denied") return await this.#failureAudit(proposal, result);
     return result;
   }
-  async submit(proposal) {
-    const prepared = await this.prepare(proposal);
+  async submit(proposal, publicationReceipt) {
+    const prepared = await this.prepare(proposal, publicationReceipt);
     const decision = prepared.decision;
     let result;
-    if (decision.outcome === Outcome.ALLOW) result = await this.execute(proposal, prepared.permit);
+    if (decision.outcome === Outcome.ALLOW) result = await this.execute(proposal, prepared.permit, publicationReceipt);
     else if (decision.reason === "audit_unavailable") result = failedResult(proposal, "audit_failed", "proposal_or_decision_audit_failed", false, true);
     else if (decision.reason === "runtime_closed") result = failedResult(proposal, "denied", "runtime_closed");
     else result = await this.#failureAudit(proposal, failedResult(proposal, "denied", decision.reason));
@@ -168,10 +175,12 @@ export class PermissionRuntime {
     if (this.#closed || this.#fault) throw new TypeError("runtime_unavailable");
     if (this.#dispatch === undefined) throw new TypeError("dispatch_context_required");
     const config = new AgentConfig(input);
+    if (!this.#projectRead && config.scope.tools.some((tool) =>
+      tool === "legion_list_files" || tool === "legion_read_file")) throw new TypeError("project_read_not_enabled");
     if (this.#names.has(config.name)) throw new TypeError("duplicate_agent_name");
     const version = this.#authority.snapshot().organizationVersion;
     if (version !== this.#dispatch.organizationVersion) throw new TypeError("stale_dispatch_context");
-    this.#policy.validateScope(this.#authority.boundary(this.#dispatch.roleId), this.#dispatch, config.scope);
+    this.#policy.validateScope(this.#authority.boundary(this.#dispatch.roleId), this.#dispatch, config.scope, this.#authority.snapshot().fileOwners);
     if (!Object.hasOwn(this.#providers, config.proxy.provider)) throw new TypeError("unknown_model_provider");
     if (!this.#providers[config.proxy.provider].models.some((model) => model.id === config.proxy.model)) throw new TypeError("unknown_model");
     const session = new AgentSession({ sessionId: this.#mutation.createIdentity(), roleId: this.#dispatch.roleId,
@@ -180,16 +189,17 @@ export class PermissionRuntime {
     this.#authority.registerInstance({ instanceId: instance.instanceId, session, dispatchContext: this.#dispatch, scope: config.scope });
     const epoch = this.#epoch;
     const record = { instance, session, config, controller: new AbortController(), service: undefined,
-      creation: undefined, activeRun: undefined, status: "creating", results: [], runId: "" };
+      creation: undefined, activeRun: undefined, status: "creating", results: [], runId: "", readBytes: 0 };
     this.#names.add(config.name); this.#records.set(instance.instanceId, record);
     this.#sessionInstances.set(session.sessionId, instance.instanceId);
     try {
       record.creation = createPiAgentService({ instance, proxy: config.proxy, scope: config.scope,
-        cwd: this.#mutation.workspace(), modelProviders: this.#providers, signal: record.controller.signal });
+        cwd: this.#mutation.workspace(), modelProviders: this.#providers, signal: record.controller.signal,
+        lifecycle: config.lifecycle });
       record.service = await record.creation;
       if (this.#closed || this.#fault || this.#epoch !== epoch || record.controller.signal.aborted ||
           this.#authority.instanceSnapshot(instance.instanceId).status !== "ready") throw new TypeError("creation_revoked");
-      await this.#audit([this.#agentEvent(record, "agent_created")]);
+      if (this.#shouldAudit(record)) await this.#audit([this.#agentEvent(record, "agent_created")]);
       if (this.#closed || this.#fault || this.#epoch !== epoch || record.controller.signal.aborted) throw new TypeError("creation_revoked");
       record.status = "ready";
       return instance;
@@ -204,6 +214,8 @@ export class PermissionRuntime {
     return new Event({ kind, roleId: record.session.roleId, taskId: record.session.taskId,
       organizationVersion: record.session.organizationVersion, correlationId: record.runId || record.instance.instanceId, reason });
   }
+  #shouldAudit(record) { return record.config.scope.tools.includes("legion_write_file") ||
+    record.config.scope.tools.includes("legion_edit_file"); }
   #record(instanceId) {
     const record = this.#records.get(instanceId);
     if (record === undefined) throw new TypeError("unknown_instance");
@@ -215,16 +227,27 @@ export class PermissionRuntime {
     if (options.taskId !== record.session.taskId) throw new TypeError("task_mismatch");
     modelString(options.prompt, "prompt");
     if (this.#closed || this.#fault || record.status !== "ready") throw new TypeError("instance_not_ready");
+    record.status = "queued";
+    const prior = this.#roleTails.get(record.session.roleId) ?? Promise.resolve();
+    const running = prior.then(async () => {
+      if (this.#closed || this.#fault || record.status !== "queued" || record.controller.signal.aborted) throw new TypeError("instance_not_ready");
+      return await this.#startAgent(record, options.prompt);
+    });
+    this.#roleTails.set(record.session.roleId, running.then(() => undefined, () => undefined));
+    return await running;
+  }
+  async #startAgent(record, prompt) {
+    const instanceId = record.instance.instanceId;
     record.runId = this.#mutation.createIdentity();
     this.#authority.beginRun(instanceId, record.runId); record.status = "running";
-    record.activeRun = this.#runAgent(record, options.prompt);
+    record.activeRun = this.#runAgent(record, prompt);
     return await record.activeRun;
   }
   async #runAgent(record, prompt) {
     const instanceId = record.instance.instanceId;
     let final;
     try {
-      await this.#audit([this.#agentEvent(record, "agent_run_started")]);
+      if (this.#shouldAudit(record)) await this.#audit([this.#agentEvent(record, "agent_run_started")]);
       if (record.controller.signal.aborted) throw new DOMException("run_cancelled", "AbortError");
       record.service.start_run(record.runId, prompt);
       const requests = new Set();
@@ -236,9 +259,14 @@ export class PermissionRuntime {
             throw new TypeError("invalid_tool_request");
           }
           requests.add(request.requestId);
-          const proposal = this.#proposal.convert(request, record.session);
-          const outcome = await this.submit(proposal);
-          const response = new PiToolResult({ requestId: request.requestId, runId: request.runId, ...outcome });
+          let response;
+          if (request.tool === "legion_list_files" || request.tool === "legion_read_file") {
+            response = await this.#readTool(record, request);
+          } else {
+            const proposal = this.#proposal.convert(request, record.session);
+            const outcome = await this.submit(proposal);
+            response = new PiToolResult({ requestId: request.requestId, runId: request.runId, ...outcome });
+          }
           record.results.push(response);
           if (record.controller.signal.aborted || this.#fault || this.#closed) break;
           record.service.respond_tool(request, response);
@@ -246,7 +274,7 @@ export class PermissionRuntime {
           if (event.runId !== record.runId || !["agent_start", "tool_execution_start", "tool_execution_end", "agent_settled"].includes(event.eventType)) {
             throw new TypeError("invalid_run_event");
           }
-          await this.#audit([this.#agentEvent(record, "agent_run_event", event.eventType)]);
+          if (this.#shouldAudit(record)) await this.#audit([this.#agentEvent(record, "agent_run_event", event.eventType)]);
         } else {
           if (![PiEventType.RUN_FINISHED, PiEventType.RUN_FAILED, PiEventType.RUN_CANCELLED].includes(event.type) ||
               !(event.result instanceof PiRunResult) || event.result.runId !== record.runId ||
@@ -270,7 +298,7 @@ export class PermissionRuntime {
       record.status = "closed";
       await record.service.close();
     }
-    if (!this.#fault) {
+    if (!this.#fault && this.#shouldAudit(record)) {
       try { await this.#audit([this.#agentEvent(record, "agent_run_" + final.status, final.errorCode)]); }
       catch (error) {
         if (!(error instanceof MutationError)) throw error;
@@ -278,6 +306,35 @@ export class PermissionRuntime {
       }
     }
     return final;
+  }
+  async #readTool(record, toolRequest) {
+    const request = new ProjectReadRequest({ requestId: toolRequest.requestId, runId: toolRequest.runId,
+      tool: toolRequest.tool, ...toolRequest.parameters });
+    const snapshot = this.#authority.snapshot();
+    let decision = this.#policy.evaluateRead(request, { boundary: this.#authority.boundary(record.session.roleId),
+      session: record.session, trustedSession: this.#authority.trustedSession(record.session.sessionId),
+      currentVersion: snapshot.organizationVersion, taskStatus: this.#authority.taskStatus(record.session.taskId),
+      instance: this.#authority.instanceSnapshot(record.instance.instanceId), dispatchContext: this.#dispatch });
+    if (!this.#projectRead) decision = new ProjectReadDecision({ allowed: false, reason: "project_read_not_enabled" });
+    let result = new ProjectReadResult({ status: "denied", reason: decision.reason, resource: request.resource });
+    if (this.#projectRead && decision.allowed && !this.#closed && !this.#fault && !record.controller.signal.aborted) {
+      if (request.tool === "legion_list_files") result = await this.#read.listFiles(request, { signal: record.controller.signal });
+      else result = await this.#read.readFile(request, { signal: record.controller.signal });
+      const current = this.#authority.snapshot();
+      const stillAllowed = this.#policy.evaluateRead(request, { boundary: this.#authority.boundary(record.session.roleId),
+        session: record.session, trustedSession: this.#authority.trustedSession(record.session.sessionId),
+        currentVersion: current.organizationVersion, taskStatus: this.#authority.taskStatus(record.session.taskId),
+        instance: this.#authority.instanceSnapshot(record.instance.instanceId), dispatchContext: this.#dispatch });
+      if (!stillAllowed.allowed || this.#closed || this.#fault || record.controller.signal.aborted) {
+        result = new ProjectReadResult({ status: "denied", reason: "authorization_changed", resource: request.resource });
+      } else if (result.status !== "denied") {
+        const size = result.status === "read" ? result.byteLength : Buffer.byteLength(JSON.stringify(result.entries), "utf8");
+        if (record.readBytes + size > 2097152) {
+          result = new ProjectReadResult({ status: "denied", reason: "run_read_budget", resource: request.resource });
+        } else record.readBytes += size;
+      }
+    }
+    return new PiToolResult({ requestId: request.requestId, runId: request.runId, decision, result });
   }
   async #stop(record) {
     record.controller.abort();
@@ -329,17 +386,22 @@ export class PermissionRuntime {
       for (const outcome of [...stopped, ...finished]) {
         if (outcome.status === "rejected") throw outcome.reason;
       }
-    } finally { await this.#mutation.close(); }
+    } finally { await this.#mutation.close(); if (this.#read !== undefined) await this.#read.close(); }
   }
 }
 
-export async function runPermissionDemo() {
+export async function runPermissionDemo({ workspace, leaseContext } = {}) {
   const backend = new AgentSession({ sessionId: "backend", roleId: "Backend", taskId: "demo", organizationVersion: "v3" });
   const frontend = new AgentSession({ sessionId: "frontend", roleId: "Frontend", taskId: "demo", organizationVersion: "v3" });
   const boundary = new RoleBoundary({ roleId: "Backend", writeScope: ["backend/"], denyScope: ["backend/private/"], tools: ["legion_write_file"], capabilities: ["write_file"] });
-  const runtime = new PermissionRuntime({ workspace: null, boundaries: [boundary,
+  const demoOwners = new ProjectFileOwners({ projectId: "permission-demo", version: "1", owners: [
+    { resource: "backend/main.mjs", roleId: "Backend" }, { resource: "frontend/login.vue", roleId: "Frontend" }] });
+  const runtime = new PermissionRuntime({ workspace, boundaries: [boundary,
     new RoleBoundary({ roleId: "Frontend", writeScope: ["frontend/"], tools: ["legion_write_file"], capabilities: ["write_file"] })],
-    sessions: [backend, frontend], organizationVersion: "v3" });
+    sessions: [backend, frontend], organizationVersion: "v3",
+    fileOwners: new ProjectFileOwners({ projectId: "permission-demo", version: "1", owners: [
+      { resource: "backend/main.mjs", roleId: "Backend" }, { resource: "frontend/login.vue", roleId: "Frontend" }] }),
+    leaseContext, isolatedOwnerLease: workspace === undefined });
   function proposal(proposalId, resource, session, extra = {}) { return new ActionProposal({ proposalId, resource, session,
     action: "write_file", content: "backend content", tool: "legion_write_file", capability: "write_file", ...extra }); }
   try {
