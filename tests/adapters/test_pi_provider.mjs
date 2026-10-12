@@ -2,6 +2,7 @@ import test, { mock } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { syncBuiltinESMExports } from "node:module";
 import { createServer } from "node:http";
 import { setTimeout as delay } from "node:timers/promises";
@@ -11,7 +12,7 @@ import { Type, InMemoryCredentialStore, createFauxCore, fauxAssistantMessage,
   fauxToolCall } from "@earendil-works/pi-ai";
 import { createPiSessionProvider, PiSessionProvider } from "../../src/adapters/providers/public/pi_session.mjs";
 import { AgentInstance, AgentScope, PiConnection, PiConnectionProfile, PiTextDelta, PiConversationHistory,
-  PiConversationCheckpoint, PiToolRequest, PiToolResult, PiRunResult, ProjectReadDecision,
+  PiConversationCheckpoint, PiImageReference, PiImageInput, PiToolRequest, PiToolResult, PiRunResult, ProjectReadDecision,
   ProjectReadResult, AgentControlTools, AgentControlDecision, AgentControlResult } from "../../src/kernel/models/agent.mjs";
 import { PolicyDecision, MutationResult, Outcome } from "../../src/kernel/models/core.mjs";
 
@@ -1116,4 +1117,136 @@ test("real partial SSE cancel then same-instance continuation distinguishes chec
       assert.deepEqual(promptErrors,[]);
     }finally{spy.mock.restore();await provider.close();await host.close();}
   }
+});
+
+const imageFixtureBytes = ["iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==", "/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAAqADAAQAAAABAAAAAgAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgAAgACAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwUDAwMFBgUFBQUGCAYGBgYGCAoICAgICAgKCgoKCgoKCgwMDAwMDA4ODg4ODw8PDw8PDw8PD//bAEMBAgICBAQEBwQEBxALCQsQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEP/dAAQAAf/aAAwDAQACEQMRAD8A+L6KKK/lM/38P//Z"];
+
+function imageInput(index=0, overrides={}) {
+  const data=imageFixtureBytes[index],bytes=Buffer.from(data,"base64");
+  let mimeType="image/png";if(index===1)mimeType="image/jpeg";
+  const ref=new PiImageReference({projectId:"image_project",attachmentId:"image_"+index,
+    sha256:createHash("sha256").update(bytes).digest("hex"),mimeType,byteLength:bytes.length,width:2,height:2,...overrides});
+  return new PiImageInput({ref,data});
+}
+function imageSetup(protocol,url,capability="supported") {
+  const options=plainOptions(protocol,url);
+  options.cwd=fs.mkdtempSync(resolve(fixtureRoot,"images-"));
+  let input;
+  if(capability==="supported")input=["text","image"];
+  if(capability==="unsupported")input=["text"];
+  if(input!==undefined)options.connection=new PiConnectionProfile({...options.connection,modelMetadata:{input}});
+  return options;
+}
+function decodedWireImages(protocol,body) {
+  let messages=body.messages;if(protocol==="openai-responses")messages=body.input;
+  const images=[];
+  for(const message of messages ?? []){
+    if(message.role!=="user"||!Array.isArray(message.content))continue;
+    for(const block of message.content){
+      let mimeType,data;
+      if(block.type==="image"){mimeType=block.source.media_type;data=block.source.data;}
+      else if(block.type==="image_url"||block.type==="input_image"){
+        let url=block.image_url;if(typeof url!=="string")url=url.url;
+        const match=/^data:(image\/(?:png|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(url);
+        assert.ok(match,"inline image URL required");mimeType=match[1];data=match[2];
+      }else continue;
+      const bytes=Buffer.from(data,"base64");
+      assert.equal(bytes.toString("base64"),data);
+      images.push({mimeType,sha256:createHash("sha256").update(bytes).digest("hex"),byteLength:bytes.length});
+    }
+  }
+  return images;
+}
+function wireExpected(images){return images.map(image=>({mimeType:image.ref.mimeType,sha256:image.ref.sha256,byteLength:image.ref.byteLength}));}
+
+for(const protocol of ["openai-completions","openai-responses","anthropic-messages"]){
+  test("real "+protocol+" pure PNG/JPEG pixels, order, continuation and hydrated history",async()=>{
+    const host=await localhost(protocol),options=imageSetup(protocol,host.url),images=[imageInput(0),imageInput(1)];
+    const provider=await createPiSessionProvider(options);
+    try{
+      provider.start_run("pictures","",{images});const first=await turn(provider,"pictures");
+      assert.equal(first.result.status,"completed");assert.deepEqual(decodedWireImages(protocol,host.requests[0].body),wireExpected(images));
+      assert.deepEqual(provider.get_history().messages[0],{role:"user",text:"",imageRefs:images.map(image=>image.ref)});
+      assert.doesNotMatch(JSON.stringify(provider.get_history()),/"data"|base64/);
+      const checkpoint=new PiConversationCheckpoint({instance:options.instance,profileId:options.connection.profileId,profileVersion:options.connection.profileVersion,history:provider.get_history()});
+      await assert.rejects(provider.restore_history(checkpoint),/image_reference_inputs_mismatch/);
+      await assert.rejects(provider.restore_history(checkpoint,{images:[images[0]]}),/image_reference_inputs_mismatch/);
+      await assert.rejects(provider.restore_history(checkpoint,{images:[images[0],imageInput(1,{attachmentId:"extra"})]}),/image_reference_inputs_mismatch/);
+      await assert.rejects(provider.restore_history(checkpoint,{images:[images[0],imageInput(1,{projectId:"foreign"})]}),/image_project_mismatch/);
+      await provider.restore_history(checkpoint,{images:[images[1],images[0]]});
+      provider.start_run("continued","Explain the earlier pictures");const done=await turn(provider,"continued");
+      assert.equal(done.result.status,"completed");assert.equal(host.requests.length,2);
+      assert.deepEqual(decodedWireImages(protocol,host.requests[1].body),wireExpected(images));
+      assert.doesNotMatch(JSON.stringify(done),/plain-key|"data"|base64/);
+    }finally{await provider.close();await host.close();fs.rmdirSync(options.cwd);}
+  });
+  test("real "+protocol+" unknown/unsupported image input rejects with zero network and text stays valid",async()=>{
+    for(const capability of ["unknown","unsupported"]){
+      const host=await localhost(protocol),options=imageSetup(protocol,host.url,capability),provider=await createPiSessionProvider(options);
+      try{
+        assert.throws(()=>provider.start_run("no-image-network","picture",{images:[imageInput()]}),new RegExp("image_capability_"+capability));
+        assert.equal(host.requests.length,0);assert.deepEqual(provider.get_history().messages,[]);
+        provider.start_run("text","ordinary text");assert.equal((await turn(provider,"text")).result.status,"completed");
+        assert.deepEqual(decodedWireImages(protocol,host.requests[0].body),[]);
+      }finally{await provider.close();await host.close();fs.rmdirSync(options.cwd);}
+    }
+  });
+  test("real "+protocol+" SDK omitted or changed image fails before network",async()=>{
+    for(const mode of ["omit","reorder","change"]){
+      const host=await localhost(protocol),options=imageSetup(protocol,host.url),provider=await createPiSessionProvider(options);
+      const original=SdkSession.prototype.prompt;
+      const spy=mock.method(SdkSession.prototype,"prompt",function(text,settings){
+        let images=settings.images;
+        if(mode==="omit")images=[];
+        if(mode==="reorder")images=[...images].reverse();
+        if(mode==="change")images=[{...images[0],data:images[1].data},images[1]];
+        return original.call(this,text,{...settings,images});
+      });
+      try{
+        provider.start_run("guard","Do not omit pictures",{images:[imageInput(0),imageInput(1)]});const done=await turn(provider,"guard");
+        assert.equal(done.result.status,"failed");let code="image_content_changed";if(mode==="omit")code="image_omitted";
+        assert.equal(done.result.errorCode,code);assert.equal(host.requests.length,0);
+        assert.doesNotMatch(JSON.stringify(done),/plain-key|"data"|base64/);
+      }finally{spy.mock.restore();await provider.close();await host.close();fs.rmdirSync(options.cwd);}
+    }
+  });
+  test("real "+protocol+" hydrated single_run gets source pixels before inference",async()=>{
+    const host=await localhost(protocol),options=imageSetup(protocol,host.url),image=imageInput();options.lifecycle="single_run";
+    options.scope=new AgentScope({write:[],tools:["legion_query_memory"]});const provider=await createPiSessionProvider(options);
+    try{
+      const history=new PiConversationHistory({messages:[{role:"user",text:"Source Human",imageRefs:[image.ref]}]});
+      await provider.restore_history(new PiConversationCheckpoint({instance:options.instance,profileId:options.connection.profileId,profileVersion:options.connection.profileVersion,history}),{images:[image]});
+      provider.start_run("worker","Inspect source image");assert.equal((await turn(provider,"worker")).result.status,"completed");
+      assert.deepEqual(decodedWireImages(protocol,host.requests[0].body),wireExpected([image]));assert.match(JSON.stringify(host.requests[0].body),/Source Human/);
+    }finally{await provider.close();await host.close();fs.rmdirSync(options.cwd);}
+  });
+}
+
+test("typed image options reject forged inputs and requests over the restored context budget",async()=>{
+  const host=await localhost("openai-completions"),options=imageSetup("openai-completions",host.url),provider=await createPiSessionProvider(options);
+  try{
+    const image=imageInput();
+    assert.throws(()=>provider.start_run("bad","x",{images:[{...image}]}),/typed_image_input_required/);
+    assert.throws(()=>provider.start_run("bad","x",{images:[image],path:"customer.png"}),TypeError);
+    assert.throws(()=>provider.start_run("bad","x",{images:Array(5).fill(image)}),/collection_budget/);
+    assert.throws(()=>provider.start_run("empty","",{images:[]}),TypeError);
+    const messages=Array.from({length:8},()=>({role:"user",text:"image source",imageRefs:[image.ref]}));
+    await provider.restore_history(new PiConversationCheckpoint({instance:options.instance,profileId:options.connection.profileId,profileVersion:options.connection.profileVersion,history:new PiConversationHistory({messages})}),{images:[image]});
+    assert.throws(()=>provider.start_run("too-many","x",{images:[imageInput(1)]}),/image_request_budget/);
+    assert.equal(host.requests.length,0);
+  }finally{await provider.close();await host.close();fs.rmdirSync(options.cwd);}
+});
+
+test("image HTTP cancellation retains refs and rejects replay while safe same-instance continuation sends pixels",async()=>{
+  const host=await localhost("openai-completions",{partialThenHang:true}),options=imageSetup("openai-completions",host.url),provider=await createPiSessionProvider(options),image=imageInput();
+  try{
+    provider.start_run("image-cancel","Human picture",{images:[image]});await next(provider,"image-cancel","text_delta");
+    assert.deepEqual(decodedWireImages("openai-completions",host.requests[0].body),wireExpected([image]));
+    await provider.cancel_turn("image-cancel");assert.equal((await turn(provider,"image-cancel")).result.status,"cancelled");
+    const history=provider.get_history();assert.deepEqual(history.messages,[{role:"user",text:"Human picture",imageRefs:[image.ref]}]);
+    await provider.restore_history(new PiConversationCheckpoint({instance:options.instance,profileId:options.connection.profileId,profileVersion:options.connection.profileVersion,history}),{images:[image]});
+    provider.start_run("image-next","Continue with the original image");assert.equal((await turn(provider,"image-next")).result.status,"completed");
+    assert.equal(host.requests.length,2);assert.deepEqual(decodedWireImages("openai-completions",host.requests[1].body),wireExpected([image]));
+    assert.doesNotMatch(JSON.stringify(provider.get_history()),/cancelled-partial-canary/);
+  }finally{await provider.close();await host.close();fs.rmdirSync(options.cwd);}
 });

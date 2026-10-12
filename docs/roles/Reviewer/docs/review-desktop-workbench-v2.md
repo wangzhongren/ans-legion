@@ -80,3 +80,21 @@ Windows ZIP/DPAPI在本机未执行、unsupported；历史0.7.0档案只读字�
 
 
 取消分支证据修正：旧f5e18085的80/80是自然Host路径实际通过，不能声称原prototype屏障起效；public Service facade在fixture创建时已绑定原方法，晚装wrapper未改变它。文档后dcb92ad9样本自然drain cancelled失败于错误单常量预期，全部日志保留。本角色已移除wrapper、不增加生产hook或mockSDK；仅按实际私有terminal的conversationId/runId/同instance、createdAt=finishedAt、空text/零assistant与两个源码来源对作精确校验：#interruptCapturedMember→interrupted+run_cancelled；#memberEnd drain→cancelled+null reason。Model没有额外SDK-origin字段，不编造该字段；公共turn.cancelled与实际HTTP2/后续completed/原Human/无partial仍独立严格验证。除此两对不接受其他状态，最终同文档候选需固定门实跑。
+
+
+## 图片v1当前结构候选：Runtime1.3.0 / Desktop0.4.0
+
+正式Reviewer-image-current-1，Human scope2236f669…/74配置e4e0282b…，仅R9七现有测试+两报告。最终fresh tar desktop-image-input-v1-final-20261012/legion-runtime-1.3.0.tgz，SHA0004ffe3c74cddf0960ce10c90da0283210e4fa11292d69f173539cb19d1afea；旧1.2.2/0.3.2及更早各门只保留历史，不作图片验收。包/version/modelExports/lock/已安装源字节迁当前身份；本角色gen仅command-center Reviewer根fresh，已授权Shell reviewer亦迁新fresh，旧包/证据不写。
+
+本轮最小独立结构新增：纯PiImageReference/Input旧text JSON精确兼容、不含路径/owner/callback/IO授权、图片refs不能注入dispatch grant；Project public Service→Provider自身私有blob、不读peerOrg/private memory JSON。实际Project stage/preview读取原像素并核项目/ref/SHA，跨项目/变SHA/非法path拒绝；普通Host state无base64/私有blob路径/key、没有客户项目写或owner变化；仅专用受控preview IPC返回有限typed ref/data。Adapter真正SDK获typed图片后故意省图，实际image_omitted必须在HTTP前失败（requests0），不接受普通fake input或resolver回调、不自读Desktop图文件。原私有DTO/调用层/文本CLI/owner/lease/CAS/Shell/取消续轮/PM来源强门保持，UI像素流程由独立Tester负责，本R不扩GUI矩阵。
+
+当前fixture/报告静态定稿后待唯一固定structure七入口，同候选exit0才可complete；不沿用旧通过。Windows/付费远端/旧Shell GUI不冒通过，known-key仍有限原值/前置与串流保证，不声称OCR/未知秘密/编码全称扫描。真实整仓库旧observer unavailable与隔离合法fixture、历史unknown markers保留；未知记录不删。未改产品、T、SDK依赖或无授权文档，不自verify/派发。
+
+
+图片首结构门a66a2056实际83项79pass/4fail，旧证据保留且本图不complete。3个本角色旧fixture为imageCapability新DTO字段、ModelExports62→64、真实窗口标题现二哥；已按真实契约最小修正未重跑。新preview测试此前误用Headless，但静态真实链确认Desktop也缺公共入口：Main187→createWorkbenchPipeline1578→workbenchFacade1583未绑定stageImage/discardImage/readImagePreview，IPC调用会internal_error，不能绕Impl冒充通过。R仅将测试改真实public Desktop factory并严格断三方法存在；D原owner须补公开接线、重包及调用方重验。本轮partial冻结，无新的通过声明，不改产品/T/SDK依赖，不再跑旧图fixed门。实际SDK image_omitted requests0、纯refs/旧JSON/权限强门已作为有限首轮证据，其余必须新当前候选重验。
+
+## 图片公开 Facade 返修当前候选：Runtime1.3.1 / Desktop0.4.1
+
+当前正式 facade-repair 图承接旧 R9 partial。fresh stage desktop-image-input-v1-facade-repair-20261012，tar SHA555a4184456d6457674ded591e7dea3098cdb6b3fed4ad408c782019813dae46；原1.3.0首门79/83、issue37/stop38保留历史，不能作为当前通过。当前固定structure尚待运行。包/lock/安装字节使用当前身份，64 Model exports强断言保留。新增图片预览经真实公开createWorkbenchPipeline及Electron Main/preload stage→preview→discard；普通DTO无像素/私有blob路径，专用有限preview按project/ref绑定返回像素。旧文本、权限、真实SDK image_omitted零网络与取消历史门保留。仅结构证据，不冒充Tester实际图片UI像素场景；Windows unsupported与有限known-key/外部TOCTOU边界不变。
+
+当前 facade-repair 首固定structure event20：83/83 pass，0fail/skip，exit0，candidate273cb84911632537c4713e3bf3633b05ae010bf0b83fe539bba9afb79c0e1e1f unchanged。日志 `.ans/runtime/desktop-image-input-v1-facade-repair-integration/evidence/reviewer-image-current-1-structure-3eb6f231.log`，SHAa63cb9577241accc995e535716b7fdbbd2bd0ef0b4524960d1403b9fd061f003。真实公开factory、Main/preload stage/preview/discard、ref/SHA/project绑定、普通DTO无pixel/path、SDK image_omitted零HTTP，以及既有文本/取消/owner/lease/commit/Shell边界均实际通过。本段文档改动后冻结，最终同候选固定门及调度验收待完成；不作Tester图片UI或整仓observer可用性全称证明。

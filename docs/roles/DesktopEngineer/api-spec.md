@@ -1,5 +1,7 @@
 # DesktopEngineer 当前公开接线
 
+图片输入候选接口：`stageImage({projectId,mimeType,data}) → {ref:PiImageReference}`，`discardImage({projectId,ref}) → null`，`readImagePreview({projectId,ref}) → {ref,data}`；`sendMessage`在原三字段后可选`imageRefs:PiImageReference[]`，有图时文本可为空。`ref`仅含`projectId,attachmentId,sha256,mimeType,byteLength,width,height`，图片原字节/base64不进入`getState`、Org JSON、角色日志或审批事实；历史预览是当前项目显式有限读。每图仅PNG/JPEG、≤4MiB/边≤8192/像素≤16MP，本轮≤4图/8MiB，恢复和当前网络合计≤8图/16MiB。旧无图输入、历史和CLI仍保持原字段。真实阶段证据以`desktop-image-input-v1`固定门为准。
+
 > 2026-10-12 当前项目指挥台契约以本节和下方“项目指挥台只读查询”为准。较早章节记录历史阶段的 PM 客户入口、task.writeSet 与成员原文页；当前产品由“二哥”唯一对客，内部仍以 `Supervisor` 标识，角色精确 owner 决定写权，原文不公开。
 
 客户聊天标签属于 Interface 投影：Human 为“你”，所有当前客户助手回复为“二哥”，`kind:question` 的实际持久问题显示“二哥 · 转达待答复问题”。这不改 timeline 的 `kind`、`requestId`、答案绑定或原问题文字，也不把后台 PM 变成客户发送入口。默认连接的设置标签是“默认二哥对话连接”；后台 PM 仍用其项目角色映射/已保存连接规则，Shell 审核与返修事实仍明确标 PM。计划协议 fallback 与无计划引导只在客户区使用二哥名称，后台 RoleArchitect/PM 原身份在角色区保持。窗口和 HTML 标题均为“二哥项目指挥台”；CLI 仍以 `roleId:Supervisor` 调用同一 Host。

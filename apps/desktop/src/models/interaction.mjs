@@ -1,6 +1,6 @@
 import { supervisionInput } from './memory.mjs';
 /** Human interactions are durable values, never runtime tool approvals or execution authority. */
-import { digestValue, normalizeResource, normalizeProjectReadResource, ShellRequest, ShellPreparation, ShellReview, ShellResult, ShellCandidate, FileBaseline, shellEffects, MutationResult } from 'legion-runtime/workbench-models';
+import { digestValue, normalizeResource, normalizeProjectReadResource, ShellRequest, ShellPreparation, ShellReview, ShellResult, ShellCandidate, FileBaseline, shellEffects, MutationResult, PiImageReference } from 'legion-runtime/workbench-models';
 import { exactObject, identifier, projectIdentifier, textValue, immutable } from './desktop.mjs';
 
 export class InteractionValidationError extends Error {
@@ -18,6 +18,16 @@ function sha(value) {
 function text(value, max = 16384) {
   if (typeof value !== 'string' || !value.trim() || value.length > max || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value)) fail('invalid_answer_text');
   return value;
+}
+function humanText(value, hasImages) {
+  if (typeof value !== 'string' || value.length > 65536 || (!hasImages && !value.trim()) || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(value)) fail('invalid_answer_text');
+  return value;
+}
+function customerImages(value, projectId) {
+  if (!Array.isArray(value) || !value.length || value.length > 4) fail('image_budget');
+  const refs=value.map(item=>{const ref=new PiImageReference({...item});if(ref.projectId!==projectId)fail('image_project_mismatch');return {...ref};});
+  if(new Set(refs.map(ref=>ref.attachmentId)).size!==refs.length||refs.reduce((sum,ref)=>sum+ref.byteLength,0)>8388608)fail('image_budget');
+  return refs;
 }
 function time(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) fail('invalid_timestamp');
@@ -177,9 +187,11 @@ export function conversationTimeline(value) {
   });
   if (new Set(turns.map((turn) => turn.id)).size !== turns.length) fail('duplicate_conversation_turn');
   const messages = value.messages.map((message) => {
-    exactObject(message, ['id', 'turnId', 'requestId', 'answerId', 'kind', 'text', 'order', 'createdAt', 'orderKnown']);
+    exactObject(message, ['id', 'turnId', 'requestId', 'answerId', 'kind', 'text', 'imageRefs', 'order', 'createdAt', 'orderKnown']);
     if (!['human', 'assistant', 'question', 'answer'].includes(message.kind) || typeof message.orderKnown !== 'boolean') fail('invalid_conversation_message');
     const fields = { id: identifier(message.id), turnId: nullableId(message.turnId), requestId: nullableId(message.requestId), answerId: nullableId(message.answerId), kind: message.kind, text: journalText(message.text), order: integer(message.order), createdAt: time(message.createdAt), orderKnown: message.orderKnown };
+    if(message.imageRefs!==undefined){if(message.kind!=='human')fail('invalid_conversation_message');fields.imageRefs=customerImages(message.imageRefs,projectId);}
+    if(message.kind==='human'&&!fields.text.trim()&&!fields.imageRefs?.length)fail('invalid_conversation_message');
     if (fields.turnId !== null && !turns.some((turn) => turn.id === fields.turnId)) fail('unknown_conversation_turn');
     if (['question', 'answer'].includes(fields.kind) && fields.requestId === null) fail('conversation_request_required');
     if (fields.kind === 'answer' && fields.answerId === null) fail('conversation_answer_required');
@@ -215,11 +227,11 @@ export function importConversationHistory(value, history) {
   return nextTimeline(timeline,{historyImported:true,legacyMessages:history.messages.map((message,sourceIndex)=>({...message,sourceIndex}))});
 }
 export function beginConversationTurn(value,input) {
-  const timeline=conversationTimeline(value);exactObject(input,['turnId','userMessageId','continuationAnswerId','text','createdAt']);
+  const timeline=conversationTimeline(value);exactObject(input,['turnId','userMessageId','continuationAnswerId','text','imageRefs','createdAt']);
   const id=identifier(input.turnId);if(timeline.turns.some((turn)=>turn.id===id))fail('duplicate_conversation_turn');
   const userMessageId=nullableId(input.userMessageId),continuationAnswerId=nullableId(input.continuationAnswerId);const messages=[...timeline.messages];
-  if(continuationAnswerId===null) {if(userMessageId===null)fail('conversation_user_anchor_required');messages.push({id:userMessageId,turnId:id,requestId:null,answerId:null,kind:'human',text:text(input.text,65536),order:messageOrder(timeline),createdAt:time(input.createdAt),orderKnown:true});}
-  else if(userMessageId!==null)fail('duplicate_conversation_answer');
+  if(continuationAnswerId===null) {if(userMessageId===null)fail('conversation_user_anchor_required');const imageRefs=input.imageRefs===undefined?null:customerImages(input.imageRefs,timeline.projectId);const message={id:userMessageId,turnId:id,requestId:null,answerId:null,kind:'human',text:humanText(input.text,Boolean(imageRefs)),order:messageOrder(timeline),createdAt:time(input.createdAt),orderKnown:true};if(imageRefs)message.imageRefs=imageRefs;messages.push(message);}
+  else if(userMessageId!==null||input.imageRefs!==undefined)fail('duplicate_conversation_answer');
   return nextTimeline(timeline,{turns:[...timeline.turns,{id,userMessageId,continuationAnswerId,status:'running'}],messages});
 }
 export function appendConversationText(value,input) {
@@ -345,7 +357,7 @@ export function roleMemoriesDocument(value) {
     const summary = journalText(entry.summary); if (summary.length > ROLE_MEMORY_LIMITS.summaryChars) fail('role_memory_budget');
     if (!Array.isArray(entry.covered) || entry.covered.length > 4096 || !Array.isArray(entry.messages) || entry.messages.length > ROLE_MEMORY_LIMITS.messages) fail('role_memory_budget');
     const covered = entry.covered.map((ref) => { exactObject(ref, ['sourceId', 'sourceDigest']); return { sourceId: sha(ref.sourceId), sourceDigest: sha(ref.sourceDigest) }; });
-    const messages = entry.messages.map((message) => { exactObject(message, ['sourceId', 'sourceDigest', 'role', 'text']); if (!['user', 'assistant'].includes(message.role)) fail('invalid_role_memory'); return { sourceId: sha(message.sourceId), sourceDigest: sha(message.sourceDigest), role: message.role, text: journalText(message.text) }; });
+    const messages = entry.messages.map((message) => { exactObject(message, ['sourceId', 'sourceDigest', 'role', 'text','imageRefs']); if (!['user', 'assistant'].includes(message.role)) fail('invalid_role_memory'); const item={ sourceId: sha(message.sourceId), sourceDigest: sha(message.sourceDigest), role: message.role, text: journalText(message.text) };if(message.imageRefs!==undefined){if(message.role!=='user')fail('invalid_role_memory');item.imageRefs=customerImages(message.imageRefs,value.projectId);}return item; });
     if (new Set(covered.map((ref) => ref.sourceId)).size !== covered.length || new Set(messages.map((message) => message.sourceId)).size !== messages.length || messages.some((message) => covered.some((ref) => ref.sourceId === message.sourceId))) fail('invalid_role_memory');
     if (summary.length + messages.reduce((sum, message) => sum + message.text.length, 0) > ROLE_MEMORY_LIMITS.hardChars || (covered.length && !summary.trim())) fail('role_memory_budget');
     return { roleId: identifier(entry.roleId), ...(value.schemaVersion===2?{channel:memoryChannel(entry.roleId,entry.channel)}:{}), revision: integer(entry.revision, 0), summary, covered, messages, sourceDigest: sha(entry.sourceDigest), updatedAt: time(entry.updatedAt) };

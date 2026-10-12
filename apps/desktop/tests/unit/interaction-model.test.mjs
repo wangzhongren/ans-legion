@@ -6,12 +6,20 @@ import { createShellWorkflow, enqueueShellWorkflow, updateShellWorkflow, interru
 import assert from 'node:assert/strict';
 import { createInteraction, interactionDocument, interactionBindings, answerInteraction, closeInteraction,
   invalidateInteraction, createInteractionQueue, interactionQueueDocument, enqueueInteraction,
-  answerQueuedInteraction, pendingInteractions, restoreInteractionQueue } from '../../src/models/interaction.mjs';
+  answerQueuedInteraction, pendingInteractions, restoreInteractionQueue, createCustomerTimeline, updateCustomerTimeline, beginConversationTurn, customerTimeline } from '../../src/models/interaction.mjs';
 
 const projectId = 'a'.repeat(64);
 const origin = { roleId: 'ProjectManager', instanceId: 'pm-1', runId: 'run-1', toolRequestId: 'tool-1' };
 const actor = { projectId, roleId: 'Human' };
 const time = '2026-10-08T10:00:00.000Z';
+test('customer timeline keeps old text-only bytes and anchors image-only Human refs without granting authority',()=>{
+  const initial=createCustomerTimeline(projectId);const old=updateCustomerTimeline(initial,beginConversationTurn,{turnId:'old',userMessageId:'old.human',continuationAnswerId:null,text:'旧文本',createdAt:time});
+  assert.equal(Object.hasOwn(old.messages[0],'imageRefs'),false);assert.deepEqual(customerTimeline(JSON.parse(JSON.stringify(old))),old);
+  const ref={projectId,attachmentId:'image_1',sha256:'b'.repeat(64),mimeType:'image/png',byteLength:68,width:1,height:1};
+  const image=updateCustomerTimeline(old,beginConversationTurn,{turnId:'visual',userMessageId:'visual.human',continuationAnswerId:null,text:'',imageRefs:[ref],createdAt:time});
+  assert.equal(image.messages[1].text,'');assert.deepEqual(image.messages[1].imageRefs,[ref]);assert.equal(image.messages[1].kind,'human');assert.deepEqual(customerTimeline(JSON.parse(JSON.stringify(image))),image);
+  assert.throws(()=>updateCustomerTimeline(old,beginConversationTurn,{turnId:'bad',userMessageId:'bad.human',continuationAnswerId:null,text:'',imageRefs:[{...ref,projectId:'c'.repeat(64)}],createdAt:time}));
+});
 function shellEntry() { const request = new ShellRequest({ requestId:'shell-1',runId:'worker-run',command:'printf safe > src/a.mjs',reason:'当前任务',generatedEffects:[] }); return { id:request.requestId,revision:1,request,requestDigest:request.digest,origin:{projectId,roleId:'Worker',taskId:'task-1',sessionId:'session-1',instanceId:'worker-1',runId:'worker-run'},bindings:{planDigest:'a'.repeat(64),organizationDigest:'b'.repeat(64),organizationVersion:'v1',roleDigest:'c'.repeat(64),roleRevision:1,profileVersion:'d'.repeat(64),contextSnapshotDigest:'e'.repeat(64),fileOwnersDigest:'f'.repeat(64),epoch:1},preparation:null,status:'pending',review:null,reviewer:null,reviewText:'',output:{stdout:'',stderr:'',truncated:false},result:null,publication:null,createdAt:time,expiresAt:'2026-10-08T10:05:00.000Z',updatedAt:time }; }
 test('Shell durable request is immutable, exact and cannot revive a terminal grant; publishing restart pauses conservatively', () => { const input=shellEntry();let journal=enqueueShellWorkflow(createShellWorkflow(projectId),input);assert.ok(Object.isFrozen(journal.requests[0]));assert.equal(publicShellWorkflow(journal)[0].bindings,undefined);assert.throws(()=>enqueueShellWorkflow(journal,input),{code:'duplicate_shell_request'});journal=updateShellWorkflow(journal,input.id,{status:'reviewing'});journal=updateShellWorkflow(journal,input.id,{status:'approved',review:new ShellReview({requestId:input.id,requestDigest:input.requestDigest,revision:1,approved:true,reason:'本次批准'})});journal=updateShellWorkflow(journal,input.id,{status:'consumed'});journal=updateShellWorkflow(journal,input.id,{status:'running'});journal=updateShellWorkflow(journal,input.id,{status:'publishing'});journal=interruptShellWorkflow(journal,time);assert.equal(journal.requests[0].status,'recovery_required');assert.throws(()=>updateShellWorkflow(journal,input.id,{status:'approved'}),{code:'invalid_shell_phase'});assert.throws(()=>updateShellWorkflow(journal,input.id,{request:input.request})); });
 const bindings = { planDigest: 'b'.repeat(64), organizationRevision: 1, organizationDigest: 'c'.repeat(64) };

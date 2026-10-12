@@ -2,7 +2,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, isAbsolute } from 'node:path';
 import { createWorkbenchPipeline } from '../pipelines/workbench.mjs';
 import { exactObject, identifier, projectIdentifier, displayText, immutable, probeDTO } from '../models/desktop.mjs';
-import { WB_OPERATIONS, WB_LIMITS, workbenchInput, workbenchDTO, planDocument, taskState, contextDescriptor, publicQueryDTO, wbSuccess, wbFailure, wbError, governedWireDTO, roleActivity } from '../models/workbench.mjs';
+import { WB_OPERATIONS, WB_LIMITS, workbenchInput, workbenchDTO, planDocument, taskState, contextDescriptor, publicQueryDTO, wbSuccess, wbFailure, wbError, governedWireDTO, roleActivity, imageRefs } from '../models/workbench.mjs';
+import { PiImageReference, PiImageInput } from 'legion-runtime/workbench-models';
 import { ProjectFileOwners } from 'legion-runtime/workbench-models';
 const directory = dirname(fileURLToPath(import.meta.url));
 const channel = (operation) => `legion-desktop:${operation}`;
@@ -54,6 +55,9 @@ export async function _dispatchDesktopIpc(event, window, documentUrl, operation,
       case 'deleteProfile': result = await pipeline.deleteProfile(checked.value); break;
       case 'assignProfile': result = await pipeline.assignProfile(checked.value); break;
       case 'sendMessage': result = await pipeline.sendMessage(checked.value); break;
+      case 'stageImage': result = await pipeline.stageImage(checked.value); break;
+      case 'discardImage': result = await pipeline.discardImage(checked.value); break;
+      case 'readImagePreview': result = await pipeline.readImagePreview(checked.value); break;
       case 'selectContext': result = await pipeline.selectContext(checked.value); break;
       case 'answerInteraction': result = await pipeline.answerInteraction(checked.value); break;
       case 'closeInteraction': result = await pipeline.closeInteraction(checked.value); break;
@@ -73,6 +77,9 @@ export async function _dispatchDesktopIpc(event, window, documentUrl, operation,
     }
     if (!result.ok) return wbFailure(result.error?.code, result.error?.field);
     if (operation === 'cancelProbe') return wbSuccess(null);
+    if (operation === 'discardImage') return wbSuccess(null);
+    if (operation === 'stageImage') return wbSuccess({ref:imageRefs([result.value.ref],checked.value.projectId,1)[0]});
+    if (operation === 'readImagePreview') {const ref=new PiImageReference(result.value.ref);const image=new PiImageInput({ref,data:result.value.data});if(ref.projectId!==checked.value.projectId)return wbFailure('image_project_mismatch');return wbSuccess({ref:{...ref},data:image.data});}
     if (operation === 'testConnection') return wbSuccess(probeDTO(result.value));
     if (['listProjectFiles','readProjectFile','queryRoleActivity','queryRoleLog','queryProjectFacts','queryProjectOutputs','queryProjectMemory'].includes(operation)) return wbSuccess(publicQueryDTO(operation,result.value));
     return wbSuccess(wireState(result.value));

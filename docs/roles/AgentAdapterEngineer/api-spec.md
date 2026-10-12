@@ -1,5 +1,13 @@
 # Adapter实际公开API：受控组织、交互、检查与Pi生命周期
 
+## 2026-10-12 图片输入实施契约
+
+依据已接受的 [图片v1范围](../../../.ans/decisions/desktop-image-input-v1-scope.md)，A9仅接Pi SDK边界。支持 `start_run(runId,text,{images})`、`restore_history(checkpoint,{images})`；images仅Kernel PiImageInput({ref,data})，ref为唯一PiImageReference({projectId,attachmentId,sha256,mimeType,byteLength,width,height})。历史仅user.imageRefs，Host提供已经校验项目/来源的临时字节，Adapter不读磁盘。旧text调用保持；纯图可空text。能力来自显式modelMetadata.input，缺失unknown、有图unsupported/unknown拒绝。单turn4图/8MiB，restore或一次完整上下文8图/16MiB，context及SDK实际序列化请求24MiB。
+
+SDK自动缩放关闭，使用有效PNG/JPEG保原字节。在受控streamSimple调用真实网络前核用户图块数量、顺序、MIME、规范base64及实际解码字节SHA；省图hint报image_omitted，换图/重排报image_content_changed，不发送文本替代。内部SDK onPayload只核最终实际请求24MiB，非Host回调。恢复按引用顺序重建SDK用户图块，hydration数组可乱序但必须与引用一一匹配，少图/额外图/变更引用拒绝。同一引用重复出现在历史时每次图块计入请求预算；恢复输入每个引用提供一次。whole cancel/close释放临时图片cache，cancel_turn保留已发送Human引用供Host安全恢复。
+
+固定images门：`node --test --test-concurrency=1 tests/adapters/test_pi_provider.mjs tests/adapters/test_pi_service.mjs`；真实SDK三协议原PNG/JPEG字节/顺序、Provider与公开Service纯图/恢复/续轮、unknown/unsupported零网络、SDK省图/重排/换图网络前拒绝、图片HTTP取消及旧文本强回归见 [当前候选证据](../../scheduling/desktop-image-input-v1.md)。第一轮图片强门已通过，最终当前候选结果以阶段记录为准；不将旧检查算作图片证据。Host负责源项目绑定、PNG/JPEG解码/像素校验、私有blob/预览、来源及profile失效；输入能力是客户声明而非已探明远端能力，引用不授写权，像素不做OCR/DLP扫描。
+
 本层实现真实Pi SDK1.0.4，不实现Desktop入口、计划确认、调度、客户目录读取或Kernel写审计。客户Human唯一项目管理入口与其他Agent禁止directchat/start由Desktop负责。Workbench Pipeline只组合公开Services；本Service只调用自身Provider public，Provider不接上层权限callback。项目目录与文本由可信宿主调用Kernel受控Read Service读取，本层只转交工具请求和结果。
 
 ## 2026-10-11 Su 客户入口控制合同（当前）

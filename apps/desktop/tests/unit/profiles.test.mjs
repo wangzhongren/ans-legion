@@ -19,7 +19,7 @@ assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(t
 const projectRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 let roleDirectory = testRole;
 if (testRole !== 'DesktopEngineer') roleDirectory = `${testRole}/desktop`;
-const base = join(projectRoot, `.ans/runtime/legion-governed-workflow-v1/${roleDirectory}`);
+const base = join(projectRoot, `.ans/runtime/legion-desktop-command-center-v1/${roleDirectory}`);
 const fixtureRoot = join(base, 'fixtures');
 process.env.NODE_DISABLE_COMPILE_CACHE = '1';
 delete process.env.NODE_OPTIONS;
@@ -34,6 +34,13 @@ async function fixture() { return mkdtemp(join(fixtureRoot, 'profiles-')); }
 test('Service private connection: stored version is stable until edit, decrypt failure safe, public DTO has no key', async () => {
   const directory = await fixture(); const crypto = encryptedDouble(); const settings = new SettingsProviderImpl({ userDataDir: directory }, async () => crypto); const probe = createProbeProvider({ timeoutMs: 1000 }); const service = new ProfilesServiceImpl({ userDataDir: directory }, { settings, probe });
   try { const saved = await service.save({ ...input, id: undefined }); assert.equal(saved.ok, true); const id = saved.value.id; const first = await service.resolveConnection(id); assert.equal(first.ok, true); assert.equal(first.value.credentials.apiKey, input.apiKey); assert.equal((await service.resolveConnection(id)).value.connection.profileVersion, first.value.connection.profileVersion); assert.equal(JSON.stringify((await service.list()).value).includes(input.apiKey), false); await service.save({ ...input, id, name: '新连接名', keyAction: 'keep', apiKey: '' }); assert.notEqual((await service.resolveConnection(id)).value.connection.profileVersion, first.value.connection.profileVersion); await service.save({ ...input, id, keyAction: 'clear', apiKey: '' }); assert.equal((await service.resolveConnection(id)).error.code, 'key_required'); } finally { service.close(); }
+});
+test('visual capability is explicit, old settings stay byte-compatible and profile version changes only on opt-in',async()=>{
+  const directory=await fixture(),crypto=encryptedDouble(),settings=new SettingsProviderImpl({userDataDir:directory},async()=>crypto),probe=createProbeProvider({timeoutMs:1000}),service=new ProfilesServiceImpl({userDataDir:directory},{settings,probe});
+  try{const saved=await service.save({...input,id:undefined});assert.equal(saved.ok,true);assert.equal(saved.value.imageCapability,'unknown');const id=saved.value.id;const before=await service.resolveConnection(id);assert.deepEqual(before.value.connection.modelMetadata.input,['text']);const persisted=JSON.parse(await readFile(join(directory,'desktop-settings.json'),'utf8'));assert.equal(Object.hasOwn(persisted.profiles[0],'imageCapability'),false);
+    const updated=await service.save({...input,id,imageCapability:'supported',keyAction:'keep',apiKey:''});assert.equal(updated.ok,true);const after=await service.resolveConnection(id);assert.deepEqual(after.value.connection.modelMetadata.input,['text','image']);assert.notEqual(after.value.connection.profileVersion,before.value.connection.profileVersion);assert.equal((await service.list()).value.profiles[0].imageCapability,'supported');
+    assert.throws(()=>profileInput({...input,imageCapability:'invented'}));
+  }finally{service.close();}
 });
 function encryptedDouble() {
   const key = randomBytes(32);

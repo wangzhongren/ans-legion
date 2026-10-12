@@ -53,6 +53,10 @@ export class ProjectServiceImpl {
   now() {
     return this.#provider.now();
   }
+  async stageImage(project,input){if(this.#closed)return wbFailure('closed');return this.#provider.stageImage(project,input);}
+  async readImage(project,ref){if(this.#closed)return wbFailure('closed');return this.#provider.readImage(project,ref);}
+  async discardImage(project,ref,referenced){if(this.#closed)return wbFailure('closed');if(referenced)return wbFailure('image_referenced');return this.#provider.discardImage(project,ref);}
+  async pruneImages(project,protectedIds){if(this.#closed)return wbFailure('closed');return this.#provider.pruneImages(project,protectedIds);}
   async catalog(knownSecrets = []) {
     for (const key of knownSecrets) this.#knownSecrets.add(key);
     await this.#tail;

@@ -435,3 +435,21 @@ activity payload `{roleId?,taskId?,planDigest?}`；log `{roleId,taskId?,planDige
 Host以私有真实project/instance/session/run/channel registry限制delegate仅su_customer前台；后台PM不能递归委托，单项目一个委托、深度1、每turn最多4次有效start/resume链。前台与后台preflight/monitor均可使用两个只读查询，后台保留独立bounded事实快照。委托completed仅指本次工具响应已返回，needs_human/plan_ref/result_ref内状态决定PM阶段；实际Human问题答复、取消、execute_plan确认均由Host继续验证，模型不得造answer/value/grant。
 
 两类Su普通文件读取复用readScope:['.']、read_project与list/read双工具、现Policy真实身份/工具/run/版本、Restricted/链接/稳定性及预算守门；scope.write=[]且无write/edit/Check/Shell，不改Read/Policy/Provider公开方法，不改owner/grant。真实来源与用途绑定由Host验证，Kernel纯Model不能仅凭roleId或payload.purpose代替。
+
+## 2026-10-12 桌面图片v1正式纯数据契约
+
+本节按已冻结scope SHA `2236f669e63816419a89c88837e3b55a76f773f484bcfddb3fd4f2cba072ab0d`、Human接受及Kernel三文件派发实施，先固定A/D共用接口。
+
+只新增具名导出 `PiImageReference` 与 `PiImageInput`。`new PiImageReference({projectId,attachmentId,sha256,mimeType,byteLength,width,height})` 精确七字段，无默认type、path、URL或许可。两个ID为1..200字符的不透明A-Za-z0-9_-标识；SHA为小写64hex，mime仅image/png或image/jpeg；byteLength正整数≤4194304，宽/高正整数≤8192、乘积≤16000000。引用没有读取或写入授权。
+
+`new PiImageInput({ref,data})` 要求ref为typed PiImageReference；data为规范、无空白/URL前缀的标准base64。先按声明byteLength限制编码长度，再decode核回编码、实际字节数和原字节SHA256；值深度冻结，只含ref/data。Model不解码图像格式或验证像素真实尺寸，Desktop Provider负责magic/解码/16MP/EXIF等。原blob SHA证明来源；SDK后续合法规范化/resize不以原base64哈希判断图块遗漏。
+
+`PiImageInput.assertCollection(images,{mode:'turn'|'restore'}={})` 为纯静态方法：缺省turn，最多4张/8388608字节；restore最多8张/16777216字节，拒非typed数组/重复attachmentId/混项目，返回冻结数组。所有图片须先通过单张值核验。单图IPC6MiB、项目64MiB含staged/256refs、完整序列化请求24MiB与实际userData计数由Host在相应效果前核验，不能由这个纯数组方法证明。
+
+PiConversationHistory的user消息可选**非空**imageRefs数组（plain引用可规范构造）；每条最多4张/8MiB，所有图片属于同一project，同一attachmentId在history中不能换SHA/MIME/尺寸等metadata，assistant不接受图；只保存七字段ref，不保存data/SDK blocks。旧role/text消息不加imageRefs:[]，保持原字段顺序与JSON字节；Checkpoint的instance/profileId/profileVersion/history外壳不增默认字段，旧text restore继续单参兼容。新history缺失/变动ref由Host重载明确拒绝，不能拿文字id冒充像素。
+
+Profile.modelMetadata.input仅在字段存在时接受非空唯一text/image数组；缺省不补input、仍unknown，不自行证明视觉支持。Desktop profile的imageCapability unknown/supported/unsupported由用户显式设置并绑定profileVersion；unknown/unsupported发送图片前拒绝且保留草稿，真实服务拒绝仍报真实安全错误。模型名/协议/默认placeholder不能证明支持。
+
+Adapter owner扩可选 `start_run(runId,text,{images})`/`restore_history(checkpoint,{images})`，只接Host重载的PiImageInput；按project/id/SHA精确匹配history refs、顺序与预算，SDK仅投影 `{type:'image',data,mimeType:ref.mimeType}`。二参text和单参text checkpoint行为不变；纯图片user text可为空，但是否发送由Adapter当前images校验。不得把bytes拼入prompt文字预算、工具、grant、普通日志或持久history。Kernel PermissionRuntime旧text入口不扩。
+
+Host Pipeline通过Desktop Project公开Service→相邻Provider私有blob IO，绑定project/Human source/message/channel/当前PM或worker实例后重载；Pi Provider无peer附件Provider或上层IO回调。PM/worker image handoff包含可信ref且收到真实像素，不增加owner/Mutation/Check/Shell权限。缺失、变化、预算、取消和image_omitted/视觉拒绝须安全静态原因；图片像素不做OCR或全称DLP。本阶段不做CLI图片、生成或远程下载。

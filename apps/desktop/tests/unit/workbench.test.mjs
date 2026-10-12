@@ -1541,6 +1541,35 @@ test('public Node factory uses environment profile for actual SDK PM without Ele
   assert.equal((await readdir(data)).some(name=>name.includes('settings')),false);for(const name of await readdir(data))if(name.endsWith('.json'))assert.equal((await readFile(join(data,name),'utf8')).includes('node-fixture-secret'),false);
  }finally{await pipeline.close();await local.close();}
 });
+test('both public Desktop and Headless facades stage, preview and discard exact project PNG bytes',async()=>{
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/+d8AAAAASUVORK5CYII=','base64');
+ for(const mode of ['desktop','headless']){
+  const location=await mkdtemp(join(base,'fixtures','image-facade-'+mode+'-')),root=join(location,'customer'),data=join(location,'private');await mkdir(root);
+  let pipeline;if(mode==='desktop')pipeline=createWorkbenchPipeline({userDataDir:data,leaseRoot:join(location,'leases')});
+  else pipeline=createHeadlessWorkbenchPipeline({userDataDir:data,leaseRoot:join(location,'leases'),profile:{protocol:'openai-completions',provider:'local',modelId:'fixture',baseUrl:'http://127.0.0.1:9999/v1',env:{LEGION_API_KEY:'fixture-only-key'}}});
+  try{for(const name of ['stageImage','readImagePreview','discardImage'])assert.equal(typeof pipeline[name],'function',mode+' '+name);const selected=await pipeline.selectProject(root);assert.equal(selected.ok,true,JSON.stringify(selected));const projectId=selected.value.currentProject.id;
+   const staged=await pipeline.stageImage({projectId,mimeType:'image/png',data:png.toString('base64')});assert.equal(staged.ok,true,JSON.stringify(staged));const ref=staged.value.ref;assert.equal(ref.projectId,projectId);assert.equal(ref.sha256,createHash('sha256').update(png).digest('hex'));
+   const preview=await pipeline.readImagePreview({projectId,ref});assert.equal(preview.ok,true,JSON.stringify(preview));assert.equal(preview.value.data,png.toString('base64'));assert.equal((await pipeline.readImagePreview({projectId:'b'.repeat(64),ref})).ok,false);
+   assert.equal((await pipeline.discardImage({projectId,ref})).ok,true);assert.equal((await pipeline.readImagePreview({projectId,ref})).ok,false);
+  }finally{await pipeline.close();}
+ }
+});
+test('pure Node Workbench Host stages a real PNG, refuses unknown vision and sends image-only pixels after explicit profile opt-in',async()=>{
+ const observed=[];const local=await server((record,reply)=>{if(isCustomerCall(record.body))observed.push(record.body);completion(reply,protocol(record),'已看到当前图片');});const setup=await fixture(local);
+ try{const bytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/+d8AAAAASUVORK5CYII=','base64');const stage=await setup.pipeline.stageImage({projectId:setup.projectId,mimeType:'image/png',data:bytes.toString('base64')});assert.equal(stage.ok,true,JSON.stringify(stage));
+  const ref=stage.value.ref;const denied=await setup.pipeline.sendMessage({projectId:setup.projectId,roleId:'Supervisor',text:'',imageRefs:[ref]});assert.equal(denied.ok,false);assert.equal(denied.error.code,'image_capability_unknown');assert.equal(observed.length,0);
+  const original=(await setup.pipeline.getState()).value.profiles.find(item=>item.id===setup.ids[0]);const saved=await setup.pipeline.saveProfile({id:original.id,name:original.name,protocol:original.protocol,provider:original.provider,modelId:original.modelId,baseUrl:original.baseUrl,imageCapability:'supported',keyAction:'keep',apiKey:''});assert.equal(saved.ok,true,JSON.stringify(saved));
+  const started=await setup.pipeline.sendMessage({projectId:setup.projectId,roleId:'Supervisor',text:'',imageRefs:[ref]});assert.equal(started.ok,true,JSON.stringify(started));const done=await until(setup.pipeline,state=>state.turn?.status==='completed'||state.turn?.status==='failed');assert.equal(done.turn.status,'completed',JSON.stringify(done.error));assert.equal(done.timeline.messages.find(message=>message.kind==='human').imageRefs[0].sha256,ref.sha256);assert.equal(observed.length,1);assert.match(JSON.stringify(observed[0]),/data:image\/png;base64,/u);
+ }finally{await setup.pipeline.close();await local.close();}
+});
+test('trusted Human image source reaches the real PM prompt and its exact task reference is bound into the draft and confirmation',async()=>{
+ let candidate;const local=await server((record,reply)=>completion(reply,protocol(record),'```legion-plan\n'+JSON.stringify(candidate)+'\n```'));const setup=await fixture(local);
+ try{const original=(await setup.pipeline.getState()).value.profiles.find(item=>item.id===setup.ids[0]);assert.equal((await setup.pipeline.saveProfile({id:original.id,name:original.name,protocol:original.protocol,provider:original.provider,modelId:original.modelId,baseUrl:original.baseUrl,imageCapability:'supported',keyAction:'keep',apiKey:''})).ok,true);
+  const bytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/+d8AAAAASUVORK5CYII=','base64');const staged=await setup.pipeline.stageImage({projectId:setup.projectId,mimeType:'image/png',data:bytes.toString('base64')});assert.equal(staged.ok,true,JSON.stringify(staged));const ref=staged.value.ref;candidate=proposal([setup.ids[0]]);candidate.tasks[0].imageRefs=[ref];
+  assert.equal((await setup.pipeline.sendMessage({projectId:setup.projectId,roleId:'Supervisor',text:'按当前图片制订任务',imageRefs:[ref]})).ok,true);const state=await until(setup.pipeline,value=>value.interactions.some(item=>item.purpose==='execute_plan')||value.error?.code==='preflight_incomplete');assert.equal(state.plan?.status,'draft',JSON.stringify(state.error));assert.deepEqual(state.plan.tasks[0].imageRefs,[ref]);const confirmation=state.interactions.find(item=>item.purpose==='execute_plan');assert.ok(confirmation,JSON.stringify({error:state.error,supervisions:state.supervisions,turn:state.turn?.status}));assert.match(confirmation.text,new RegExp(ref.sha256,'u'));
+  const pm=local.calls.find(record=>strings(record.body).some(text=>text.includes('Host可信Human图片引用')));assert.ok(pm);assert.match(strings(pm.body).join('\n'),new RegExp(ref.attachmentId,'u'));assert.match(JSON.stringify(pm.body),/data:image\/png;base64,/u);
+ }finally{await setup.pipeline.close();await local.close();}
+});
 
 test('parallel real SDK: Shell snapshot and another owner Mutation share Host commit queue without baseline relaxation',async()=>{
  let candidate;let setup;let other=null;let reviewSeen=false;let checkedPendingWrite=false;let published=false;

@@ -34,6 +34,7 @@
 /* Members keep wheel/keyboard scrolling without a visible scrollbar or reserved strip. */
 .member-list { scrollbar-width: none; scrollbar-gutter: auto; }
 .member-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.image-drafts{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.image-draft{position:relative;width:108px;border:1px solid var(--line);border-radius:9px;padding:4px;background:var(--subtle)}.image-draft img{display:block;max-width:100%;height:72px;object-fit:contain;margin:auto}.image-draft button{display:block;width:100%;padding:4px;font-size:10px}.message-image{margin-top:8px}.message-image img{display:block;max-width:min(100%,360px);max-height:300px;object-fit:contain;border-radius:8px}.composer-box[data-image-drop=true]{border-color:var(--warning)}
 
 /* The customer entry is separate from the read-only role list. */
 .entry-card{display:grid;grid-template-columns:26px minmax(0,1fr) auto;grid-template-areas:"icon copy badge" "icon state state";align-items:center;column-gap:8px;row-gap:5px;min-width:0;padding:11px;border:1px solid var(--line);background:var(--panel)}

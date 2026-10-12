@@ -13,7 +13,7 @@ export class _PiAgentService extends PiAgentService {
     Object.freeze(this);
   }
   static async create(options) { return new _PiAgentService(await createPiSessionProvider(options)); }
-  start_run(runId, prompt) { return this.#provider.start_run(runId, prompt); }
+  start_run(runId, prompt, options) { return this.#provider.start_run(runId, prompt, options); }
   async next_event(runId, options) {
     const event = await this.#provider.next_event(runId, options);
     if (!Object.isFrozen(event) || !Object.values(PiEventType).includes(event.type)) {
@@ -40,7 +40,7 @@ export class _PiAgentService extends PiAgentService {
     if (!(history instanceof PiConversationHistory)) throw new TypeError("invalid_pi_history");
     return history;
   }
-  restore_history(checkpoint) { return this.#provider.restore_history(checkpoint); }
+  restore_history(checkpoint, options) { return this.#provider.restore_history(checkpoint, options); }
   cancel() { return this.#provider.cancel(); }
   close() { return this.#provider.close(); }
 }

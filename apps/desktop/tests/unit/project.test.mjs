@@ -10,7 +10,7 @@ import {
   readFile,
   readdir,
   symlink,
-  rename, lstat, unlink
+  rename, lstat, unlink, utimes
 } from 'node:fs/promises';
 import {
   resolve,
@@ -33,7 +33,7 @@ assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(t
 const projectRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 let roleDirectory = testRole;
 if (testRole !== 'DesktopEngineer') roleDirectory = `${testRole}/desktop`;
-const base = resolve(projectRoot, `.ans/runtime/legion-cli-role-owned-v2/${roleDirectory}`);
+const base = resolve(projectRoot, `.ans/runtime/legion-desktop-command-center-v1/${roleDirectory}`);
 await mkdir(join(base, 'fixtures'), {
   recursive: true
 });
@@ -69,6 +69,22 @@ async function fixture() {
       userDataDir: userData
     }); assert.equal((await unsafe.describeRoot(selected)).error.code, 'data_overlap');
   } const alias = join(location, 'alias'); await symlink(root, alias, 'junction'); assert.equal((await provider.describeRoot(alias)).error.code, 'unsafe_path'); assert.deepEqual(await readdir(root), []);
+});
+test('project-private PNG stage/read/discard binds real bytes and rejects changed or linked blobs',async()=>{
+  const {root,data,fixture:location}=await fixture();const service=realCreateProjectService({userDataDir:data,leaseRoot:join(location,'leases')});
+  const selected=await service.select(root);assert.equal(selected.ok,true,JSON.stringify(selected));const project=selected.value;
+  const bytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/+d8AAAAASUVORK5CYII=','base64');
+  const staged=await service.stageImage(project,{projectId:project.id,mimeType:'image/png',data:bytes.toString('base64')});assert.equal(staged.ok,true,JSON.stringify(staged));
+  const ref=staged.value.ref;assert.equal(ref.projectId,project.id);assert.equal(ref.mimeType,'image/png');assert.equal(ref.sha256,createHash('sha256').update(bytes).digest('hex'));assert.equal(ref.width,1);assert.equal(ref.height,1);
+  const file=join(data,'workbench-attachments',project.id,ref.attachmentId);assert.equal((await lstat(file)).mode&0o777,0o600);assert.deepEqual(await readdir(root),[]);
+  const read=await service.readImage(project,ref);assert.equal(read.ok,true,JSON.stringify(read));assert.equal(read.value.data,bytes.toString('base64'));
+  assert.equal((await service.discardImage(project,ref,true)).error.code,'image_referenced');
+  const old=new Date('2020-01-01T00:00:00.000Z');await utimes(file,old,old);assert.equal((await service.pruneImages(project,[ref.attachmentId])).value.removed,0);assert.equal((await lstat(file)).isFile(),true);
+  const orphan=await service.stageImage(project,{projectId:project.id,mimeType:'image/png',data:bytes.toString('base64')});assert.equal(orphan.ok,true);const orphanPath=join(data,'workbench-attachments',project.id,orphan.value.ref.attachmentId);await utimes(orphanPath,old,old);const orphanRead=await service.readImage(project,orphan.value.ref);assert.equal(orphanRead.ok,true,JSON.stringify(orphanRead));const pruned=await service.pruneImages(project,[ref.attachmentId]);assert.equal(pruned.ok,true,JSON.stringify(pruned));assert.equal(pruned.value.removed,1);await assert.rejects(lstat(orphanPath),{code:'ENOENT'});
+  await writeFile(file,'changed');assert.equal((await service.readImage(project,ref)).error.code,'image_changed');await utimes(file,old,old);
+  assert.equal((await service.pruneImages(project,[])).ok,false);assert.equal((await lstat(file)).isFile(),true);
+  await unlink(file);const sentinel=join(data,'sentinel');await writeFile(sentinel,'unchanged');await symlink(sentinel,file);assert.equal((await service.readImage(project,ref)).ok,false);assert.equal(await readFile(sentinel,'utf8'),'unchanged');
+  await unlink(file);const again=await service.stageImage(project,{projectId:project.id,mimeType:'image/png',data:bytes.toString('base64')});assert.equal(again.ok,true);assert.equal((await service.discardImage(project,again.value.ref,false)).ok,true);await service.close();
 });
 test('unavailable historical root does not block selecting a new valid customer project', async () => {
   const {

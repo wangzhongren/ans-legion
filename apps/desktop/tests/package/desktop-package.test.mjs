@@ -14,12 +14,12 @@ const desktop = join(root, 'apps/desktop');
 const role = process.env.LEGION_DESKTOP_TEST_ROLE ?? 'ProjectManager';
 assert.ok(['ProjectManager', 'Reviewer', 'Tester'].includes(role), 'unknown_desktop_test_role');
 const generated = join(root, '.ans/runtime/legion-desktop-command-center-v1', role);
-const packaging = join(generated, 'packaging', 'er-ge-display-name-v1-final-v2-a689a7d63d7dfc26');
-const fixtures = join(generated, 'fixtures', 'er-ge-display-name-v1-final-v2-a689a7d63d7dfc26');
-const userDataRoot = join(generated, 'user-data', 'er-ge-display-name-v1-final-v2-a689a7d63d7dfc26');
-const temporary = join(generated, 'tmp', 'er-ge-display-name-v1-final-v2-a689a7d63d7dfc26');
+const packaging = join(generated, 'packaging', 'desktop-image-input-v1-facade-repair-20261012');
+const fixtures = join(generated, 'fixtures', 'desktop-image-input-v1-facade-repair-20261012');
+const userDataRoot = join(generated, 'user-data', 'desktop-image-input-v1-facade-repair-20261012');
+const temporary = join(generated, 'tmp', 'desktop-image-input-v1-facade-repair-20261012');
 const npm = 'D:/soft/nodejs/node_modules/npm/bin/npm-cli.js';
-const stableZip = join(packaging, 'LegionDesktop-0.3.3-win32-x64.zip');
+const stableZip = join(packaging, 'LegionDesktop-0.4.1-win32-x64.zip');
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const protocols = ['openai-completions', 'openai-responses', 'anthropic-messages'];
 const readTools = ['legion_list_files', 'legion_read_file'].sort();
@@ -40,7 +40,7 @@ async function files(directory, prefix = '') {
 }
 
 async function currentPackageSmoke() {
-  const descriptor = join(root, '.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/er-ge-display-name-v1-final-v2-a689a7d63d7dfc26/package-smoke.json');
+  const descriptor = join(root, '.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-image-input-v1-facade-repair-20261012/package-smoke.json');
   try { return JSON.parse(await readFile(descriptor, 'utf8')); }
   catch (error) {
     if (error.code !== 'ENOENT') throw error;
@@ -53,7 +53,7 @@ async function currentPackageSmoke() {
 
 async function snapshot() {
   const packageEvidence = JSON.parse(await readFile(join(root,
-    '.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/er-ge-display-name-v1-final-v2-a689a7d63d7dfc26/package-smoke.json'), 'utf8'));
+    '.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-image-input-v1-facade-repair-20261012/package-smoke.json'), 'utf8'));
   const hashes = {};
   const paths = Object.keys(packageEvidence.sourceHashes);
   paths.push('.ans/runtime/legion-governed-workflow-v1/ProjectManager/packaging/legion-runtime-0.7.0.tgz', '.ans/runtime/legion-governed-workflow-v1/ProjectManager/packaging/package-smoke.json');
@@ -109,7 +109,7 @@ async function guardedRemove(target, base) {
 
 function environment(extra = {}) {
   const env = { ...process.env, ...extra, LEGION_DESKTOP_TEST_ROLE: role, TEMP: temporary, TMP: temporary,
-    npm_config_cache: join(generated, 'npm-cache', 'er-ge-display-name-v1-final-v2-a689a7d63d7dfc26'), npm_config_ignore_scripts: 'true',
+    npm_config_cache: join(generated, 'npm-cache', 'desktop-image-input-v1-facade-repair-20261012'), npm_config_ignore_scripts: 'true',
     npm_config_audit: 'false', npm_config_fund: 'false', npm_config_offline: 'true',
     NODE_DISABLE_COMPILE_CACHE: '1', ELECTRON_DISABLE_SECURITY_WARNINGS: 'false' };
   for (const key of ['NODE_OPTIONS', 'NODE_COMPILE_CACHE', 'NODE_PATH', 'ELECTRON_RUN_AS_NODE',
@@ -310,7 +310,7 @@ if (process.platform === 'win32') test('current Windows ZIP ships real runtime a
     const appRoot = join(extracted, 'resources/app');
     const manifest = JSON.parse(await readFile(join(appRoot, 'package.json'), 'utf8'));
     const sourceManifest = JSON.parse(await readFile(join(desktop, 'package.json'), 'utf8'));
-    assert.equal(manifest.name, 'legion-desktop'); assert.equal(manifest.version, '0.3.3');
+    assert.equal(manifest.name, 'legion-desktop'); assert.equal(manifest.version, '0.4.1');
     assert.equal(manifest.main, 'main.mjs'); assert.equal(manifest.type, 'module');
     assert.deepEqual(manifest.dependencies, sourceManifest.dependencies);
     const { scripts, devDependencies, private: privatePackage, ...expectedManifest } = sourceManifest;
@@ -324,7 +324,7 @@ if (process.platform === 'win32') test('current Windows ZIP ships real runtime a
     const sourceFiles = await files(join(desktop, 'src'));
     for (const path of [...sourceFiles.map(name => 'src/' + name), 'main.mjs', 'README.md'])
       assert.equal(sha(await readFile(join(appRoot, path))), sha(await readFile(join(desktop, path))), path);
-    const coreSmoke = JSON.parse(await readFile(join(root, '.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/er-ge-display-name-v1-final-v2-a689a7d63d7dfc26/package-smoke.json'), 'utf8'));
+    const coreSmoke = JSON.parse(await readFile(join(root, '.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-image-input-v1-facade-repair-20261012/package-smoke.json'), 'utf8'));
     const runtimeRoot = join(appRoot, 'node_modules/legion-runtime');
     const runtimeFiles = await files(runtimeRoot); assert.equal(runtimeFiles.length, coreSmoke.fileCount);
     for (const path of runtimeFiles) assert.equal(sha(await readFile(join(runtimeRoot, path))), sha(await readFile(join(root, path))), 'runtime_package:' + path);
@@ -344,15 +344,15 @@ if (process.platform === 'win32') test('current Windows ZIP ships real runtime a
       import {createProposalService} from 'legion-runtime/services/proposal';
       import {readFileSync} from 'node:fs';
       assert.equal(typeof normalizeContext,'function');for(const api of [a,b,c])assert.equal(typeof api.streamSimple,'function');
-      assert.equal(typeof createAgentSession,'function');assert.equal(Object.keys(models).length,62);
+      assert.equal(typeof createAgentSession,'function');assert.equal(Object.keys(models).length,64);
       for(const name of ['ProjectReadRequest','ProjectReadDecision','ProjectReadResult','normalizeProjectReadResource',
         'ProjectFileOwners','FileOwnershipPlan','FileOwnershipTransfer','FileOwnershipError',
         'applyFileOwnershipPlan','assertFileOwner','assertDistinctRoleWriteScopes'])assert.equal(typeof models[name],'function');
       for(const factory of [createPiAgentService,createPolicyService,createMutationService,createReadService,createProposalService])assert.equal(typeof factory,'function');
       for(const name of ['pi-ai','pi-coding-agent'])assert.equal(JSON.parse(readFileSync('node_modules/@earendil-works/'+name+'/package.json')).version,'1.0.4');
-      assert.equal(JSON.parse(readFileSync('node_modules/legion-runtime/package.json')).version,'1.2.3');
+      assert.equal(JSON.parse(readFileSync('node_modules/legion-runtime/package.json')).version,'1.3.1');
       assert.equal(process.versions.electron,'44.6.0');const v=process.versions.node.split('.').map(Number);assert.ok(v[0]>22||(v[0]===22&&v[1]>=19));
-      console.log(JSON.stringify({electron:process.versions.electron,node:process.versions.node,piAi:'1.0.4',piSdk:'1.0.4',runtime:'1.2.3',models:62,publicApis:3,readService:true,fileOwners:true}));`;
+      console.log(JSON.stringify({electron:process.versions.electron,node:process.versions.node,piAi:'1.0.4',piSdk:'1.0.4',runtime:'1.3.1',models:64,publicApis:3,readService:true,fileOwners:true}));`;
     const embedded = command(executable, ['--input-type=module', '-e', probeCode], {
       cwd: appRoot, env: { ...environment(), ELECTRON_RUN_AS_NODE: '1' }, timeout: 30000 });
     const runtime = JSON.parse(embedded.stdout.trim());
@@ -528,9 +528,9 @@ if (process.platform === 'win32') test('current Windows ZIP ships real runtime a
 });
 
 if (process.platform === 'darwin') test('macOS installed package identity; Windows ZIP proof pending', async () => {
-  const nodePackage = join(root, '.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/er-ge-display-name-v1-final-v2-a689a7d63d7dfc26');
+  const nodePackage = join(root, '.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-image-input-v1-facade-repair-20261012');
   const smoke = await currentPackageSmoke();
-  const archive = await readFile(join(nodePackage, 'legion-runtime-1.2.3.tgz'));
+  const archive = await readFile(join(nodePackage, 'legion-runtime-1.3.1.tgz'));
   assert.equal(smoke.sha256, sha(archive));
   assert.equal(sha(await readFile(join(root, '.ans/runtime/legion-desktop-workbench-v2/ProjectManager/node/packaging/legion-runtime-0.4.0.tgz'))),
     'f3114a19205b69542c5629cfbb4a2664e9aebc62fc81f76a69d332e6f922140c');
@@ -538,16 +538,16 @@ if (process.platform === 'darwin') test('macOS installed package identity; Windo
     '9fe38c708833d261ee3f3d7b25e7d66c19f6a4978039d1d8a38e7a31b69350da');
   assert.ok(smoke.fileCount > 46);
   assert.equal(Object.keys(smoke.sourceHashes).length, smoke.fileCount - 3);
-  assert.equal(smoke.modelExports.length, 62);
+  assert.equal(smoke.modelExports.length, 64);
   assert.equal(smoke.smoke.fileOwnership, true);
   assert.equal(smoke.smoke.controlledEdit, true);
   const manifest = JSON.parse(await readFile(join(desktop, 'package.json'), 'utf8'));
   const lock = JSON.parse(await readFile(join(desktop, 'package-lock.json'), 'utf8'));
   const spec = manifest.dependencies['legion-runtime'];
-  assert.equal(spec, 'file:../../.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/er-ge-display-name-v1-final-v2-a689a7d63d7dfc26/legion-runtime-1.2.3.tgz');
+  assert.equal(spec, 'file:../../.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-image-input-v1-facade-repair-20261012/legion-runtime-1.3.1.tgz');
   assert.equal(lock.packages[''].dependencies['legion-runtime'], spec);
   const entry = lock.packages['node_modules/legion-runtime'];
-  assert.equal(entry.version, '1.2.3');
+  assert.equal(entry.version, '1.3.1');
   assert.equal(entry.resolved, spec);
   assert.equal(entry.integrity, 'sha512-' + createHash('sha512').update(archive).digest('base64'));
   assert.equal(entry.link, undefined);
@@ -555,7 +555,7 @@ if (process.platform === 'darwin') test('macOS installed package identity; Windo
   const runtimeInfo = await lstat(runtimeRoot);
   assert.ok(runtimeInfo.isDirectory() && !runtimeInfo.isSymbolicLink());
   const published = JSON.parse(await readFile(join(runtimeRoot, 'package.json'), 'utf8'));
-  assert.equal(published.version, '1.2.3');
+  assert.equal(published.version, '1.3.1');
   for (const file of ['README.md', 'package.json'])
     assert.deepEqual(await readFile(join(runtimeRoot, file)), await readFile(join(root, file)), 'installed_source_bytes:' + file);
   assert.deepEqual(published.exports, smoke.packageExports);
@@ -618,7 +618,7 @@ async function electronCheckSmoke(generated) {
   const { createCheckService } = await import('legion-runtime/services/check');
   assert.equal(process.versions.electron, '44.6.0');
   assert.ok(process.execPath.endsWith('/Electron'));
-  const fixtureRoot = path.join(generated, 'fixtures', 'er-ge-display-name-v1-final-v2-a689a7d63d7dfc26');
+  const fixtureRoot = path.join(generated, 'fixtures', 'desktop-image-input-v1-facade-repair-20261012');
   await fs.mkdir(fixtureRoot, { recursive: true });
   const base = await fs.mkdtemp(path.join(fixtureRoot, 'electron-check-'));
   const candidate = path.join(base, 'candidate');
@@ -673,8 +673,8 @@ async function electronCheckSmoke(generated) {
     assert.equal(revoked.result.executed, false); assert.equal(revoked.decision.allowed, false);
     const evidence = { electron: process.versions.electron, node: process.versions.node, runtimeExecutable: process.execPath,
       validations, result: value.result, forged: forged.result, revoked: revoked.result };
-    await fs.mkdir(path.join(generated, 'packaging', 'er-ge-display-name-v1-final-v2-a689a7d63d7dfc26'), { recursive: true });
-    await fs.writeFile(path.join(generated, 'packaging/er-ge-display-name-v1-final-v2-a689a7d63d7dfc26/electron-check-smoke.json'), JSON.stringify(evidence, null, 2) + '\n');
+    await fs.mkdir(path.join(generated, 'packaging', 'desktop-image-input-v1-facade-repair-20261012'), { recursive: true });
+    await fs.writeFile(path.join(generated, 'packaging/desktop-image-input-v1-facade-repair-20261012/electron-check-smoke.json'), JSON.stringify(evidence, null, 2) + '\n');
     console.log('ELECTRON_CHECK_SMOKE ' + JSON.stringify(evidence));
   } finally { await service.close(); await service.close(); }
 }

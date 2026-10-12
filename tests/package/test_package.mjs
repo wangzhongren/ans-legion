@@ -10,9 +10,9 @@ const project = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const role = process.env.LEGION_NODE_TEST_ROLE ?? "ProjectManager";
 assert.ok(["ProjectManager", "Reviewer", "Tester"].includes(role), "unknown_node_test_role");
 const generated = join(project, ".ans/runtime/legion-desktop-command-center-v1", role);
-const packaging = join(generated, "packaging", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26");
-const cache = join(generated, "npm-cache", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26");
-const temporary = join(generated, "tmp", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26");
+const packaging = join(generated, "packaging", "desktop-image-input-v1-facade-repair-20261012");
+const cache = join(generated, "npm-cache", "desktop-image-input-v1-facade-repair-20261012");
+const temporary = join(generated, "tmp", "desktop-image-input-v1-facade-repair-20261012");
 const historicalSeed = join(project, ".ans/runtime/legion-pi-node-v3/npm-cache/_cacache");
 const localSeed = "/private/tmp/legion-npm-cache/_cacache";
 const previousGovernedTarball = join(project, ".ans/runtime/legion-governed-workflow-v1/ProjectManager/packaging/legion-runtime-0.7.0.tgz");
@@ -25,7 +25,7 @@ const publicNames = ["createRuntime", "AgentSession", "ActionProposal", "RoleBou
   "Outcome", "AgentScope", "PiConnection", "TaskDispatchContext"].sort();
 const modelNames = ["ContextReadConfirmation", "ContextSnapshot", "ConfirmedTaskGrant", "MutationVerification",
   "createWorkbenchAuthority", "isWorkbenchMutationAuthority", "PiConnection", "PiConnectionProfile", "AgentScope",
-  "AgentConfig", "TaskDispatchContext", "AgentInstance", "PiEventType", "PiTextDelta", "PiConversationHistory",
+  "AgentConfig", "TaskDispatchContext", "AgentInstance", "PiEventType", "PiTextDelta", "PiImageReference", "PiImageInput", "PiConversationHistory",
   "PiConversationCheckpoint", "PiToolRequest", "PiToolResult", "PiRunResult", "AgentSession", "RoleBoundary",
   "ActionProposal", "PolicyDecision", "ExecutionPermit", "MutationResult", "Event", "Outcome",
   "ProjectReadRequest", "ProjectReadDecision", "ProjectReadResult", "normalizeProjectReadResource",
@@ -283,6 +283,25 @@ async function installedFreshSingleRunSmoke(workspace) {
     fixtureModelCalls: calls.length + lengthCore.state.callCount, paidModelCalls: 0 };
 }
 
+async function installedPublicImageFacadeSmoke(base) {
+  const assert = (await import('node:assert/strict')).default;
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const {createWorkbenchPipeline,createHeadlessWorkbenchPipeline} = await import('legion-runtime/headless-workbench');
+  await fs.mkdir(base,{recursive:true});
+  const directory=await fs.mkdtemp(path.join(base,'installed-image-facade-'));
+  const desktop=createWorkbenchPipeline({userDataDir:path.join(directory,'desktop'),leaseRoot:path.join(directory,'desktop-leases')});
+  const headless=createHeadlessWorkbenchPipeline({userDataDir:path.join(directory,'headless'),leaseRoot:path.join(directory,'headless-leases'),profile:{protocol:'openai-completions',provider:'local',modelId:'local',baseUrl:'http://127.0.0.1:1/v1',env:{LEGION_API_KEY:'installed-image-facade-fixture'}}});
+  try {
+    const methods=['stageImage','discardImage','readImagePreview'];
+    for(const [name,host] of [['desktop',desktop],['headless',headless]]) {
+      assert.equal(Object.isFrozen(host),true,name+' public facade must be finite');
+      for(const method of methods)assert.equal(typeof host[method],'function',name+' public image method missing:'+method);
+    }
+    return {desktop:true,headless:true,methods,source:'actual-installed-public-factories'};
+  } finally {await desktop.close();await headless.close();}
+}
+
 async function installedShellSmoke(base) {
   const assert = (await import('node:assert/strict')).default;
   const fs = (await import('node:fs')).promises;
@@ -302,9 +321,9 @@ async function installedShellSmoke(base) {
   await fs.writeFile(path.join(workspaceRoot, 'owned.txt'), 'original\n');
   await fs.writeFile(path.join(workspaceRoot, 'removed.txt'), 'remove with exact baseline\n');
   await fs.writeFile(path.join(workspaceRoot, 'asset.png'), Buffer.from([137, 80, 0]));
-  await fs.writeFile(path.join(workspaceRoot, 'package.json'), JSON.stringify({ name: 'installed-shell-fixture', version: '1.2.3',
+  await fs.writeFile(path.join(workspaceRoot, 'package.json'), JSON.stringify({ name: 'installed-shell-fixture', version: '1.3.1',
     scripts: { build: 'node -e "require(\'node:fs\').mkdirSync(\'dist\',{recursive:true});require(\'node:fs\').writeFileSync(\'dist/result.txt\',\'built\')"' } }));
-  await fs.writeFile(path.join(workspaceRoot, 'local/package.json'), JSON.stringify({ name: 'installed-shell-local', version: '1.2.3', bin: { 'installed-bin': 'bin.js' } }));
+  await fs.writeFile(path.join(workspaceRoot, 'local/package.json'), JSON.stringify({ name: 'installed-shell-local', version: '1.3.1', bin: { 'installed-bin': 'bin.js' } }));
   await fs.writeFile(path.join(workspaceRoot, 'local/bin.js'), '#!/usr/bin/env node\nconsole.log("local installed dependency");\n');
   const stat = await fs.lstat(workspaceRoot, { bigint: true });
   const workspaceIdentity = { canonicalPath: workspaceRoot, deviceId: String(stat.dev), fileId: String(stat.ino) };
@@ -861,7 +880,7 @@ export async function buildPackageEvidence() {
     const packed = JSON.parse(npm(["pack", "--json", "--pack-destination", runDirectory]))[0];
     assert.deepEqual(packed.files.map((file) => file.path).sort(), expected);
     assert.equal(packed.name, "legion-runtime");
-    assert.equal(packed.version, "1.2.3");
+    assert.equal(packed.version, "1.3.1");
     const tarball = join(packaging, packed.filename);
     const bytes = await fs.readFile(join(runDirectory, packed.filename));
     try { await fs.writeFile(tarball, bytes, { flag: "wx" }); }
@@ -880,16 +899,16 @@ export async function buildPackageEvidence() {
       private: true, type: "module", dependencies: { "legion-runtime": tarballDependency } }));
     const sourceLock = JSON.parse(await fs.readFile(join(project, "package-lock.json"), "utf8"));
     sourceLock.name = "legion-isolated-consumer";
-    sourceLock.version = "1.2.3";
-    sourceLock.packages[""] = { name: "legion-isolated-consumer", version: "1.2.3",
+    sourceLock.version = "1.3.1";
+    sourceLock.packages[""] = { name: "legion-isolated-consumer", version: "1.3.1",
       dependencies: { "legion-runtime": tarballDependency } };
-    sourceLock.packages["node_modules/legion-runtime"] = { version: "1.2.3", resolved: tarballDependency,
+    sourceLock.packages["node_modules/legion-runtime"] = { version: "1.3.1", resolved: tarballDependency,
       integrity, dependencies: { "@earendil-works/pi-ai": "1.0.4", "@earendil-works/pi-coding-agent": "1.0.4" },
       bin: { legion: "bin/legion.mjs" }, engines: { node: ">=22.19.0" } };
     await fs.writeFile(join(consumer, "package-lock.json"), JSON.stringify(sourceLock, null, 2) + "\n");
     npm(["ci", "--offline", "--cache", cache], consumer);
     const tree = JSON.parse(npm(["ls", "--all", "--json"], consumer));
-    assert.equal(tree.dependencies["legion-runtime"].version, "1.2.3");
+    assert.equal(tree.dependencies["legion-runtime"].version, "1.3.1");
     await fs.writeFile(join(consumer, "smoke.mjs"), "const installedLease = " + installedLease.toString() + ";\nconst installedFreshSingleRunSmoke = " + installedFreshSingleRunSmoke.toString() + ";\nawait (" + installedSmoke.toString() + ")(" + JSON.stringify(modelNames) + "," + JSON.stringify(serviceNames) + ");\n");
     const smokeOutput = execute(["smoke.mjs"], consumer);
     const smoke = JSON.parse(smokeOutput.trim());
@@ -899,10 +918,14 @@ export async function buildPackageEvidence() {
     assert.equal(smoke.projectRead, true);
     assert.equal(smoke.fileOwnership, true);
     assert.equal(smoke.controlledEdit, true);
-    await fs.writeFile(join(consumer, "shell-smoke.mjs"), "const installedLease = " + installedLease.toString() + ";\nconst value = await (" + installedShellSmoke.toString() + ")(" + JSON.stringify(join(generated, "fixtures", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26")) + "); console.log(JSON.stringify(value));\n");
+    await fs.writeFile(join(consumer, "shell-smoke.mjs"), "const installedLease = " + installedLease.toString() + ";\nconst value = await (" + installedShellSmoke.toString() + ")(" + JSON.stringify(join(generated, "fixtures", "desktop-image-input-v1-facade-repair-20261012")) + "); console.log(JSON.stringify(value));\n");
     const shell = JSON.parse(execute(["shell-smoke.mjs"], consumer).trim());
     assert.equal(shell.realOfflineNpmInstall, true);
     assert.equal(shell.publicWorkbenchPublication, true);
+    await fs.writeFile(join(consumer,"public-image-facade-smoke.mjs"),"const value = await ("+installedPublicImageFacadeSmoke.toString()+")("+JSON.stringify(join(generated,"fixtures","desktop-image-input-v1-facade-repair-20261012"))+"); console.log(JSON.stringify(value));\n");
+    const publicImageFacades=JSON.parse(execute(["public-image-facade-smoke.mjs"],consumer).trim());
+    assert.equal(publicImageFacades.desktop,true);assert.equal(publicImageFacades.headless,true);
+    assert.deepEqual(publicImageFacades.methods,['stageImage','discardImage','readImagePreview']);
     const installed = join(consumer, "node_modules/legion-runtime");
     const sourceHashes = {};
     for (const file of expected) {
@@ -928,7 +951,7 @@ export async function buildPackageEvidence() {
     assert.match(exampleOutput, /Su discussion complete/);
     const readmeExample = true;
     const suWorkflow = 'final fixed cli requires installed-cli-flow.json';
-    await fs.writeFile(join(consumer, "su-control-smoke.mjs"), "const value = await (" + installedSuControlSmoke.toString() + ")(" + JSON.stringify(join(generated, "fixtures", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26")) + "); console.log(JSON.stringify(value));\n");
+    await fs.writeFile(join(consumer, "su-control-smoke.mjs"), "const value = await (" + installedSuControlSmoke.toString() + ")(" + JSON.stringify(join(generated, "fixtures", "desktop-image-input-v1-facade-repair-20261012")) + "); console.log(JSON.stringify(value));\n");
     const suControls = JSON.parse(execute(["su-control-smoke.mjs"], consumer).trim());
     assert.equal(suControls.results.length, 9);
     assert.equal(suControls.totalActualLocalRequests, 18);
@@ -946,7 +969,7 @@ export async function buildPackageEvidence() {
     for (const [name, entry] of Object.entries(lock.packages)) {
       if (name !== "") assert.ok(entry.integrity, "consumer integrity missing: " + name);
     }
-    const evidence = { tarball, sha256, integrity, fileCount: packed.files.length,
+    const evidence = { publicImageFacades, tarball, sha256, integrity, fileCount: packed.files.length,
       publicExports: publicNames, modelExports: modelNames, serviceExports: serviceNames, packageExports,
       packageFiles: expected, sourceHashes, keyGuardSources, sourceAggregateSha256, sourceAggregateAlgorithm: "ordinal /relativePath TAB SHA256 LF UTF-8",
       isolatedInstall: true, smoke, shell, suControls, suWorkflow, readmeExample, cliScenarios: 6, cliEvents: 23,

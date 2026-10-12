@@ -174,7 +174,7 @@ test('IPC exact sender main frame URL and fields reject before any business call
 
 test('safe immutable DTOs do not return stored secrets or raw errors', () => {
   const profile = model.profileDTO({ ...input, id: 'saved', keyCiphertext: 'c2VjcmV0', apiKey: 'never-roundtrip' });
-  assert.deepEqual(Object.keys(profile).sort(), ['baseUrl', 'hasSavedKey', 'id', 'modelId', 'name', 'protocol', 'provider']);
+  assert.deepEqual(Object.keys(profile).sort(), ['baseUrl', 'hasSavedKey', 'id','imageCapability', 'modelId', 'name', 'protocol', 'provider']);
   assert.equal(profile.hasSavedKey, true);
   const dto = model.desktopDTO({ profiles: [profile], assignments: [], workspace: model.emptyWorkspace(), probe: { status: 'failed', error: { code: 'raw-key-and-stack', message: 'never-roundtrip' } }, error: { code: 'raw-key-and-stack', field: 'private' } });
   assert.ok(!JSON.stringify(dto).includes('never-roundtrip') && !JSON.stringify(dto).includes('c2VjcmV0'));
@@ -324,7 +324,7 @@ async function run(){
  assert.ok(decrypted.ok&&decrypted.value===secret,${JSON.stringify(process.platform === 'win32' ? 'real main-process Windows DPAPI roundtrip' : 'real main-process macOS safeStorage roundtrip')});
  const window=BrowserWindow.fromId(first.readiness.windowId);
  const proof=await window.webContents.executeJavaScript('({process:typeof process,require:typeof require,api:Object.keys(window.legionDesktop).sort(),pages:document.querySelectorAll("[data-page]").length,zones:document.querySelectorAll("#command-grid > section").length,title:document.title})');
- assert.equal(proof.process,'undefined'); assert.equal(proof.require,'undefined'); assert.equal(proof.pages,2);assert.equal(proof.zones,3);assert.match(proof.title,/Legion/u);
+ assert.equal(proof.process,'undefined'); assert.equal(proof.require,'undefined'); assert.equal(proof.pages,2);assert.equal(proof.zones,3);assert.equal(proof.title,'二哥项目指挥台');
  assert.deepEqual(proof.api,${JSON.stringify([...wb.WB_OPERATIONS].sort())});
  window.setSize(900,700);
  const narrow=await window.webContents.executeJavaScript("({visible:(()=>{const n=document.getElementById('mobile-nav-toggle'),b=n.getBoundingClientRect();return b.width>0&&b.height>0&&getComputedStyle(n).display!=='none';})()})");assert.equal(narrow.visible,true);
@@ -333,13 +333,24 @@ async function run(){
 
  const state=await window.webContents.executeJavaScript('window.legionDesktop.getState()');
  assert.equal(state.ok,true); assert.equal(state.value.profiles[0].hasSavedKey,true); assert.ok(!JSON.stringify(state).includes(secret));
+ const pixel='iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==';
+ const projectId=state.value.currentProject.id;
+ const staged=await window.webContents.executeJavaScript('window.legionDesktop.stageImage('+JSON.stringify({projectId,mimeType:'image/png',data:pixel})+')');
+ assert.equal(staged.ok,true);assert.deepEqual(Object.keys(staged.value),['ref']);assert.equal(staged.value.ref.projectId,projectId);assert.equal(staged.value.ref.width,2);
+ const imageRequest={projectId,ref:staged.value.ref};
+ const preview=await window.webContents.executeJavaScript('window.legionDesktop.readImagePreview('+JSON.stringify(imageRequest)+')');
+ assert.equal(preview.ok,true);assert.equal(preview.value.data,pixel);assert.deepEqual(preview.value.ref,staged.value.ref);
+ const ordinary=await window.webContents.executeJavaScript('window.legionDesktop.getState()');assert.equal(ordinary.ok,true);assert.ok(!JSON.stringify(ordinary).includes(pixel));assert.ok(!JSON.stringify(ordinary).includes('workbench-attachments'));
+ const wrong=await window.webContents.executeJavaScript('window.legionDesktop.readImagePreview('+JSON.stringify({...imageRequest,ref:{...imageRequest.ref,projectId:'b'.repeat(64)}})+')');assert.equal(wrong.ok,false);
+ const discarded=await window.webContents.executeJavaScript('window.legionDesktop.discardImage('+JSON.stringify(imageRequest)+')');assert.equal(discarded.ok,true);
+ assert.equal((await window.webContents.executeJavaScript('window.legionDesktop.readImagePreview('+JSON.stringify(imageRequest)+')')).ok,false);
  const denied=await window.webContents.executeJavaScript('window.legionDesktop.assignProfile({roleId:"Reviewer",profileId:null,projectId:"forged"})');
  assert.equal(denied.error.code,'invalid_input');
  assert.equal((await window.webContents.executeJavaScript('window.legionDesktop.testConnection({profileId:"missing"})')).error.code,'not_found');
  profiles.close();
  const closed=await first.close(); assert.equal(closed.closed,true); assert.equal(await first.close(),closed); assert.equal(window.isDestroyed(),true);
  const second=await startDesktop(options); assert.equal(second.readiness.ready,true); assert.equal((await second.close()).closed,true);
- await writeFile(${JSON.stringify(join(directory, 'native-proof.json'))},JSON.stringify({sandbox:true,DPAPI:${process.platform === 'win32'},macOSSafeStorage:${process.platform === 'darwin'},savedKeyDTO:true,pages:2,zones:3,repeatedClose:true,windowRestart:true}));
+ await writeFile(${JSON.stringify(join(directory, 'native-proof.json'))},JSON.stringify({sandbox:true,DPAPI:${process.platform === 'win32'},macOSSafeStorage:${process.platform === 'darwin'},savedKeyDTO:true,imageIPC:true,pages:2,zones:3,repeatedClose:true,windowRestart:true}));
  app.exit(0);
 }
 void run().catch(()=>{console.error('Reviewer native boundary failed');app.exit(1);});
@@ -365,7 +376,7 @@ void run().catch(()=>{console.error('Reviewer native boundary failed');app.exit(
   assert.equal(result.signal, null);
   const proof = JSON.parse(await fs.readFile(join(directory, 'native-proof.json'), 'utf8'));
   assert.deepEqual(proof, { sandbox: true, DPAPI: process.platform === 'win32',
-    macOSSafeStorage: process.platform === 'darwin', savedKeyDTO: true, pages: 2,zones:3,
+    macOSSafeStorage: process.platform === 'darwin', savedKeyDTO: true, imageIPC: true, pages: 2,zones:3,
     repeatedClose: true, windowRestart: true });
   const evidenceRoot = join(project, '.ans/runtime/legion-desktop-command-center-v1/Reviewer/evidence'); await ensure(evidenceRoot); const proofDirectory = await fs.mkdtemp(join(evidenceRoot, 'native-boundary-')); await fs.writeFile(join(proofDirectory, 'native-boundary.json'), JSON.stringify({ ...proof, exitCode: result.code, paidCalls: 0 }) + '\n');
 });
@@ -453,22 +464,22 @@ test(legacyCaseName, async () => {
   assert.ok(![...entries.keys()].some((path) => /\/resources\/app\/(tests|\.ans|scripts)\//u.test(path)));
 });
 
-test('macOS installed runtime matches current 1.2.2 package and every shipped source byte', { skip: process.platform !== 'darwin' }, async () => {
+test('macOS installed runtime matches current 1.3.1 package and every shipped source byte', { skip: process.platform !== 'darwin' }, async () => {
   const installed = join(desktop, 'node_modules/legion-runtime');
   const metadata = await fs.lstat(installed);
   assert.ok(metadata.isDirectory() && !metadata.isSymbolicLink());
   const manifest = JSON.parse(await fs.readFile(join(desktop, 'package.json'), 'utf8'));
   const lock = JSON.parse(await fs.readFile(join(desktop, 'package-lock.json'), 'utf8'));
-  const dependency = 'file:../../.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-command-center-su-label-repair-v1-9850a3707d523eba/legion-runtime-1.2.2.tgz';
+  const dependency = 'file:../../.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-image-input-v1-facade-repair-20261012/legion-runtime-1.3.1.tgz';
   assert.equal(manifest.dependencies['legion-runtime'], dependency);
   assert.equal(lock.packages[''].dependencies['legion-runtime'], dependency);
-  assert.equal(lock.packages['node_modules/legion-runtime'].version, '1.2.2');
+  assert.equal(lock.packages['node_modules/legion-runtime'].version, '1.3.1');
   assert.equal(lock.packages['node_modules/legion-runtime'].resolved, dependency);
   const tarballPath = resolve(desktop, dependency.slice(5));
   const descriptor = JSON.parse(await fs.readFile(join(dirname(tarballPath), 'package-smoke.json'), 'utf8'));
   const tarball = await fs.readFile(tarballPath);
   assert.equal(resolve(descriptor.tarball), tarballPath);
-  assert.equal(descriptor.sha256, '773da2d1dbb58b7a9ff251e14f1cf80281a8b9286348d7a864589dd92832eef2');
+  assert.equal(descriptor.sha256, '555a4184456d6457674ded591e7dea3098cdb6b3fed4ad408c782019813dae46');
   assert.equal(hash(tarball), descriptor.sha256);
   const integrity = 'sha512-' + createHash('sha512').update(tarball).digest('base64');
   assert.equal(descriptor.integrity, integrity);
@@ -486,7 +497,7 @@ test('macOS installed runtime matches current 1.2.2 package and every shipped so
     if (Object.hasOwn(descriptor.sourceHashes, name)) assert.equal(hash(await fs.readFile(join(installed, name))), descriptor.sourceHashes[name], 'pinned installed source ' + name);
   }
   const installedManifest = JSON.parse(await fs.readFile(join(installed, 'package.json'), 'utf8'));
-  assert.equal(installedManifest.version, '1.2.2');
+  assert.equal(installedManifest.version, '1.3.1');
   assert.deepEqual(installedManifest.exports, {
     '.': './runtime.mjs', './workbench-models': './workbench.mjs',
     './services/policy': './src/kernel/services/public/policy.mjs',

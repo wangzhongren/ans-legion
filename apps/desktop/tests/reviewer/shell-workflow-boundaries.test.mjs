@@ -13,7 +13,7 @@ import { createShellWorkflow, enqueueShellWorkflow, updateShellWorkflow, interru
   shellWorkflowDocument, publicShellWorkflow } from '../../src/models/interaction.mjs';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../../../..');
-const stage=join(root,'.ans/runtime/legion-cli-role-owned-v2/Reviewer/fixtures');
+const stage=join(root,'.ans/runtime/legion-desktop-command-center-v1/Reviewer/fixtures');
 const hash='a'.repeat(64), now=()=>new Date().toISOString();
 async function directory(t){
   await fs.mkdir(stage,{recursive:true});

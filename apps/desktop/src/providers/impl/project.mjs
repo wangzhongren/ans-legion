@@ -7,7 +7,9 @@ import {
   mkdir,
   open,
   rename,
-  unlink
+  unlink,
+  readdir,
+  link
 } from 'node:fs/promises';
 import {
   resolve,
@@ -37,10 +39,12 @@ import {
   workspaceIdentity,
   catalogDocument,
   contextDescriptor,
+  projectDocument,
   exactResources,
   wbSuccess,
   wbCaught
 } from '../../models/workbench.mjs';
+import { PiImageReference } from 'legion-runtime/workbench-models';
 function fail(code) {
   throw new WorkbenchValidationError(code);
 } function within(parent, child) {
@@ -132,7 +136,20 @@ function fail(code) {
   }
   if (failure) throw failure;
   return result;
-} export class ProjectProviderImpl {
+}
+function imageSize(data,mimeType){
+  let width=0,height=0;
+  if(mimeType==='image/png'){
+    if(data.length<33||!data.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||data.readUInt32BE(8)!==13||data.toString('ascii',12,16)!=='IHDR')fail('invalid_image');
+    width=data.readUInt32BE(16);height=data.readUInt32BE(20);
+  }else if(mimeType==='image/jpeg'){
+    if(data.length<4||data[0]!==255||data[1]!==216)fail('invalid_image');let offset=2;
+    while(offset+4<=data.length){if(data[offset]!==255)fail('invalid_image');while(data[offset]===255)offset++;const marker=data[offset++];if(marker===217||marker===218)break;if(marker===1||marker>=208&&marker<=215)continue;if(offset+2>data.length)break;const length=data.readUInt16BE(offset);if(length<2||offset+length>data.length)fail('invalid_image');if([192,193,194,195,198,199,201,202,203,205,206,207].includes(marker)){if(length<7)fail('invalid_image');height=data.readUInt16BE(offset+3);width=data.readUInt16BE(offset+5);break;}offset+=length;}
+  }else fail('unsupported_image_mime');
+  if(!width||!height||width>8192||height>8192||width*height>16000000)fail('image_dimension_budget');
+  return {width,height};
+}
+export class ProjectProviderImpl {
   #data; #leaseRoot;
   #closed = false;
   constructor(options) {
@@ -149,6 +166,72 @@ function fail(code) {
   close() {
     this.#closed = true;
     return wbSuccess(null);
+  }
+  async #imageDirectory(project,create=false){
+    const checked=projectDocument(project);await this.#isolate(checked.workspaceIdentity);
+    const base=await canonicalDirectory(this.#data,create);
+    const root=await canonicalDirectory(join(base,'workbench-attachments'),create);
+    const directory=await canonicalDirectory(join(root,checked.id),create);
+    if(create){for(const path of [base,root,directory]){const info=await lstat(path);if(!info.isDirectory()||info.isSymbolicLink())fail('image_store_unavailable');}}
+    return {directory,project:checked};
+  }
+  async #imageInventory(directory){
+    let count=0,bytes=0;
+    for(const name of await readdir(directory)){
+      if(name.startsWith('.'))continue;
+      if(!/^[A-Za-z0-9_-]{1,200}$/u.test(name))fail('image_store_unavailable');
+      const info=await lstat(join(directory,name));if(!info.isFile()||info.isSymbolicLink())fail('image_store_unavailable');
+      count++;bytes+=info.size;
+    }
+    return {count,bytes};
+  }
+  async #imageMetadata(directory,attachmentId){
+    const path=join(directory,'.'+attachmentId+'.meta.json');const before=await lstat(path);
+    if(!before.isFile()||before.isSymbolicLink()||before.size>2048||(before.mode&0o777)!==0o600)fail('image_changed');
+    const handle=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);let raw;
+    try{const stat=await handle.stat();if(stat.dev!==before.dev||stat.ino!==before.ino||stat.size!==before.size)fail('image_changed');raw=await handle.readFile({encoding:'utf8'});}finally{await handle.close();}const after=await lstat(path);if(after.dev!==before.dev||after.ino!==before.ino||after.isSymbolicLink())fail('image_changed');
+    let metadata;try{metadata=JSON.parse(raw);}catch{fail('image_changed');}
+    if(!metadata||Object.keys(metadata).sort().join(',')!=='ref,state'||metadata.state!=='staged'||metadata.ref?.attachmentId!==attachmentId)fail('image_changed');
+    return new PiImageReference(metadata.ref);
+  }
+  async stageImage(project,input){
+    let temporary=null,target=null,metadataPath=null;
+    try{
+      if(this.#closed)fail('closed');const {directory,project:checked}=await this.#imageDirectory(project,true);
+      const data=Buffer.from(input.data,'base64');if(!data.length||data.length>4194304||data.toString('base64')!==input.data)fail('invalid_image');
+      const size=imageSize(data,input.mimeType);const inventory=await this.#imageInventory(directory);
+      if(inventory.count>=256||inventory.bytes+data.length>67108864)fail('image_store_budget');
+      const attachmentId=randomUUID();const ref=new PiImageReference({projectId:checked.id,attachmentId,sha256:createHash('sha256').update(data).digest('hex'),mimeType:input.mimeType,byteLength:data.length,width:size.width,height:size.height});
+      temporary=join(directory,'.'+attachmentId+'.tmp');const finalTarget=join(directory,attachmentId),finalMetadata=join(directory,'.'+attachmentId+'.meta.json');
+      const handle=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+      try{await handle.writeFile(data);await handle.sync();}finally{await handle.close();}
+      await link(temporary,finalTarget);target=finalTarget;await unlink(temporary);temporary=null;
+      const metadataHandle=await open(finalMetadata,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);metadataPath=finalMetadata;
+      try{await metadataHandle.writeFile(JSON.stringify({state:'staged',ref:{...ref}}));await metadataHandle.sync();}finally{await metadataHandle.close();}
+      const dirHandle=await open(directory,constants.O_RDONLY|constants.O_DIRECTORY|constants.O_NOFOLLOW);try{await dirHandle.sync();}finally{await dirHandle.close();}
+      return wbSuccess({ref:{...ref}});
+    }catch(error){for(const path of [temporary,metadataPath,target])if(path){try{await unlink(path);}catch(cleanupError){if(cleanupError.code!=='ENOENT')return wbCaught(cleanupError,'image_store_unavailable');}}return wbCaught(error,'image_store_unavailable');}
+  }
+  async readImage(project,raw){
+    try{
+      if(this.#closed)fail('closed');const ref=new PiImageReference({...raw});const {directory,project:checked}=await this.#imageDirectory(project);
+      if(ref.projectId!==checked.id)fail('image_project_mismatch');const metadata=await this.#imageMetadata(directory,ref.attachmentId);if(['projectId','attachmentId','sha256','mimeType','byteLength','width','height'].some(field=>metadata[field]!==ref[field]))fail('image_changed');const path=join(directory,ref.attachmentId);
+      const before=await lstat(path);if(!before.isFile()||before.isSymbolicLink()||before.size!==ref.byteLength||(before.mode&0o777)!==0o600)fail('image_changed');
+      const handle=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);let data;
+      try{const info=await handle.stat();if(info.ino!==before.ino||info.dev!==before.dev||info.size!==before.size)fail('image_changed');const buffer=Buffer.alloc(ref.byteLength+1);let offset=0;for(;;){const part=await handle.read(buffer,offset,buffer.length-offset,offset);offset+=part.bytesRead;if(offset>ref.byteLength)fail('image_changed');if(!part.bytesRead)break;}data=buffer.subarray(0,offset);const after=await handle.stat();if(after.ino!==info.ino||after.dev!==info.dev||after.size!==info.size)fail('image_changed');}finally{await handle.close();}
+      const dimensions=imageSize(data,ref.mimeType);if(dimensions.width!==ref.width||dimensions.height!==ref.height||createHash('sha256').update(data).digest('hex')!==ref.sha256)fail('image_changed');
+      const pathInfo=await lstat(path);if(pathInfo.ino!==before.ino||pathInfo.dev!==before.dev||pathInfo.isSymbolicLink())fail('image_changed');
+      return wbSuccess({ref:{...ref},data:data.toString('base64')});
+    }catch(error){return wbCaught(error,'image_unavailable');}
+  }
+  async discardImage(project,raw){
+    try{const read=await this.readImage(project,raw);if(!read.ok)return read;const {directory}=await this.#imageDirectory(project);await unlink(join(directory,raw.attachmentId));await unlink(join(directory,'.'+raw.attachmentId+'.meta.json'));return wbSuccess(null);}catch(error){return wbCaught(error,'image_store_unavailable');}
+  }
+  async pruneImages(project,protectedIds=[]){
+    try{const {directory}=await this.#imageDirectory(project);if(!Array.isArray(protectedIds)||protectedIds.some(id=>typeof id!=='string'||!/^[A-Za-z0-9_-]{1,200}$/u.test(id)))fail('invalid_image');const keep=new Set(protectedIds);let removed=0;
+      for(const name of await readdir(directory)){if(name.startsWith('.')||keep.has(name))continue;if(!/^[A-Za-z0-9_-]{1,200}$/u.test(name))fail('image_store_unavailable');const path=join(directory,name);const info=await lstat(path);if(!info.isFile()||info.isSymbolicLink())fail('image_store_unavailable');if(Date.now()-info.mtimeMs<86400000)continue;const ref=await this.#imageMetadata(directory,name);if(ref.projectId!==project.id)fail('image_project_mismatch');const read=await this.readImage(project,{...ref});if(!read.ok)return read;const again=await lstat(path);if(!again.isFile()||again.isSymbolicLink()||again.ino!==info.ino||again.dev!==info.dev)fail('image_changed');await unlink(path);await unlink(join(directory,'.'+name+'.meta.json'));removed++;}
+      return wbSuccess({removed});
+    }catch(error){return wbCaught(error,'image_store_unavailable');}
   }
   async #isolate(root, verify = true) {
     const data = await canonicalDirectory(this.#data);

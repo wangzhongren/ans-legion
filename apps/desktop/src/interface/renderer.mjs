@@ -101,7 +101,7 @@ const requestKey = (request) => [request.projectId, request.requestId, request.v
 export class _Renderer {
   constructor(document, api) {
     this.document = document; this.api = api; this.state = null; this.reading = false; this.sending = false;
-    this.projectId = null; this.messageDrafts = new Map(); this.contextDrafts = new Map(); this.mappingDrafts = new Map(); this.roleRows = new Map();
+    this.projectId = null; this.messageDrafts = new Map(); this.imageDrafts = new Map(); this.contextDrafts = new Map(); this.mappingDrafts = new Map(); this.roleRows = new Map();
     this.memberNodes = new Map(); this.profileNodes = new Map(); this.messageNodes = new Map(); this.regions = new Map();
     this.defaultDraft = null; this.pendingHuman = null; this.modalRequest = null; this.interactionDrafts = new Map();
     this.interactionBusy = false; this.interactionStale = false; this.timer = null; this.page = 'conversation'; this.tab = 'task';
@@ -237,8 +237,8 @@ export class _Renderer {
     if (action === 'clear') text = '保存后移除已保存密钥。'; this.setText(this.get('key-hint'), text);
   }
   editProfile(profile = null) {
-    const fields = { 'profile-id': '', 'profile-name': '', protocol: 'openai-completions', provider: '', 'model-id': '', 'base-url': '', 'key-action': 'replace', 'api-key': '' };
-    if (profile) Object.assign(fields, { 'profile-id': profile.id, 'profile-name': profile.name, protocol: profile.protocol, provider: profile.provider, 'model-id': profile.modelId, 'base-url': profile.baseUrl, 'key-action': 'keep' });
+    const fields = { 'profile-id': '', 'profile-name': '', protocol: 'openai-completions', provider: '', 'model-id': '', 'base-url': '', 'image-capability':'unknown', 'key-action': 'replace', 'api-key': '' };
+    if (profile) Object.assign(fields, { 'profile-id': profile.id, 'profile-name': profile.name, protocol: profile.protocol, provider: profile.provider, 'model-id': profile.modelId, 'base-url': profile.baseUrl, 'image-capability':profile.imageCapability??'unknown', 'key-action': 'keep' });
     for (const [id, value] of Object.entries(fields)) this.get(id).value = value;
     this.setText(this.get('form-title'), '新增连接'); if (profile) this.setText(this.get('form-title'), '编辑连接');
     this.setText(this.get('saved-key'), '尚未保存密钥'); if (profile?.hasSavedKey) this.setText(this.get('saved-key'), '已保存密钥');
@@ -247,7 +247,7 @@ export class _Renderer {
   renderProfileSelection() { for (const [id, row] of this.profileNodes) row.card.classList.toggle('selected', id === this.get('profile-id').value); }
   async saveProfile() {
     if (this.get('save-profile').disabled) return;
-    const input = { id: this.get('profile-id').value, name: this.get('profile-name').value, protocol: this.get('protocol').value, provider: this.get('provider').value, modelId: this.get('model-id').value, baseUrl: this.get('base-url').value, keyAction: this.get('key-action').value, apiKey: this.get('api-key').value };
+    const input = { id: this.get('profile-id').value, name: this.get('profile-name').value, protocol: this.get('protocol').value, provider: this.get('provider').value, modelId: this.get('model-id').value, baseUrl: this.get('base-url').value, imageCapability:this.get('image-capability').value, keyAction: this.get('key-action').value, apiKey: this.get('api-key').value };
     if (input.keyAction !== 'replace') input.apiKey = '';
     const before = new Set(this.state.profiles.map((item) => item.id)); this.get('save-profile').disabled = true;
     const hadActivePlan = ['draft','confirmed','running'].includes(this.state.plan?.status);
@@ -451,7 +451,7 @@ export class _Renderer {
       for (let index = 0; index < timeline.legacyMessages.length; index += 1) { const message = timeline.legacyMessages[index]; items.push({ id: 'legacy-' + index, role: message.role, kind: 'legacy', raw: message.text, text: '旧记录（未记录交互顺序）\n' + message.text }); }
       for (const message of timeline.messages) {
         let role = 'assistant'; if (['human', 'answer'].includes(message.kind)) role = 'user'; let text = message.text;
-        if (!message.orderKnown) text = '旧记录或终态校准（顺序未知）\n' + text; items.push({ id: message.id, role, kind: message.kind, text, raw: message.text });
+        if (!message.orderKnown) text = '旧记录或终态校准（顺序未知）\n' + text; items.push({ id: message.id, role, kind: message.kind, text, raw: message.text, imageRefs:message.imageRefs??[] });
       }
     } else {
       for (let index = 0; index < this.state.history.messages.length; index += 1) { const message = this.state.history.messages[index]; items.push({ ...message, id: 'history-' + index }); }
@@ -481,6 +481,7 @@ export class _Renderer {
         if (item.role === 'assistant' && globalThis.marked?.Lexer) { const rendered = _markdownContent(this.document, text); row.content.replaceChildren(rendered.root); }
         else { this.setText(row.content, text); if (item.role === 'assistant') { const note = this.node('small', 'Markdown 未加载，已显示完整纯文本。', 'markdown-fallback'); row.content.append(note); } }
       }
+      if(item.role==='user'&&item.imageRefs?.length&&!row.imageList){row.imageList=this.node('div','','message-image');row.body.append(row.imageList);for(const ref of item.imageRefs){const button=this.node('button','查看图片 · '+ref.mimeType+' · '+ref.width+'×'+ref.height,'secondary compact');button.addEventListener('click',async()=>{const projectId=this.projectId;const result=await this.call('readImagePreview',{projectId,ref});if(!result.ok){this.setText(button,result.error?.message??'图片不可读取');return;}if(projectId!==this.projectId||!button.isConnected)return;const img=this.node('img');img.src='data:'+result.value.ref.mimeType+';base64,'+result.value.data;img.alt='Human发送的图片';button.replaceWith(img);});row.imageList.append(button);}}
       if (item.role === 'assistant' && !row.raw && (globalThis.marked?.Lexer || item.text.includes('```legion-plan'))) { row.raw = this.disclosure('raw-' + item.id, '查看原始回复'); row.raw.className = 'message-raw'; row.original = this.node('pre'); row.raw.append(row.original); row.body.append(row.raw); }
       if (row.raw) { row.raw.hidden = false; this.setText(row.original, item.raw ?? item.text); }
     }
@@ -629,7 +630,7 @@ export class _Renderer {
     this.get('welcome-choose').hidden = id !== null; this.get('welcome-settings').hidden = !id || Boolean(profile);
     this.setText(this.get('welcome-description'), '选择一个项目，和二哥从你的想法开始。'); if (id) this.setText(this.get('welcome-description'), '把目标告诉二哥，一起理清方案。'); if (id && !profile) this.setText(this.get('welcome-description'), '项目已准备好，配置一个 AI 连接后即可和二哥开始。');
     const running = ['running', 'waiting'].includes(value.turn?.status); const executing = ['confirmed', 'running'].includes(value.plan?.status);
-    this.get('message-input').disabled = !id; this.get('send-message').disabled = !id || !profile || running || this.sending; this.get('cancel-turn').hidden = !running;
+    this.get('message-input').disabled = !id; this.get('send-message').disabled = !id || !profile || running || this.sending; this.get('choose-image').disabled=!id||running;this.get('cancel-turn').hidden = !running;
     let status = '选择项目后开始对话'; if (id) status = '需求只发送给二哥'; if (running) status = '二哥正在回复'; if (value.turn?.status === 'waiting') status = '等待你的答复，请打开待答复请求'; if (executing) status = '按已确认计划执行中 · 可向二哥只读询问进度与文件';
     if (!profile && id) status = '先配置有效的 AI 连接'; this.setText(this.get('conversation-status'), status);
     const runningTasks = value.tasks.filter(task => task.status === 'running').length;
@@ -637,7 +638,7 @@ export class _Renderer {
     const failedTasks = value.tasks.filter(task => task.status === 'failed').length;
     let planStatus = '尚无计划'; if (value.plan) planStatus = label(value.plan.status); let pendingStatus = ''; if ((value.interactions ?? []).some(item => item.status === 'pending')) pendingStatus = ' · 待答复'; this.setText(this.get('command-status'), `${planStatus} · 运行 ${runningTasks} · 阻塞 ${blockedTasks} · 失败 ${failedTasks}${pendingStatus}`);
     this.get('select-context').disabled = !id || running || executing;
-    this.renderProfiles(); this.renderSidebar(); this.renderMemberActivity(); this.renderMemberCurrent(); this.renderMemberConversation(); this.renderMessages(); this.renderPlan(); this.renderFileOwners(); this.renderResults(); this.renderAcceptance(); this.renderObservation(); this.renderInteractions();
+    this.renderProfiles(); this.renderSidebar(); this.renderMemberActivity(); this.renderMemberCurrent(); this.renderMemberConversation(); this.renderMessages(); this.renderImageDrafts(); this.renderPlan(); this.renderFileOwners(); this.renderResults(); this.renderAcceptance(); this.renderObservation(); this.renderInteractions();
     this.setText(this.get('context-state'), `已读取 ${value.context.files.length} 个文件 · 校验 ${time(value.context.verifiedAt)}`);
     this.region('context-files', value.context, (node) => { for (const file of value.context.files) node.append(this.node('p', `${file.resource} · ${file.byteLength} bytes · SHA ${file.contentDigest ?? file.sha256 ?? '未提供'}`, 'muted')); });
     this.renderCommandZones();
@@ -986,12 +987,29 @@ export class _Renderer {
     if (changedProject) { await this.loadRoleLog(); await this.loadMemory(); }
   }
   async send() {
-    if (this.sending || !this.projectId || !this.get('message-input').value.trim() || this.get('send-message').disabled) return;
-    const projectId = this.projectId; const text = this.get('message-input').value; this.sending = true; this.get('send-message').disabled = true;
-    const result = await this.update('sendMessage', { projectId, roleId: 'Supervisor', text }); this.sending = false;
+    const drafts=this.imageDrafts.get(this.projectId)??[];
+    if (this.sending || !this.projectId || (!this.get('message-input').value.trim()&&!drafts.length) || this.get('send-message').disabled) return;
+    const projectId = this.projectId; const text = this.get('message-input').value;const imageRefs=drafts.map(item=>item.ref); this.sending = true; this.get('send-message').disabled = true;
+    const input={ projectId, roleId: 'Supervisor', text };if(imageRefs.length)input.imageRefs=imageRefs;
+    const result = await this.update('sendMessage', input); this.sending = false;
     if (result.ok && result.value.turn && projectId === this.projectId) this.pendingHuman = { projectId, turnId: result.value.turn.id, text };
     if (result.ok && projectId === this.projectId && this.get('message-input').value === text) this.get('message-input').value = '';
+    if(result.ok){const current=this.imageDrafts.get(projectId)??[];this.imageDrafts.set(projectId,current.filter(item=>!imageRefs.some(ref=>ref.attachmentId===item.ref.attachmentId)));this.renderImageDrafts();}
     if (this.state) this.render(this.state);
+  }
+  renderImageDrafts(){
+    const drafts=this.imageDrafts.get(this.projectId)??[];
+    this.region('image-drafts',[this.projectId,drafts.map(item=>item.ref.attachmentId)],node=>{for(const item of drafts){const card=this.node('div','','image-draft');const img=this.node('img');img.src=item.dataUrl;img.alt='待发送图片';const remove=this.node('button','移除图片','secondary');remove.type='button';remove.addEventListener('click',async()=>{const projectId=this.projectId;const result=await this.call('discardImage',{projectId,ref:item.ref});if(!result.ok){this.fail(result);return;}const current=this.imageDrafts.get(projectId)??[];this.imageDrafts.set(projectId,current.filter(value=>value.ref.attachmentId!==item.ref.attachmentId));if(projectId===this.projectId){this.renderImageDrafts();this.get('choose-image').focus();}});card.append(img,remove);node.append(card);}});
+  }
+  async addImageFile(file){
+    const projectId=this.projectId;if(!projectId||!file||!['image/png','image/jpeg'].includes(file.type)||!Number.isSafeInteger(file.size)||file.size<1||file.size>4194304){this.notice('只接受当前项目内不超过4MiB的PNG/JPEG图片。',true);return;}
+    const drafts=this.imageDrafts.get(projectId)??[];if(drafts.length>=4||drafts.reduce((sum,item)=>sum+item.ref.byteLength,0)+file.size>8388608){this.notice('每次最多4张图片，总计8MiB。',true);return;}
+    let dataUrl;try{dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('image_read_failed'));reader.readAsDataURL(file);});}catch{this.notice('图片读取失败，请重新选择。',true);return;}
+    if(projectId!==this.projectId)return;
+    const prefix='data:'+file.type+';base64,';if(typeof dataUrl!=='string'||!dataUrl.startsWith(prefix)){this.notice('图片读取失败，请重新选择。',true);return;}
+    const result=await this.call('stageImage',{projectId,mimeType:file.type,data:dataUrl.slice(prefix.length)});
+    if(!result.ok){this.fail(result);return;}if(projectId!==this.projectId)return;
+    this.imageDrafts.set(projectId,[...(this.imageDrafts.get(projectId)??[]),{ref:result.value.ref,dataUrl}]);this.renderImageDrafts();this.notice('图片已加入待发送内容。');
   }
   start() {
     this.get('mobile-nav-toggle').addEventListener('click',() => { if (this.isMobileNavOpen()) this.closeMobileNav(true); else this.openMobileNav(); });
@@ -1051,6 +1069,12 @@ export class _Renderer {
       const result = await this.update('setDefaultProfile', { profileId }); if (result.ok) { this.defaultDraft = null; this.render(result.value); let message = '默认连接已保存，后续讨论使用新连接。'; if (hadActivePlan) message = '默认连接已保存，原活动计划已失效。'; this.notice(message); }
     });
     this.get('message-form').addEventListener('submit', (event) => { event.preventDefault(); void this.send(); });
+    this.get('choose-image').addEventListener('click',()=>this.get('image-file').click());
+    this.get('image-file').addEventListener('change',event=>{const files=[...(event.target.files??[])];void (async()=>{for(const file of files)await this.addImageFile(file);})();event.target.value='';});
+    this.get('message-input').addEventListener('paste',event=>{const files=[...(event.clipboardData?.files??[])].filter(file=>['image/png','image/jpeg'].includes(file.type));if(files.length){event.preventDefault();void (async()=>{for(const file of files)await this.addImageFile(file);})();}});
+    this.get('message-form').addEventListener('dragover',event=>{if([...(event.dataTransfer?.types??[])].includes('Files')){event.preventDefault();this.get('composer-box').dataset.imageDrop='true';}});
+    this.get('message-form').addEventListener('dragleave',()=>{this.get('composer-box').dataset.imageDrop='false';});
+    this.get('message-form').addEventListener('drop',event=>{this.get('composer-box').dataset.imageDrop='false';const files=[...(event.dataTransfer?.files??[])].filter(file=>['image/png','image/jpeg'].includes(file.type));if(files.length){event.preventDefault();void (async()=>{for(const file of files)await this.addImageFile(file);})();}});
     this.get('message-input').addEventListener('keydown', (event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); void this.send(); } });
     this.get('select-context').addEventListener('click', () => { const resources = this.get('context-input').value.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean); void this.update('selectContext', { projectId: this.projectId, resources }, '上下文已读取，原计划需重新讨论确认。'); });
     this.get('confirm-plan').addEventListener('click', () => this.openInteraction('execute_plan'));

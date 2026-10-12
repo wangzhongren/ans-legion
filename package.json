@@ -1,7 +1,7 @@
 {
   "name": "legion-runtime",
-  "version": "1.2.3",
-  "description": "二哥：以角色为核心的 Pi 项目运行时与指挥台",
+  "version": "1.3.1",
+  "description": "二哥：支持项目图片输入和角色协作的 Pi 运行时与指挥台",
   "type": "module",
   "engines": {
     "node": ">=22.19.0"

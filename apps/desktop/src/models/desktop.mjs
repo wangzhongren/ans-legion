@@ -17,7 +17,7 @@ const ERROR_MESSAGES = Object.freeze({
   workspace_corrupt: '项目记录结构无效。', unsafe_path: '项目记录路径超出允许范围。', unknown_operation: '不支持此操作。',
   unauthorized_sender: '此窗口无权执行操作。', internal_error: '操作失败，请重试。'
 });
-const INPUT_FIELDS = Object.freeze(['id', 'name', 'protocol', 'provider', 'modelId', 'baseUrl', 'keyAction', 'apiKey', 'projectId', 'roleId', 'profileId', 'probeId']);
+const INPUT_FIELDS = Object.freeze(['id', 'name', 'protocol', 'provider', 'modelId', 'baseUrl', 'imageCapability', 'keyAction', 'apiKey', 'projectId', 'roleId', 'profileId', 'probeId']);
 
 export class DesktopValidationError extends Error {
   constructor(field = '') {
@@ -95,11 +95,16 @@ export function profileFields(value) {
   const provider = textValue(value.provider, 'provider', 100);
   const modelId = textValue(value.modelId, 'modelId', 200);
   const baseUrl = baseUrlValue(value.baseUrl);
-  return { id, name, protocol, provider, modelId, baseUrl };
+  const fields = { id, name, protocol, provider, modelId, baseUrl };
+  if (value.imageCapability !== undefined) {
+    if (!['unknown','supported','unsupported'].includes(value.imageCapability)) throw new DesktopValidationError('imageCapability');
+    fields.imageCapability = value.imageCapability;
+  }
+  return fields;
 }
 
 export function profileInput(value) {
-  exactObject(value, ['id', 'name', 'protocol', 'provider', 'modelId', 'baseUrl', 'keyAction', 'apiKey']);
+  exactObject(value, ['id', 'name', 'protocol', 'provider', 'modelId', 'baseUrl', 'imageCapability', 'keyAction', 'apiKey']);
   let id = value.id;
   if (id === undefined || id === '') id = null;
   if (id !== null) identifier(id);
@@ -113,6 +118,7 @@ export function profileInput(value) {
 
 export function profileDTO(value) {
   const fields = profileFields(value);
+  if (fields.imageCapability === undefined) fields.imageCapability = 'unknown';
   let hasSavedKey = value.hasSavedKey;
   if (hasSavedKey === undefined) hasSavedKey = Boolean(value.keyCiphertext);
   if (typeof hasSavedKey !== 'boolean') throw new DesktopValidationError();
@@ -120,7 +126,7 @@ export function profileDTO(value) {
 }
 
 export function storedProfile(value) {
-  exactObject(value, ['id', 'name', 'protocol', 'provider', 'modelId', 'baseUrl', 'keyCiphertext']);
+  exactObject(value, ['id', 'name', 'protocol', 'provider', 'modelId', 'baseUrl', 'imageCapability', 'keyCiphertext']);
   const fields = profileFields(value);
   const keyCiphertext = value.keyCiphertext;
   if (keyCiphertext !== null && (typeof keyCiphertext !== 'string' || keyCiphertext.length > 32768 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u.test(keyCiphertext) || keyCiphertext.length === 0)) throw new DesktopValidationError();

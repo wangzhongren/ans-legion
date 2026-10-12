@@ -117,3 +117,20 @@ er_ge_sidebar_entry_v1_candidate:
   conditional_record: docs/scheduling/er-ge-sidebar-entry-v1.md
   scope_reference: .ans/decisions/er-ge-sidebar-entry-v1-scope.md
   new_authored_paths: []
+
+desktop_image_input_v1_candidate:
+  state: ACCEPTED
+  config: .ans/decisions/desktop-image-input-v1-project.json
+  config_sha256: e4e0282ba6d29148360834b40b48f48299c0565e1796eaa1a16aa99679e1e4ef
+  permission_source: .ans/decisions/desktop-image-input-v1-authorization.md
+  conditional_record: docs/scheduling/desktop-image-input-v1.md
+  scope_reference: .ans/decisions/desktop-image-input-v1-scope.md
+  new_authored_paths: []
+
+desktop_image_facade_repair_integration:
+  state: AUTHORIZED_WITHIN_ACCEPTED_CONFIG
+  config_sha256: e4e0282ba6d29148360834b40b48f48299c0565e1796eaa1a16aa99679e1e4ef
+  permission_source: .ans/decisions/desktop-image-input-v1-authorization.md
+  scope_reference: .ans/decisions/desktop-image-input-v1-facade-repair-scope.md
+  conditional_record: docs/scheduling/desktop-image-input-v1-facade-repair-integration.md
+  new_authored_paths: []

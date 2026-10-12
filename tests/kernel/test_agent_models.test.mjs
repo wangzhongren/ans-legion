@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { makeTestOwners, testLeaseContext } from "./test_control_memory.test.mjs";
 const kernelOwners = makeTestOwners("Backend", ["backend/a.txt"]);
 import test from "node:test";
@@ -6,7 +7,7 @@ import { AgentSession, ActionProposal, RoleBoundary, PolicyDecision, MutationRes
   validateInstanceGrant, _createRuntimeAuthority } from "../../src/kernel/models/core.mjs";
 import { PiConnection, AgentScope, AgentConfig, TaskDispatchContext, AgentInstance, PiEventType,
   PiToolRequest, PiToolResult, PiRunResult, PiConnectionProfile, PiTextDelta, PiConversationHistory,
-  PiConversationCheckpoint } from "../../src/kernel/models/agent.mjs";
+  PiConversationCheckpoint, PiImageReference, PiImageInput } from "../../src/kernel/models/agent.mjs";
 
 function fixture() {
   const boundary = new RoleBoundary({ roleId: "Backend", writeScope: ["backend/"], denyScope: ["backend/private/"],
@@ -378,4 +379,101 @@ test("thirteen workflow tools use bounded pure payloads and host-matched typed r
   assert.equal(response.result.status, "error");
   assert.throws(() => new PiToolResult({ ...response, decision: new CheckDecision({ ...decision, checkId: "foreign" }) }), /binding/);
   assert.throws(() => new PiToolResult({ ...response, result: new MutationResult({ success: false, status: "denied", reason: "no" }) }), TypeError);
+});
+
+function imageValue(bytes = Buffer.from("opaque image bytes"), extra = {}) {
+  const raw = { projectId: "project-1", attachmentId: "attachment-1", sha256: createHash("sha256").update(bytes).digest("hex"),
+    mimeType: "image/png", byteLength: bytes.byteLength, width: 1, height: 1, ...extra };
+  const ref = new PiImageReference(raw); const data = bytes.toString("base64");
+  return { raw, ref, data, input: new PiImageInput({ ref, data }) };
+}
+
+test("image values are pure frozen references and canonical byte/hash input with no effects or forged brands", () => {
+  const f = imageValue();
+  assert.deepEqual(Object.keys(f.ref), ["projectId", "attachmentId", "sha256", "mimeType", "byteLength", "width", "height"]);
+  assert.deepEqual(Object.keys(f.input), ["ref", "data"]);
+  assert.ok(Object.isFrozen(f.ref)); assert.ok(Object.isFrozen(f.input));
+  assert.deepEqual(new PiImageReference(JSON.parse(JSON.stringify(f.ref))), f.ref);
+  assert.throws(() => { f.ref.width = 2; }, TypeError);
+  for (const change of [{ projectId: "../other" }, { attachmentId: "https://example.test/image" }, { sha256: "A".repeat(64) },
+    { mimeType: "image/svg+xml" }, { mimeType: "image/webp" }, { byteLength: 0 }, { byteLength: 4194305 },
+    { width: 8193 }, { height: 0 }, { width: 4001, height: 4000 }, { path: "/private/image.png" },
+    { url: "https://example.test/image.png" }, { callback() {} }, { permit: {} }, { token: "secret" }]) {
+    assert.throws(() => new PiImageReference({ ...f.raw, ...change }), TypeError);
+  }
+  for (const data of [f.data+'\n', 'data:image/png;base64,'+f.data, f.data.replace('+','-')+'-', '%%%=', '', f.data+'====']) {
+    assert.throws(() => new PiImageInput({ ref: f.ref, data }), TypeError);
+  }
+  assert.throws(() => new PiImageInput({ ref: new PiImageReference({ ...f.raw, sha256: "0".repeat(64) }), data: f.data }), /image_content_mismatch/);
+  const zero = imageValue(Buffer.from([0]));
+  assert.throws(() => new PiImageInput({ ref: zero.ref, data: 'AB==' }), /noncanonical_image_base64/);
+  assert.throws(() => new PiImageInput({ ref: { ...f.raw }, data: f.data }), /typed_image_reference/);
+  const forgedRef = Object.assign(Object.create(PiImageReference.prototype), f.raw);
+  assert.throws(() => new PiImageInput({ ref: forgedRef, data: f.data }), /typed_image_reference/);
+  const forgedInput = Object.assign(Object.create(PiImageInput.prototype), { ref: f.ref, data: f.data });
+  assert.throws(() => PiImageInput.assertCollection([forgedInput]), /typed_image_input/);
+  let invoked = false; const getter = { ref: f.ref };
+  Object.defineProperty(getter, "data", { enumerable: true, get() { invoked = true; return f.data; } });
+  assert.throws(() => new PiImageInput(getter), /image_effect_field/); assert.equal(invoked, false);
+});
+
+test("image turn and restore budgets enforce count, project identity and decoded bytes", () => {
+  const one = imageValue().input;
+  assert.deepEqual(PiImageInput.assertCollection([]), []);
+  assert.ok(Object.isFrozen(PiImageInput.assertCollection([one])));
+  assert.throws(() => PiImageInput.assertCollection([one, one]), /duplicate_image/);
+  assert.throws(() => PiImageInput.assertCollection([one, imageValue(undefined, { projectId: "other", attachmentId: "other" }).input]), /image_project_mismatch/);
+  assert.throws(() => PiImageInput.assertCollection([one], { path: "/private" }), TypeError);
+  assert.throws(() => PiImageInput.assertCollection([one], { mode: "anything" }), /invalid_image_collection_mode/);
+  const small = Array.from({ length: 9 }, (_, i) => imageValue(undefined, { attachmentId: "small-"+i }).input);
+  assert.equal(PiImageInput.assertCollection(small.slice(0, 4)).length, 4);
+  assert.throws(() => PiImageInput.assertCollection(small.slice(0, 5)), TypeError);
+  assert.equal(PiImageInput.assertCollection(small.slice(0, 8), { mode: "restore" }).length, 8);
+  assert.throws(() => PiImageInput.assertCollection(small, { mode: "restore" }), TypeError);
+  // Model verifies opaque bytes, not actual raster decoding; the Desktop Provider owns that proof.
+  const large = Buffer.alloc(4194304, 7);
+  const inputs = Array.from({ length: 5 }, (_, i) => imageValue(large, { attachmentId: "large-"+i }).input);
+  assert.equal(PiImageInput.assertCollection(inputs.slice(0, 2)).length, 2);
+  assert.throws(() => PiImageInput.assertCollection(inputs.slice(0, 3)), /image_collection_byte_budget/);
+  assert.equal(PiImageInput.assertCollection(inputs.slice(0, 4), { mode: "restore" }).length, 4);
+  assert.throws(() => PiImageInput.assertCollection(inputs, { mode: "restore" }), /image_collection_byte_budget/);
+});
+
+test("image refs preserve exact legacy text history and checkpoint JSON while image-only user history stays metadata-only", () => {
+  const legacy = '{"messages":[{"role":"user","text":"需求"},{"role":"assistant","text":"计划"}]}';
+  const history = new PiConversationHistory(JSON.parse(legacy)); assert.equal(JSON.stringify(history), legacy);
+  const instance = new AgentInstance({ instanceId: "i", name: "Su", sessionId: "s", roleId: "Supervisor", taskId: "discussion", organizationVersion: "v1" });
+  const rawCheckpoint = { instance: JSON.parse(JSON.stringify(instance)), profileId: "p", profileVersion: "1", history: JSON.parse(legacy) };
+  const checkpoint = new PiConversationCheckpoint({ ...rawCheckpoint, instance });
+  assert.equal(JSON.stringify(checkpoint), JSON.stringify(rawCheckpoint));
+  const f = imageValue(); const refs = [{ ...f.raw }];
+  const withImages = new PiConversationHistory({ messages: [{ role: "user", text: "", imageRefs: refs }, { role: "assistant", text: "seen" }] });
+  refs[0].sha256 = "b".repeat(64);
+  assert.equal(withImages.messages[0].imageRefs[0].sha256, f.ref.sha256);
+  assert.ok(Object.isFrozen(withImages.messages[0].imageRefs));
+  assert.equal(Object.hasOwn(withImages.messages[1], "imageRefs"), false);
+  assert.equal(JSON.stringify(withImages).includes(f.data), false);
+  assert.deepEqual(new PiConversationHistory(JSON.parse(JSON.stringify(withImages))), withImages);
+  for (const message of [{ role: "assistant", text: "", imageRefs: [f.ref] }, { role: "user", text: "", imageRefs: [] },
+    { role: "user", text: "", images: [f.input] }, { role: "user", text: "", data: f.data },
+    { role: "user", text: "", imageRefs: [f.ref, f.ref] }]) assert.throws(() => new PiConversationHistory({ messages: [message] }), TypeError);
+  assert.throws(() => new PiConversationHistory({ messages: [{ role: "user", text: "", imageRefs: [f.ref] },
+    { role: "user", text: "", imageRefs: [new PiImageReference({ ...f.raw, sha256: "b".repeat(64) })] }] }), /image_reference_changed/);
+  assert.throws(() => new PiConversationHistory({ messages: [{ role: "user", text: "", imageRefs: [f.ref] },
+    { role: "user", text: "", imageRefs: [imageValue(undefined, { projectId: "other", attachmentId: "other" }).ref] }] }), /image_project_mismatch/);
+  const refsOverBytes = [1,2,3].map(i => new PiImageReference({ ...f.raw, attachmentId: "big-"+i, byteLength: 4194304 }));
+  assert.throws(() => new PiConversationHistory({ messages: [{ role: "user", text: "", imageRefs: refsOverBytes }] }), /image_collection_byte_budget/);
+});
+
+test("model input metadata validates only explicit text/image declarations and leaves old unknown bytes unchanged", () => {
+  const options = { profileId: "p", profileVersion: "1", protocol: "openai-responses", provider: "local", model: "m", baseUrl: "https://example.test" };
+  const missing = new PiConnectionProfile(options); assert.equal(missing.modelMetadata, null);
+  const old = { name: "model", contextWindow: 8192 };
+  assert.equal(JSON.stringify(new PiConnectionProfile({ ...options, modelMetadata: old }).modelMetadata), JSON.stringify(old));
+  assert.equal(Object.hasOwn(new PiConnectionProfile({ ...options, modelMetadata: old }).modelMetadata, "input"), false);
+  for (const input of [["text"], ["image"], ["text", "image"]]) assert.deepEqual(new PiConnectionProfile({ ...options, modelMetadata: { input } }).modelMetadata.input, input);
+  for (const input of [[], ["text", "text"], ["audio"], ["text", "image", "text"], ["image", undefined], "image", null]) assert.throws(() => new PiConnectionProfile({ ...options, modelMetadata: { input } }), TypeError);
+  let invoked = false; const metadata = {};
+  Object.defineProperty(metadata, "input", { enumerable: true, get() { invoked = true; return ["image"]; } });
+  assert.throws(() => new PiConnectionProfile({ ...options, modelMetadata: metadata }), TypeError); assert.equal(invoked, false);
 });

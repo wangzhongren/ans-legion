@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { createAgentSession, createExtensionRuntime, ModelRuntime, SessionManager,
   SettingsManager } from "@earendil-works/pi-coding-agent";
@@ -9,7 +9,7 @@ import { streamSimple as anthropicStream } from "@earendil-works/pi-ai/api/anthr
 import { PiSessionProvider } from "../abstract/pi_session.mjs";
 import { modelRecord, modelString, PolicyDecision, MutationResult } from "../../../kernel/models/core.mjs";
 import { AgentInstance, AgentScope, PiConnection, PiConnectionProfile, PiEventType, PiTextDelta,
-  PiConversationHistory, PiConversationCheckpoint, PiToolRequest, PiToolResult, PiRunResult } from "../../../kernel/models/agent.mjs";
+  PiConversationHistory, PiConversationCheckpoint, PiToolRequest, PiToolResult, PiRunResult, PiImageInput } from "../../../kernel/models/agent.mjs";
 import { ProjectReadDecision, ProjectReadResult, AgentTools, AgentControlTools,
   AgentControlDecision, AgentControlResult } from "../../../kernel/models/agent.mjs";
 import { ShellRequest, ShellDecision, ShellResult } from "../../../kernel/models/shell.mjs";
@@ -208,6 +208,31 @@ function storedAssistant(text, model) {
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } } };
 }
 
+function imageKey(ref) { return ref.projectId + "/" + ref.attachmentId; }
+function sameImageRef(first, second) {
+  return ["projectId", "attachmentId", "sha256", "mimeType", "byteLength", "width", "height"].every(key => first[key] === second[key]);
+}
+function imageOptions(options, mode) {
+  modelRecord(options, "Pi image options", ["images"]);
+  if (Object.getOwnPropertySymbols(options).length !== 0 || Object.getOwnPropertyNames(options).some(key => key !== "images")) throw new TypeError("invalid_pi_image_options");
+  const descriptor = Object.getOwnPropertyDescriptor(options, "images");
+  if (descriptor !== undefined && !Object.hasOwn(descriptor, "value")) throw new TypeError("image_effect_field_rejected");
+  return PiImageInput.assertCollection(descriptor?.value ?? [], { mode });
+}
+function sdkImage(image) { return { type: "image", data: image.data, mimeType: image.ref.mimeType }; }
+function historyImages(history, values) {
+  const expected = new Map();
+  for (const message of history.messages) for (const ref of message.imageRefs ?? []) expected.set(imageKey(ref), ref);
+  if (expected.size !== values.length) throw new TypeError("image_reference_inputs_mismatch");
+  const hydrated = new Map();
+  for (const image of values) {
+    const ref = expected.get(imageKey(image.ref));
+    if (ref === undefined || !sameImageRef(ref, image.ref)) throw new TypeError("image_reference_inputs_mismatch");
+    hydrated.set(imageKey(ref), image);
+  }
+  return hydrated;
+}
+
 export class _PiSessionProvider extends PiSessionProvider {
   #session;
   #unsubscribe;
@@ -219,6 +244,9 @@ export class _PiSessionProvider extends PiSessionProvider {
   #lifecycle = "single_run";
   #limits = LIMITS;
   #history = new PiConversationHistory({ messages: [] });
+  #images = new Map();
+  #expectedImages = [];
+  #imageCapability = "unknown";
   #state = "ready";
   #closed = false;
   #terminated = false;
@@ -302,12 +330,29 @@ export class _PiSessionProvider extends PiSessionProvider {
       this.#profileVersion = this.#instance.organizationVersion;
     }
     if (!config.models.some((model) => model.id === options.proxy.model)) throw new TypeError("unknown_model");
+    const selected = config.models.find(model => model.id === options.proxy.model);
+    let declaredInput = selected.input;
+    if (plain) declaredInput = options.connection.modelMetadata?.input;
+    if (Array.isArray(declaredInput)) {
+      this.#imageCapability = "unsupported";
+      if (declaredInput.includes("image")) this.#imageCapability = "supported";
+    }
     {
       const originalStream = config.streamSimple;
       const budget = this.#limits;
-      config.streamSimple = (model, context, input) => originalStream(model, context, {
-        ...input, maxTokens: budget.maxOutputTokens, maxRetries: 0,
-        timeoutMs: Math.max(1, Math.ceil(this.#remainingActiveBudget())) });
+      config.streamSimple = (model, context, input) => {
+        this.#assertImageContext(context);
+        return originalStream(model, context, {
+          ...input, maxTokens: budget.maxOutputTokens, maxRetries: 0,
+          timeoutMs: Math.max(1, Math.ceil(this.#remainingActiveBudget())),
+          onPayload: async (payload, selectedModel) => {
+            const transformed = await input?.onPayload?.(payload, selectedModel);
+            if (Buffer.byteLength(JSON.stringify(transformed ?? payload), "utf8") > 25165824) {
+              this.#failTurn("image_request_budget"); throw new TypeError("image_request_budget");
+            }
+            return transformed;
+          } });
+      };
     }
     const credentials = new InMemoryCredentialStore();
     await credentials.modify(options.proxy.provider, async () => ({ type: "api_key", key: config.apiKey }));
@@ -319,7 +364,7 @@ export class _PiSessionProvider extends PiSessionProvider {
     const model = modelRuntime.getModel(options.proxy.provider, options.proxy.model);
     if (model === undefined) throw new TypeError("unknown_model");
     const settingsManager = SettingsManager.inMemory({ compaction: { enabled: false },
-      retry: { enabled: false }, cacheWarming: "off" });
+      retry: { enabled: false }, cacheWarming: "off", images: { autoResize: false } });
     let systemPrompt = "Discuss the current request using only granted Legion tools.";
     if (this.#tools.length === 0) systemPrompt = "Discuss requirements without tools or file access.";
     if (this.#tools.some((name) => WRITE_TOOLS.includes(name))) {
@@ -354,11 +399,14 @@ export class _PiSessionProvider extends PiSessionProvider {
       excludeTools: ["mcp__*", "codemode", "tool_search"], customTools };
     await this.#createSession(this.#history, options.signal);
   }
-  async #createSession(history, signal) {
+  async #createSession(history, signal, images = this.#images) {
     const manager = SessionManager.inMemory(this.#sessionOptions.cwd);
     for (const message of history.messages) {
       if (message.role === "user") {
-        manager.appendMessage({ role: "user", content: message.text, timestamp: Date.now() });
+        let content = message.text;
+        if (message.imageRefs !== undefined) content = [{ type: "text", text: message.text },
+          ...message.imageRefs.map(ref => sdkImage(images.get(imageKey(ref))))];
+        manager.appendMessage({ role: "user", content, timestamp: Date.now() });
       } else manager.appendMessage(storedAssistant(message.text, this.#sessionOptions.model));
     }
     const created = await createAgentSession({ ...this.#sessionOptions, sessionManager: manager });
@@ -454,20 +502,34 @@ export class _PiSessionProvider extends PiSessionProvider {
       this.#enqueue(Object.freeze({ type: PiEventType.TOOL_REQUEST, request }));
     });
   }
-  start_run(runId, prompt) {
+  start_run(runId, prompt, options = {}) {
     if (this.#closed || this.#terminated || !["ready", "idle"].includes(this.#state)) {
       throw new TypeError("pi_instance_not_ready");
     }
-    modelString(runId, "runId"); modelString(prompt, "prompt");
+    const images = imageOptions(options, "turn");
+    this.#assertImageCapability(images.length);
+    modelString(runId, "runId"); modelString(prompt, "prompt", { empty: images.length > 0 });
     if (this.#lifecycle === "single_run" && this.#runId !== undefined) throw new TypeError("pi_instance_not_ready");
     if (this.#usedRuns.has(runId)) throw new TypeError("run_id_reused");
     if (this.#queue.length !== 0 || this.#waiters.length !== 0) throw new TypeError("previous_run_events_pending");
+    const user = { role: "user", text: prompt };
+    if (images.length > 0) user.imageRefs = images.map(image => image.ref);
+    const nextHistory = new PiConversationHistory({ messages: [...this.#history.messages, user] });
+    const hydrated = new Map(this.#images);
+    for (const image of images) {
+      const prior = hydrated.get(imageKey(image.ref));
+      if (prior !== undefined && !sameImageRef(prior.ref, image.ref)) throw new TypeError("image_reference_changed");
+      hydrated.set(imageKey(image.ref), image);
+    }
+    const expected = nextHistory.messages.flatMap(message => message.imageRefs ?? []);
+    this.#assertImageRequestBudget(expected);
     if (this.#lifecycle === "conversation") {
       if (prompt.length > this.#limits.maxTextCharsPerTurn || this.#history.messages.length >= 255) {
         throw new TypeError("history_or_prompt_budget");
       }
-      this.#history = new PiConversationHistory({ messages: [...this.#history.messages, { role: "user", text: prompt }] });
+      this.#history = nextHistory;
     }
+    this.#images = hydrated; this.#expectedImages = expected;
     this.#usedRuns.add(runId);
     this.#runId = runId; this.#runDone = false; this.#cancelled = false; this.#failureCode = "";
     this.#modelError = ""; this.#assistantText = ""; this.#deltaChars = 0; this.#toolResults = [];
@@ -478,14 +540,14 @@ export class _PiSessionProvider extends PiSessionProvider {
     this.#unsubscribe = this.#session.subscribe((event) => {
       if (this.#runId === runId && !this.#runDone) this.#observe(event);
     });
-    this.#runPromise = this.#run(prompt);
+    this.#runPromise = this.#run(prompt, images);
   }
-  async #run(prompt) {
+  async #run(prompt, images) {
     let status = "completed"; let errorCode = "";
     this.#activeRemainingMs = this.#limits.turnTimeoutMs;
     this.#resumeActiveBudget();
     try {
-      await this.#session.prompt(prompt, { expandPromptTemplates: false });
+      await this.#session.prompt(prompt, { expandPromptTemplates: false, images: images.map(sdkImage) });
       await this.#session.waitForIdle();
       if (this.#modelError !== "") { status = "failed"; errorCode = this.#modelError; }
     } catch (error) {
@@ -520,6 +582,27 @@ export class _PiSessionProvider extends PiSessionProvider {
     this.#unsubscribe?.(); this.#unsubscribe = undefined;
     const session = this.#session; this.#session = undefined;
     session?.dispose();
+  }
+  #assertImageCapability(count) {
+    if (count > 0 && this.#imageCapability !== "supported") throw new TypeError("image_capability_" + this.#imageCapability);
+  }
+  #assertImageRequestBudget(refs) {
+    if (refs.length > 8 || refs.reduce((total, ref) => total + ref.byteLength, 0) > 16777216) throw new TypeError("image_request_budget");
+    this.#assertImageCapability(refs.length);
+  }
+  #assertImageContext(context) {
+    const actual = context.messages.filter(message => message.role === "user" && Array.isArray(message.content))
+      .flatMap(message => message.content.filter(block => block.type === "image"));
+    let reason = "";
+    if (actual.length !== this.#expectedImages.length) reason = "image_omitted";
+    for (let index = 0; reason === "" && index < actual.length; index += 1) {
+      const block = actual[index], ref = this.#expectedImages[index];
+      const bytes = Buffer.from(block.data, "base64");
+      if (block.mimeType !== ref.mimeType || bytes.toString("base64") !== block.data || bytes.byteLength !== ref.byteLength ||
+          createHash("sha256").update(bytes).digest("hex") !== ref.sha256) reason = "image_content_changed";
+    }
+    if (reason === "" && Buffer.byteLength(JSON.stringify(context), "utf8") > 25165824) reason = "image_request_budget";
+    if (reason !== "") { this.#failTurn(reason); throw new TypeError(reason); }
   }
   #remainingActiveBudget() {
     if (this.#activeStartedAt === undefined) return this.#activeRemainingMs;
@@ -602,7 +685,7 @@ export class _PiSessionProvider extends PiSessionProvider {
     if (this.#lifecycle !== "conversation" || this.#closed) throw new TypeError("conversation_history_unavailable");
     return this.#history;
   }
-  async restore_history(checkpoint) {
+  async restore_history(checkpoint, options = {}) {
     const conversationRestore = this.#lifecycle === "conversation" &&
       ["ready", "idle"].includes(this.#state);
     const singleRunRestore = this.#lifecycle === "single_run" && this.#state === "ready" &&
@@ -617,16 +700,20 @@ export class _PiSessionProvider extends PiSessionProvider {
         checkpoint.profileId !== this.#profileId || checkpoint.profileVersion !== this.#profileVersion) {
       throw new TypeError("history_binding_mismatch");
     }
+    const images = imageOptions(options, "restore");
+    const hydrated = historyImages(checkpoint.history, images);
+    this.#assertImageRequestBudget(checkpoint.history.messages.flatMap(message => message.imageRefs ?? []));
     this.#state = "restoring";
-    this.#restorePromise = this.#restoreHistory(checkpoint.history);
+    this.#restorePromise = this.#restoreHistory(checkpoint.history, hydrated);
     return await this.#restorePromise;
   }
-  async #restoreHistory(history) {
+  async #restoreHistory(history, images) {
     this.#dispose();
     try {
-      await this.#createSession(history);
+      await this.#createSession(history, undefined, images);
       if (this.#closed || this.#terminated) { this.#dispose(); throw abortError(); }
       this.#history = history;
+      this.#images = images;
       if (this.#lifecycle === "single_run") this.#historyRestored = true;
       this.#state = this.#lifecycle === "single_run" ? "ready" : "idle";
     } catch (error) {
@@ -656,7 +743,7 @@ export class _PiSessionProvider extends PiSessionProvider {
       try { await this.#restorePromise; }
       catch (error) { if (error?.name !== "AbortError") throw error; }
     }
-    finally { this.#dispose(); if (this.#runId === undefined) this.#state = "cancelled"; }
+    finally { this.#dispose(); this.#images.clear(); this.#expectedImages = []; if (this.#runId === undefined) this.#state = "cancelled"; }
   }
   close() {
     if (this.#closePromise === undefined) this.#closePromise = this.#close();

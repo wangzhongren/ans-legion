@@ -1,6 +1,6 @@
-#二哥
+# 二哥
 
-**以角色为核心的多 Agent 项目运行时。** 底层使用 Pi 执行模型会话，上层将角色职责、项目意图、文件归属、依赖调度、记忆和验收组织成持续工作的项目。当前 runtime **1.2.3**，桌面 **0.3.3**。CLI 与桌面项目指挥台共用一个 Host。指挥台源码已完成 owner 检查，当前包与独立桌面/视觉验收进行中。
+**以角色为核心的多 Agent 项目运行时。** 底层使用 Pi 执行模型会话，上层将角色职责、项目意图、文件归属、依赖调度、记忆和验收组织成持续工作的项目。当前 runtime **1.3.1**，桌面 **0.4.1**。CLI 与桌面项目指挥台共用一个 Host。图片功能源码已完成各 owner 检查，当前终版包及独立图片流程/视觉/结构验收进行中。
 
 客户始终与二哥（内部角色 Supervisor）连续对话，客户助手气泡和任务引导统一标识二哥。二哥理解需求、读取项目、汇报状态；ProjectManager（PM）在后台编排角色与计划。每个角色拥有自己的上下文、记忆和文件职责，客户无需切换角色窗口。
 
@@ -55,14 +55,24 @@ npm --prefix apps/desktop start
 
 `--ignore-scripts` 不会安装 Electron 二进制；`install:electron` 使用项目既有官方安装能力。当前 macOS 启动条件已具备，新的真实 Electron 流程与视觉验收由独立 Tester 执行。选择项目并在“AI 连接”设置服务后，只与二哥对话；完整当前计划必须由客户确认后执行。桌面主动保存的密钥沿 Electron safeStorage 加密路径，CLI 仍仅用进程环境。Windows ZIP/DPAPI 未完成本候选验收。详见[桌面说明](apps/desktop/README.md)。
 
+## 桌面图片输入（1.3.1 候选）
+
+在二哥输入框粘贴截图、拖入本地图片或点击选图，发送前可预览、移除；可以只发送图片。首版支持 PNG/JPEG，每轮最多4张，单图≤4MiB、合计≤8MiB，单边≤8192、像素≤16MP。图片来源是本地 File，不能粘贴远程图片URL要求程序下载。
+
+在AI连接设置中显式选择模型图片能力 `supported`。默认 `unknown` 或声明 `unsupported` 会在含图发送前明确拒绝并保留草稿；协议/模型名称本身不能证明视觉支持，所用服务实际拒绝也如实报错。二哥、需看图的后台PM与工作角色分别使用各自真实连接，按可信Human来源和确认任务的精确图片引用重载真实像素，不仅转发文字描述。能力设置绑定连接版本，改变连接仍沿原计划失效规则。
+
+图片保存在当前项目的应用私有数据目录，通过SHA、类型、尺寸和引用校验；普通状态/行动日志/Org JSON不包含base64。客户历史可显式打开有限图片预览，重启保留可信引用，取消不重放工具或执行确认。项目blob总量≤64MiB/最多256引用；只有未被历史、委托、任务或恢复引用且非活动的staged孤儿可经身份/no-follow核后回收，已引用历史不删。恢复/当前请求合计最多8图/16MiB，超过预算、缺图或字节改变明确失败，不能静默将图片替换成摘要。
+
+图像能力基于真实Pi SDK `images`，网络前拒绝SDK静默省图为文字hint；三协议图像请求体、PM/worker交接、历史和真实Mac粘贴/拖入/选图完整流程仍待本候选独立验收。这里不做OCR、图片生成或远程URL下载，图片像素不宣称已做秘密扫描；原文本/元数据及模型输出的known-key门继续生效。**CLI本次仍仅文本输入**，`legion`命令、包名、导入和环境参数不变；以下JavaScript文本示例维持原字节兼容。
+
 ## CLI 安装与启动
 
 要求 **Node.js ≥ 22.19.0**。CLI 是 Node ESM 包，不依赖 Electron 或 Python；Pi SDK 与 pi-ai 固定为 1.0.4。
 
-当前提供本地 npm 包安装，尚未声明发布到 npm registry。取得 `legion-runtime-1.2.3.tgz` 后，在消费者目录安装：
+当前提供本地 npm 包安装，尚未声明发布到 npm registry。取得 `legion-runtime-1.3.1.tgz` 后，在消费者目录安装：
 
 ```sh
-npm install ./legion-runtime-1.2.3.tgz --ignore-scripts
+npm install ./legion-runtime-1.3.1.tgz --ignore-scripts
 export LEGION_API_KEY='your-current-provider-key'
 export LEGION_PROTOCOL='openai-completions'
 export LEGION_PROVIDER='your-provider'
@@ -98,7 +108,7 @@ npm pack
 
 ## 验证状态
 
-**当前 1.2.3 / 桌面 0.3.3**：二哥展示名称已通过 Desktop owner 窄范围固定门；本次 PM 包/CLI 与独立 Tester 真实 Electron 流程和视觉验收以[本次任务记录](docs/scheduling/er-ge-display-name-v1-final-package-integration.md)为准，尚不宣称全部交付通过。
+**当前 1.3.1 / 桌面 0.4.1**：图像纯契约、真实 Pi 图像调用与桌面图片接线已分别通过 owner 门；本次 PM 终版包/文本 CLI 兼容、独立图片流程/真实 Electron 与结构验收以[本次任务记录](docs/scheduling/desktop-image-input-v1-facade-repair-integration.md)为准，尚不宣称全部交付通过。
 
 **历史 1.1.3 CLI** 已完成真实 npm 安装及独立验收，以下成绩属于该旧候选：
 

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { createServer } from "node:http";
 import { createFauxCore, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
@@ -8,7 +9,7 @@ import * as api from "../../src/adapters/services/public/pi_agent.mjs";
 import { createProposalService } from "../../src/adapters/services/public/proposal.mjs";
 import { AgentSession, PolicyDecision, MutationResult, Outcome } from "../../src/kernel/models/core.mjs";
 import { AgentInstance, AgentScope, PiConnection, PiConnectionProfile, PiToolResult, PiConversationCheckpoint,
-  PiConversationHistory, ProjectReadDecision, ProjectReadResult, AgentControlDecision, AgentControlResult } from "../../src/kernel/models/agent.mjs";
+  PiConversationHistory, PiImageReference, PiImageInput, ProjectReadDecision, ProjectReadResult, AgentControlDecision, AgentControlResult } from "../../src/kernel/models/agent.mjs";
 
 const roleRoot = resolve(".ans/runtime/legion-governed-workflow-v1/AgentAdapterEngineer");
 const fixtureRoot = resolve(roleRoot, "fixtures/pi-service");
@@ -253,3 +254,82 @@ test("public Service partial SSE cancellation restores Human-only history and se
     assert.deepEqual(service.get_history().messages,[{role:"user",text:human},{role:"user",text:"Continue"},{role:"assistant",text:"Continue safely"}]);
   }finally{if(service)await service.close();server.closeAllConnections();await new Promise(done=>server.close(done));}
 });
+
+const serviceImageBytes = ["iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==", "/9j/4AAQSkZJRgABAQAASABIAAD/4QBMRXhpZgAATU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAAqADAAQAAAABAAAAAgAAAAD/7QA4UGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAAAA4QklNBCUAAAAAABDUHYzZjwCyBOmACZjs+EJ+/8AAEQgAAgACAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUhMQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/bAEMAAgICAgICAwICAwUDAwMFBgUFBQUGCAYGBgYGCAoICAgICAgKCgoKCgoKCgwMDAwMDA4ODg4ODw8PDw8PDw8PD//bAEMBAgICBAQEBwQEBxALCQsQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEP/dAAQAAf/aAAwDAQACEQMRAD8A+L6KKK/lM/38P//Z"];
+function imageServiceSse(protocol, text, model) {
+  if (protocol === "openai-completions") {
+    const first = { id: "chat-1", object: "chat.completion.chunk", created: 1, model,
+      choices: [{ index: 0, delta: { role: "assistant", content: text }, finish_reason: null }] };
+    const last = { ...first, choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } };
+    return "data: " + JSON.stringify(first) + "\n\ndata: " + JSON.stringify(last) + "\n\ndata: [DONE]\n\n";
+  }
+  const events = [];
+  if (protocol === "anthropic-messages") {
+    events.push({ type: "message_start", message: { id: "msg1", type: "message", role: "assistant",
+      model, content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+    { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+    { type: "message_stop" });
+  } else {
+    const item = { id: "item1", type: "message", role: "assistant", status: "in_progress", content: [] };
+    const content = { type: "output_text", text, annotations: [] };
+    const response = { id: "resp1", object: "response", created_at: 1, model, status: "in_progress", output: [] };
+    events.push({ type: "response.created", response },
+      { type: "response.output_item.added", output_index: 0, item },
+      { type: "response.content_part.added", item_id: "item1", output_index: 0, content_index: 0,
+        part: { ...content, text: "" } },
+      { type: "response.output_text.delta", item_id: "item1", output_index: 0, content_index: 0, delta: text },
+      { type: "response.output_text.done", item_id: "item1", output_index: 0, content_index: 0, text },
+      { type: "response.content_part.done", item_id: "item1", output_index: 0, content_index: 0, part: content },
+      { type: "response.output_item.done", output_index: 0, item: { ...item, status: "completed", content: [content] } },
+      { type: "response.completed", response: { ...response, status: "completed",
+        output: [{ ...item, status: "completed", content: [content] }],
+        usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } } });
+  }
+  return events.map((value) => "event: " + value.type + "\ndata: " + JSON.stringify(value) + "\n\n").join("");
+}
+
+for(const protocol of ["openai-completions","openai-responses","anthropic-messages"]){
+  test("public Service "+protocol+" forwards typed pixels and reference-only restore options",async()=>{
+    const directory=mkdtempSync(resolve(fixtureRoot,"images-")),bodies=[];
+    const server=createServer(async(request,reply)=>{
+      const chunks=[];for await(const chunk of request)chunks.push(chunk);
+      const body=JSON.parse(Buffer.concat(chunks).toString("utf8"));bodies.push(body);
+      reply.writeHead(200,{"content-type":"text/event-stream"});reply.end(imageServiceSse(protocol,"Image received",body.model));
+    });
+    await new Promise(done=>server.listen(0,"127.0.0.1",done));
+    const instance=new AgentInstance({instanceId:"image-service",sessionId:"image-service-session",roleId:"Supervisor",taskId:"customer-image",organizationVersion:"v3",name:"Supervisor"});
+    const connection=new PiConnectionProfile({profileId:"image-profile",profileVersion:"image-version",protocol,provider:"image-service",model:"image-model",baseUrl:"http://127.0.0.1:"+server.address().port+"/v1",modelMetadata:{input:["text","image"]}});
+    const images=serviceImageBytes.map((data,index)=>{const bytes=Buffer.from(data,"base64");let mimeType="image/png";if(index===1)mimeType="image/jpeg";
+      return new PiImageInput({ref:new PiImageReference({projectId:"service_project",attachmentId:"service_"+index,sha256:createHash("sha256").update(bytes).digest("hex"),mimeType,byteLength:bytes.length,width:2,height:2}),data});});
+    let service;
+    try{
+      service=await api.createPiAgentService({instance,connection,credentials:{apiKey:"service-test-key"},proxy:new PiConnection({provider:connection.provider,model:connection.model}),scope:new AgentScope({write:[],tools:[]}),cwd:directory,lifecycle:"conversation"});
+      service.start_run("run","",{images});assert.equal((await event(service,"run_finished")).result.status,"completed");
+      const history=service.get_history();assert.deepEqual(history.messages[0].imageRefs,images.map(image=>image.ref));
+      await service.restore_history(new PiConversationCheckpoint({instance,profileId:connection.profileId,profileVersion:connection.profileVersion,history}),{images});
+      service.start_run("continued","Refer to the original image");
+      let done;for(;;){const e=await service.next_event("continued",{signal:AbortSignal.timeout(5000)});if(["run_finished","run_failed","run_cancelled"].includes(e.type)){done=e;break;}}
+      assert.equal(done.result.status,"completed");assert.equal(bodies.length,2);
+      for(const body of bodies){
+        let messages=body.messages;if(protocol==="openai-responses")messages=body.input;
+        const actual=[];
+        for(const message of messages){if(message.role!=="user"||!Array.isArray(message.content))continue;
+          for(const block of message.content){let data,mimeType;
+            if(block.type==="image"){data=block.source.data;mimeType=block.source.media_type;}
+            else if(block.type==="image_url"||block.type==="input_image"){
+              let url=block.image_url;if(typeof url!=="string")url=url.url;
+              const match=/^data:(image\/(?:png|jpeg));base64,(.*)$/.exec(url);assert.ok(match);mimeType=match[1];data=match[2];
+            }else continue;
+            actual.push({mimeType,sha256:createHash("sha256").update(Buffer.from(data,"base64")).digest("hex")});
+          }
+        }
+        assert.deepEqual(actual,images.map(image=>({mimeType:image.ref.mimeType,sha256:image.ref.sha256})));
+      }
+      assert.doesNotMatch(JSON.stringify(history),/"data"|base64|service-test-key/);
+    }finally{if(service)await service.close();server.closeAllConnections();await new Promise(done=>server.close(done));rmdirSync(directory);}
+  });
+}

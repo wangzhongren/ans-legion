@@ -640,11 +640,11 @@ test("late real SDK creation is disposed after cancellation and never published"
 });
 
 test("stable tarball exact whitelist and product bytes exclude internal development artifacts", async () => {
-  const packaging = join(project, ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-command-center-su-label-repair-v1-9850a3707d523eba");
+  const packaging = join(project, ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-image-input-v1-facade-repair-20261012");
   const descriptor = JSON.parse(await fs.readFile(join(packaging, "package-smoke.json"), "utf8"));
-  assert.equal(resolve(descriptor.tarball), join(packaging, "legion-runtime-1.2.2.tgz"));
+  assert.equal(resolve(descriptor.tarball), join(packaging, "legion-runtime-1.3.1.tgz"));
   assert.match(descriptor.sha256, /^[a-f0-9]{64}$/);
-  assert.equal(descriptor.sha256, "773da2d1dbb58b7a9ff251e14f1cf80281a8b9286348d7a864589dd92832eef2");
+  assert.equal(descriptor.sha256, "555a4184456d6457674ded591e7dea3098cdb6b3fed4ad408c782019813dae46");
   const tarball = await fs.readFile(descriptor.tarball);
   assert.equal(createHash("sha256").update(tarball).digest("hex"), descriptor.sha256);
   assert.equal(descriptor.integrity, "sha512-" + createHash("sha512").update(tarball).digest("base64"));
@@ -672,7 +672,7 @@ test("stable tarball exact whitelist and product bytes exclude internal developm
     if (Object.hasOwn(descriptor.sourceHashes, path)) assert.equal(createHash("sha256").update(bytes).digest("hex"), descriptor.sourceHashes[path], "pinned current source " + path);
   }
   const metadata = JSON.parse(entries.get("package.json").toString());
-  assert.equal(metadata.version, "1.2.2");
+  assert.equal(metadata.version, "1.3.1");
   assert.deepEqual(metadata.exports, { ".": "./runtime.mjs", "./workbench-models": "./workbench.mjs",
     "./services/policy": "./src/kernel/services/public/policy.mjs", "./services/mutation": "./src/kernel/services/public/mutation.mjs",
     "./services/read": "./src/kernel/services/public/read.mjs",
@@ -681,8 +681,8 @@ test("stable tarball exact whitelist and product bytes exclude internal developm
   assert.ok(Object.values(metadata.dependencies).every((version) => version === "1.0.4"));
   const desktop=JSON.parse(await fs.readFile(join(project,'apps/desktop/package.json'),'utf8'));
   const lock=JSON.parse(await fs.readFile(join(project,'apps/desktop/package-lock.json'),'utf8'));
-  const expectedSpec='file:../../.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-command-center-su-label-repair-v1-9850a3707d523eba/legion-runtime-1.2.2.tgz';
-  assert.equal(desktop.dependencies['legion-runtime'],expectedSpec);const installed=lock.packages['node_modules/legion-runtime'];assert.equal(installed.version,'1.2.2');assert.equal(installed.resolved,expectedSpec);assert.equal(installed.integrity,descriptor.integrity);
+  const expectedSpec='file:../../.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-image-input-v1-facade-repair-20261012/legion-runtime-1.3.1.tgz';
+  assert.equal(desktop.dependencies['legion-runtime'],expectedSpec);const installed=lock.packages['node_modules/legion-runtime'];assert.equal(installed.version,'1.3.1');assert.equal(installed.resolved,expectedSpec);assert.equal(installed.integrity,descriptor.integrity);
   for(const [path,hash] of Object.entries(descriptor.sourceHashes))assert.equal(createHash('sha256').update(await fs.readFile(join(project,'apps/desktop/node_modules/legion-runtime',path))).digest('hex'),hash,'current installed Desktop dependency '+path);
 
 });
@@ -703,4 +703,13 @@ test('final Provider commit rejects legacy active fields, transferred owner, rep
    assert.equal(result.result.reason,reasons[scenario]);await absent(join(f.root,f.action.resource));
   });
  }
+});
+
+test('real SDK omitted image is rejected before an HTTP request; provider accepts only typed pixels',async(t)=>{
+ const {createServer}=await import('node:http');const {PiImageReference,PiImageInput,PiConnectionProfile}=await import('../../workbench.mjs');const root=await workspace(t),requests=[];const server=createServer(async(request,response)=>{let body='';for await(const chunk of request)body+=chunk;requests.push(body);response.writeHead(500);response.end('must not request omitted pixels');});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const provider=await createPiSessionProvider({instance:new AgentInstance({instanceId:'image-review',sessionId:'image-session',name:'Supervisor',roleId:'Supervisor',taskId:'image-task',organizationVersion:'v'}),proxy:new PiConnection({provider:'review-image',model:'image-model'}),scope:new AgentScope({write:[],tools:[]}),cwd:root,lifecycle:'conversation',connection:new PiConnectionProfile({profileId:'image-profile',profileVersion:'v',protocol:'openai-completions',provider:'review-image',model:'image-model',baseUrl:'http://127.0.0.1:'+server.address().port+'/v1',modelMetadata:{input:['text','image']}}),credentials:{apiKey:'reviewer-only-key'}});trackClose(root,provider);
+ const data='iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP4z8AARAwQCgAf7gP9i18U1AAAAABJRU5ErkJggg==',bytes=Buffer.from(data,'base64'),ref=new PiImageReference({projectId:'review',attachmentId:'image',sha256:createHash('sha256').update(bytes).digest('hex'),mimeType:'image/png',byteLength:bytes.length,width:2,height:2}),image=new PiImageInput({ref,data});assert.throws(()=>provider.start_run('bad','',{images:[{...image}]}),/typed_image_input_required/u);assert.throws(()=>provider.start_run('bad','',{images:[image],resolver:()=>{throw Error('callback');}}),TypeError);
+ const prompt=SdkSession.prototype.prompt;const spy=t.mock.method(SdkSession.prototype,'prompt',function(text,options){assert.equal(options.images.length,1);return prompt.call(this,text,{...options,images:[]});});provider.start_run('omitted','',{images:[image]});let terminal;for(;;){const event=await provider.next_event('omitted',{signal:AbortSignal.timeout(5000)});if(['run_finished','run_failed','run_cancelled'].includes(event.type)){terminal=event.result;break;}}
+ assert.equal(terminal.status,'failed');assert.equal(terminal.errorCode,'image_omitted');assert.equal(requests.length,0);assert.ok(!JSON.stringify(terminal).includes(data));spy.mock.restore();await provider.close();
+ const adapter=await fs.readFile(join(project,'src/adapters/providers/impl/pi_session.mjs'),'utf8');assert.doesNotMatch(adapter,/node:fs|apps\/desktop|imageResolver|resolveImagePath/u);const service=await fs.readFile(join(project,'apps/desktop/src/services/impl/project.mjs'),'utf8'),storage=await fs.readFile(join(project,'apps/desktop/src/providers/impl/project.mjs'),'utf8');assert.doesNotMatch(service,/workbench-organization|workbench-role-memories|workbench-memory|node:fs/u);assert.doesNotMatch(storage,/workbench-organization|memberConversations|roleMemories/u);
 });

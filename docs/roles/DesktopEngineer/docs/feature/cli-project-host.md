@@ -1,5 +1,7 @@
 # 二哥客户入口与 CLI 项目 Host
 
+图片输入只在桌面前台提供。Host 的同一 `sendMessage` 可接收经私有项目存储校验的 `imageRefs`，CLI仍发送原纯文本形状。客户Human历史、可信PM委托来源和已确认任务只保留Kernel `PiImageReference`七字段（`projectId`、`attachmentId`、`sha256`、`mimeType`、`byteLength`、`width`、`height`）；Host在当前项目与run内重载实际字节并调用typed Pi image接口。用户目录图片不经普通项目Read/Mutation或角色owner授权，旧无图记录按原字节读取。视觉能力未知/不支持、图缺失/被改或超过恢复预算时失败，不把图片静默变成文字提示。新能力的固定证据见 `desktop-image-input-v1`；独立桌面GUI和本地三协议请求由下游验收。
+
 用户选择自己的项目，与二哥连续讨论需求，确认可读计划及角色文件归属后，让多个角色执行、检查并接受独立验收。二哥的内部 `roleId` 仍是 `Supervisor`。Node 和 Desktop 复用唯一 Workbench Pipeline；Node 从环境取得模型密钥，归属、对话、结果及有来源的项目事实可以跨会话保留。
 
 成功时项目显示 completed，留下当前检查和独立 Acceptance 证据，执行许可撤销、租约释放。拒绝、版本变化、取消、检查或验收失败均不会算成功；已有真实效果保留，二哥把有来源的失败交后台PM形成限定返修或新计划。当前展示改名由 `er-ge-display-name-v1` 验证；最终新安装包、CLI 与独立整体验收由下游节点核验。

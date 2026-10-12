@@ -1,4 +1,5 @@
 /** Immutable configuration and Pi interchange values; no SDK, callbacks, or effects. */
+import { createHash } from "node:crypto";
 import { AgentSession, PolicyDecision, MutationResult, modelRecord, modelString, immutableStrings,
   normalizeResource, normalizeScope, digestValue } from "./core.mjs";
 import { shellEffects, shellSha, ShellRequest, ShellReview, ShellDecision, ShellResult } from "./shell.mjs";
@@ -60,6 +61,12 @@ export class PiConnectionProfile {
         if (options.modelMetadata[field] !== undefined && options.modelMetadata[field] !== expected) {
           throw new TypeError("metadata_connection_mismatch");
         }
+      }
+      const input = Object.getOwnPropertyDescriptor(options.modelMetadata, "input");
+      if (input !== undefined) {
+        if (!Object.hasOwn(input, "value")) throw new TypeError("invalid_model_input_capabilities");
+        const capabilities = imageArray(input.value, "model input", 2);
+        if (capabilities.length === 0 || capabilities.some(value => !["text", "image"].includes(value)) || new Set(capabilities).size !== capabilities.length) throw new TypeError("invalid_model_input_capabilities");
       }
       this.modelMetadata = plainValue(options.modelMetadata);
     }
@@ -164,21 +171,115 @@ export class PiTextDelta {
   }
 }
 
+/** Pure image values only. Decoder, private storage, source binding and SDK effects belong to owners. */
+const imageReferenceValues = new WeakSet();
+const imageInputValues = new WeakSet();
+function imageRecord(value, name, fields) {
+  if (value === null || typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype || Object.getOwnPropertySymbols(value).length !== 0) throw new TypeError("plain_image_value_required");
+  modelRecord(value, name, fields);
+  for (const key of Object.getOwnPropertyNames(value)) {
+    if (!fields.includes(key) || !Object.hasOwn(Object.getOwnPropertyDescriptor(value, key), "value")) throw new TypeError("image_effect_field_rejected");
+  }
+  return value;
+}
+function imageArray(value, name, max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max || Reflect.ownKeys(value).length !== value.length + 1) throw new TypeError(name + "_collection_budget");
+  const result = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (descriptor === undefined || !Object.hasOwn(descriptor, "value")) throw new TypeError("image_effect_field_rejected");
+    result.push(descriptor.value);
+  }
+  return result;
+}
+export class PiImageReference {
+  constructor(options) {
+    imageRecord(options, "PiImageReference", ["projectId", "attachmentId", "sha256", "mimeType", "byteLength", "width", "height"]);
+    for (const field of ["projectId", "attachmentId"]) {
+      if (typeof options[field] !== "string" || !/^[A-Za-z0-9_-]{1,200}$/.test(options[field])) throw new TypeError("invalid_image_identifier");
+      this[field] = options[field];
+    }
+    this.sha256 = shellSha(options.sha256, "image sha256");
+    if (!["image/png", "image/jpeg"].includes(options.mimeType)) throw new TypeError("unsupported_image_mime");
+    this.mimeType = options.mimeType;
+    if (!Number.isSafeInteger(options.byteLength) || options.byteLength < 1 || options.byteLength > 4194304) throw new TypeError("image_byte_budget");
+    this.byteLength = options.byteLength;
+    for (const field of ["width", "height"]) {
+      if (!Number.isSafeInteger(options[field]) || options[field] < 1 || options[field] > 8192) throw new TypeError("image_dimension_budget");
+      this[field] = options[field];
+    }
+    if (this.width * this.height > 16000000) throw new TypeError("image_pixel_budget");
+    Object.freeze(this); imageReferenceValues.add(this);
+  }
+}
+export class PiImageInput {
+  constructor(options) {
+    imageRecord(options, "PiImageInput", ["ref", "data"]);
+    if (!imageReferenceValues.has(options.ref)) throw new TypeError("typed_image_reference_required");
+    this.ref = options.ref;
+    if (typeof options.data !== "string" || options.data.length !== 4 * Math.ceil(this.ref.byteLength / 3) ||
+        !/^[A-Za-z0-9+/]*={0,2}$/.test(options.data)) throw new TypeError("invalid_image_base64");
+    const bytes = Buffer.from(options.data, "base64");
+    if (bytes.toString("base64") !== options.data) throw new TypeError("noncanonical_image_base64");
+    if (bytes.byteLength !== this.ref.byteLength || createHash("sha256").update(bytes).digest("hex") !== this.ref.sha256) throw new TypeError("image_content_mismatch");
+    this.data = options.data;
+    Object.freeze(this); imageInputValues.add(this);
+  }
+  static assertCollection(images, options = {}) {
+    imageRecord(options, "image collection options", ["mode"]);
+    const mode = options.mode ?? "turn";
+    let count = 4; let budget = 8388608;
+    if (mode === "restore") { count = 8; budget = 16777216; }
+    else if (mode !== "turn") throw new TypeError("invalid_image_collection_mode");
+    const values = imageArray(images, "images", count); const ids = new Set(); let projectId; let bytes = 0;
+    for (const image of values) {
+      if (!imageInputValues.has(image)) throw new TypeError("typed_image_input_required");
+      if (ids.has(image.ref.attachmentId)) throw new TypeError("duplicate_image_reference");
+      ids.add(image.ref.attachmentId);
+      if (projectId !== undefined && image.ref.projectId !== projectId) throw new TypeError("image_project_mismatch");
+      projectId = image.ref.projectId; bytes += image.ref.byteLength;
+    }
+    if (bytes > budget) throw new TypeError("image_collection_byte_budget");
+    return Object.freeze(values);
+  }
+}
+
 export class PiConversationHistory {
   constructor(options) {
     modelRecord(options, "PiConversationHistory", ["messages"]);
     if (!Array.isArray(options.messages) || options.messages.length > 256) {
       throw new TypeError("history_collection_or_budget");
     }
-    let chars = 0;
+    let chars = 0; let imageProjectId;
+    const imageIds = new Map();
     const messages = [];
     for (const message of options.messages) {
-      modelRecord(message, "history message", ["role", "text"]);
+      modelRecord(message, "history message", ["role", "text", "imageRefs"]);
       if (!["user", "assistant"].includes(message.role)) throw new TypeError("text_history_only");
       const text = modelString(message.text, "text", { empty: true });
       chars += text.length;
       if (text.length > 65536 || chars > 2097152) throw new TypeError("history_text_budget");
-      messages.push(Object.freeze({ role: message.role, text }));
+      const entry = { role: message.role, text };
+      if (message.imageRefs !== undefined) {
+        if (message.role !== "user") throw new TypeError("user_image_history_only");
+        const refs = imageArray(message.imageRefs, "history images", 4);
+        if (refs.length === 0) throw new TypeError("nonempty_image_refs_required");
+        const seen = new Set(); let bytes = 0;
+        entry.imageRefs = Object.freeze(refs.map(value => {
+          let ref = value;
+          if (!imageReferenceValues.has(ref)) ref = new PiImageReference(value);
+          if (seen.has(ref.attachmentId)) throw new TypeError("duplicate_image_reference");
+          seen.add(ref.attachmentId); bytes += ref.byteLength;
+          if (imageProjectId !== undefined && ref.projectId !== imageProjectId) throw new TypeError("image_project_mismatch");
+          imageProjectId = ref.projectId;
+          const prior = imageIds.get(ref.attachmentId);
+          if (prior !== undefined && digestValue(prior) !== digestValue(ref)) throw new TypeError("image_reference_changed");
+          imageIds.set(ref.attachmentId, ref);
+          return ref;
+        }));
+        if (bytes > 8388608) throw new TypeError("image_collection_byte_budget");
+      }
+      messages.push(Object.freeze(entry));
     }
     this.messages = Object.freeze(messages);
     Object.freeze(this);

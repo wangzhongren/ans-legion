@@ -69,6 +69,15 @@ const binding = {ownerSource:'/fixture/catalog',fileOwnership:{projectId,baseVer
   }],
   contextSnapshotDigest: sha
 };
+test('image input keeps exact Kernel references, permits image-only Human and binds task refs into the plan digest',()=>{
+  const ref={projectId,attachmentId:'image_1',sha256:sha,mimeType:'image/png',byteLength:68,width:1,height:1};
+  const textOnly=workbenchInput('sendMessage',{projectId,roleId:'Supervisor',text:'文本'});assert.equal(textOnly.ok,true);assert.equal(Object.hasOwn(textOnly.value,'imageRefs'),false);
+  const imageOnly=workbenchInput('sendMessage',{projectId,roleId:'Supervisor',text:'',imageRefs:[ref]});assert.equal(imageOnly.ok,true,JSON.stringify(imageOnly));assert.deepEqual(imageOnly.value.imageRefs,[ref]);
+  assert.equal(workbenchInput('sendMessage',{projectId,roleId:'Supervisor',text:'',imageRefs:[]}).ok,false);
+  assert.equal(workbenchInput('sendMessage',{projectId,roleId:'Supervisor',text:'',imageRefs:[{...ref,projectId:'b'.repeat(64)}]}).ok,false);
+  assert.equal(workbenchInput('sendMessage',{projectId,roleId:'Supervisor',text:'',imageRefs:[{...ref,path:'/private/image.png'}]}).ok,false);
+  const plan=boundPlan({...candidate,tasks:[{...candidate.tasks[0],imageRefs:[ref]},candidate.tasks[1]]},binding);assert.deepEqual(plan.tasks.find(task=>task.id==='first').imageRefs,[ref]);assert.notEqual(plan.planDigest,boundPlan(candidate,binding).planDigest);
+});
 test('plan accepts finite DAG and rejects model authority, scope expansion, alias and cycles', () => {
   assert.deepEqual(topologicalTasks(planCandidate(candidate).tasks).map((item) => item.id), ['first', 'second']); for (const changed of [{
     ...candidate,

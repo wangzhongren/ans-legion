@@ -3,6 +3,9 @@
  * No execution permit, binary body, or SDK native Shell is exposed. */
 /** Own SDK queue, typed deferred results, bounded conversation budget and plain history restore.
  * Conversation checkpoints restore while idle; one single_run checkpoint is allowed before its first run.
+ * start_run(runId,text,{images}) and restore_history(checkpoint,{images}) hydrate
+ * Kernel image references with host-supplied PiImageInput bytes. No file/URL loading.
+ * Unknown/unsupported visual capability and omitted/changed SDK images fail closed.
  * Host waits pause conversation time; cancel/close settle pending. No host permission callbacks. */
 export class PiSessionProvider {
   constructor() {

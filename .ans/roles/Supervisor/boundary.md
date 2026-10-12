@@ -149,3 +149,19 @@ Human已接受项目指挥台v0.3和精确超时修正版586fa7aa…：允许固
 候选配置 `.ans/decisions/er-ge-sidebar-entry-v1-project.json` SHA-256 `afbcb443c97778f501467e93d1bd3792860e31f6c76e6e9ee17a3a5d844adb7f`，方案 `.ans/decisions/er-ge-sidebar-entry-v1-scope.md`。仅侧栏Interface与原owner测试/功能说明，生成沿既有获准根的fresh sidebar-entry stage；不新增Host或私有消息权限，不改版本、README或已冻结tar。
 
 2026-10-12 真人已通过call_Pi1zzPGohNCbOcjDzhWFtbQs答复“按图实施”，上述侧栏7文件配置与方案生效。
+
+
+**桌面图片输入 v1：真人已接受的条件记录**
+
+| 类型 | 项目相对路径 | 用途 |
+| --- | --- | --- |
+| 条件文件 | `docs/scheduling/desktop-image-input-v1.md` | 真人已接受74文件配置及图片方案，固定Supervisor经task_ops初始化、自动派发六owner并维护 |
+
+配置 `.ans/decisions/desktop-image-input-v1-project.json` SHA-256 `e4e0282ba6d29148360834b40b48f48299c0565e1796eaa1a16aa99679e1e4ef`，冻结方案 `.ans/decisions/desktop-image-input-v1-scope.md`。生成证据/私有operator/桥包与终包仅既有owner获准根的全新stage，旧1.2.3/侧栏/历史只读；根桥包及最终包路径按方案固定。权限仍角色独占文件与实际Human确认，图片引用不授写权，不扩私有消息读取。
+
+2026-10-12 真人通过call_95a99905bf9942a5ab14f904e236e71f确认方案与范围并实施，上述条件记录生效。
+
+
+| 条件文件 | `docs/scheduling/desktop-image-input-v1-facade-repair-integration.md` | 同真人已接受74配置e4e0282b…内真实公开图片方法遗漏的必要修复，固定Supervisor仅经task_ops维护D→PM新包→T/R→文档接续；旧失败/图/包保留 |
+
+本条件已在原接受范围内授权：依据`.ans/decisions/desktop-image-input-v1-authorization.md`及同范围修复说明`.ans/decisions/desktop-image-input-v1-facade-repair-scope.md`，不新增源码路径、权限或产品意图，不重复确认。旧T/R先安全issue+stop，当前真实公开factory成为验收入口；新1.3.1/0.4.1fresh包/readSet于新图初始化前固定，K/A/桥在字节不变时沿原verified证据，禁止用旧D/旧终包代表修后结果。

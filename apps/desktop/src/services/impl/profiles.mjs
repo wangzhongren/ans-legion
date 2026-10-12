@@ -69,6 +69,7 @@ export class ProfilesServiceImpl {
         keyCiphertext = encrypted.value;
       }
       const profile = { id, name: input.name, protocol: input.protocol, provider: input.provider, modelId: input.modelId, baseUrl: input.baseUrl, keyCiphertext };
+      if (input.imageCapability !== undefined) profile.imageCapability = input.imageCapability;
       const profiles = document.profiles.filter((item) => item.id !== id);
       profiles.push(profile);
       const written = await this.#settings.write(settingsDocument({ schemaVersion: 1, profiles, assignments: document.assignments }));
@@ -118,7 +119,8 @@ export class ProfilesServiceImpl {
       const stored = settingsDocument(read.value).profiles.find((item) => item.id === profileId); if (!stored) return failure('not_found');
       const decrypted = await this.#settings.decryptKey(stored.keyCiphertext); if (!decrypted.ok) return providerFailure(decrypted);
       if (this.#closed) return failure('closed');
-      return success({ connection: new PiConnectionProfile({ profileId: stored.id, profileVersion: profileVersion(stored), protocol: stored.protocol, provider: stored.provider, model: stored.modelId, baseUrl: stored.baseUrl }), credentials: { apiKey: decrypted.value } });
+      const metadata = { input: ['text'] }; if (stored.imageCapability === 'supported') metadata.input.push('image');
+      return success({ connection: new PiConnectionProfile({ profileId: stored.id, profileVersion: profileVersion(stored), protocol: stored.protocol, provider: stored.provider, model: stored.modelId, baseUrl: stored.baseUrl, modelMetadata: metadata }), credentials: { apiKey: decrypted.value } });
     } catch (error) { return validationFailure(error); }
   }
   async testConnection(profileId) {

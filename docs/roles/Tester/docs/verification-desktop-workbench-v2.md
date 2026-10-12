@@ -67,3 +67,14 @@ GUI在900实宽直接点击mobile-nav-toggle显示真实sidebar，点击theme/AI
 真实GUI客户所有assistant avatar/name必须Su，PM原问题显示Su转达；实际question/choice/完整原Human/当前Host确认强门保持。send在真实DOM按钮可用后用Meta+Enter，安全记录按键meta/ctrl/activeElement/disabled、旧turn/http计数和可见状态；失败记录实际publicState/输入草稿/HTTP计数，不以API先终态假设UI已解锁、不sleep/盲retry。1.2.1旧失败的plan Human未落入Host archive/无新HTTP与委托，事件瞬态未记录，未擅定产品快捷键坏；保留真实失败证据。
 
 原六尺寸主题、900实宽顶部导航/主题/AI连接/Escape/focus/草稿与全部14安装/40回归强门保留，Shell私有validated journal/公开安全分页双证不回填IPC。新GUI新增Mac场景不skip，WindowsZIP/DPAPI仍unsupported；未知lease marker/旧observer pin/付费远端与旧ShellGUI限制不变。10文件定稿冻结后仅当前三门installed/regression/gui同candidate/candidateUnchanged可报告complete，三门遵task_ops全局锁窗口。新截图仍本阶段fresh，逐张人工核manifest PID/viewport/theme/包SHA/imageSHA，不挪用旧1.2.1八图。
+
+
+## 图片输入 v1 独立验收（当前候选）
+
+输入包为 runtime 1.3.1/Desktop 0.4.1，终包 SHA256 `555a4184456d6457674ded591e7dea3098cdb6b3fed4ad408c782019813dae46`。固定 installed 保留生产 CLI 14 个文本场景；integration 在真实 Electron SDK 上覆盖三协议 Su 图片→可信 Human source→PM 像素与七字段 task.imageRefs→当前完整确认→worker 网络像素及实际 Check/独立 Acceptance。普通 DTO/私有 sidecar 只存引用，像素由项目普通文件重核加载。unknown/unsupported 拒绝不得新增 HTTP，预览与草稿可继续使用。历史重启、跨项目、篡改/缺失和预算均保留拒绝断言。
+
+GUI 继续两个真实 macOS 用例及完整双 owner/返修/取消续轮，加入原生剪贴板、文件选择、DataTransfer 拖入、预览移除、纯图与历史预览。截图均为本阶段 fresh desktop-image 目录，manifest 记录 PID、尺寸、主题、终包 SHA 与 imageSHA。固定三门最终结果及日志 SHA 在 fresh generated 报告记录，未跑结果不作通过声明。Windows ZIP/DPAPI/原生 Windows picker 与付费远端模型未执行；旧整仓库 observer 治理 pin 限制及两个身份链不全的历史共享 marker 继续保留，不据本次结果宣称恢复或删除。
+
+SDK省图负例向真实已安装SDK传入两张已核SHA的有效图片后，受控删除SDK images；Adapter guard 的 image_omitted 按已批准安全白名单规范为公开 internal_error。断言必须是当前turn.failed、精确internal_error、一次故障注入、零新增HTTP、完整Human原文与七字段引用及可读草稿图片保留，不能接受任意错误。恢复与本轮合计超过8张或16MiB的Host前检允许精确image_budget（或Adapter image_request_budget），要求客户可读提示及零新增HTTP。
+
+真实Electron剪贴板使用44版ClipboardItem API：写入前将全部可读类型仅在当前main进程内克隆为Blob快照，读取失败则不写；finally只在当前内容仍是本fixture已知像素时恢复原快照，客户剪贴板内容不返回测试进程、不持久化。GUI正例用实际File经Host stage生成ref的SHA/bytes与SDK网络decoded bytes比较，按有效像素核验；不要求nativeImage最初PNG压缩字节等于系统剪贴板重编码字节。首旧API失败未写剪贴板；其后未快照诊断轮为环境效果限制，不能倒推恢复更早原内容，保留该轮证据，最终验收必须使用快照恢复的新候选。

@@ -33,13 +33,13 @@ function review(req) { return new models.ShellReview({ requestId: req.requestId,
 
 test('Shell public package exports only approved Service and Model values, never private authority', async () => {
   const metadata = JSON.parse(await source('package.json'));
-  assert.equal(metadata.version, '1.2.2');
+  assert.equal(metadata.version, '1.3.1');
   assert.deepEqual(Object.keys(metadata.exports).sort(), ['.', './workbench-models',
     './services/policy', './services/mutation', './services/read', './services/proposal',
     './services/pi-agent', './services/check', './services/shell', './headless-workbench'].sort());
   assert.equal(metadata.exports['./services/shell'], './src/kernel/services/public/shell.mjs');
   assert.deepEqual(Object.keys(shellApi).sort(), ['ShellService', 'createShellService']);
-  assert.deepEqual(Object.keys(models).sort(), JSON.parse(await source('.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-command-center-su-label-repair-v1-9850a3707d523eba/package-smoke.json')).modelExports.sort());
+  assert.deepEqual(Object.keys(models).sort(), JSON.parse(await source('.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-image-input-v1-facade-repair-20261012/package-smoke.json')).modelExports.sort());
   for (const name of ['ShellRequest','ShellReview','ShellPreparation','ShellAuthorization','ShellDecision',
     'ShellCandidate','ShellResult','FileBaseline','shellEffects','shellArtifacts','shellBaselines']) assert.equal(typeof models[name], 'function');
   assert.ok(!Object.keys(models).some((name) => name.startsWith('_') || /Shell.*(?:Receipt|Authority)/u.test(name)));

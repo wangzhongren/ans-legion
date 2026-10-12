@@ -280,7 +280,7 @@ test('two desktop project services cannot both claim the same stale owner versio
 test('public pure authority brands reject forged reads, preserve approvals and permanently revoke whole authority', () => {
   const { createWorkbenchAuthority, ContextReadConfirmation, ContextSnapshot, ConfirmedTaskGrant,
     AgentSession, RoleBoundary, AgentScope, TaskDispatchContext, ActionProposal, PolicyDecision, Outcome } = models;
-  assert.equal(Object.keys(models).length, 62);
+  assert.equal(Object.keys(models).length, 64);assert.equal(typeof models.PiImageReference,'function');assert.equal(typeof models.PiImageInput,'function');
   assert.equal(Object.hasOwn(models, '_createRuntimeAuthority'), false);
   for (const requiredApprovals of [[], ['write_file'], ['A.TXT']]) {
     const workspaceIdentity = { canonicalPath: 'D:/review-fixture', deviceId: '1', fileId: '2' };
