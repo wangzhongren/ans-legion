@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "maxConcurrentWorkers": 3,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "projectName": "二哥 customer-facing display rename v1",
+  "authorizationSource": ".ans/decisions/er-ge-display-name-v1-dependency-authorization.md",
+  "designFiles": [
+    ".ans/decisions/er-ge-display-name-v1-scope.md"
+  ],
+  "roles": {
+    "DesktopEngineer": {
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "writeFiles": [
+        "apps/desktop/src/interface/main.mjs",
+        "apps/desktop/src/interface/index.html",
+        "apps/desktop/src/interface/renderer.mjs",
+        "apps/desktop/src/models/workbench.mjs",
+        "apps/desktop/src/pipelines/workbench.mjs",
+        "apps/desktop/tests/unit/ipc.test.mjs",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "apps/desktop/tests/unit/workbench-model.test.mjs",
+        "docs/roles/DesktopEngineer/docs/feature/desktop-console.md",
+        "docs/roles/DesktopEngineer/feature-map.md",
+        "docs/roles/DesktopEngineer/changelog.md",
+        "docs/roles/DesktopEngineer/api-spec.md",
+        "docs/roles/DesktopEngineer/docs/feature/cli-project-host.md"
+      ],
+      "checks": {
+        "display": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/workbench-model.test.mjs",
+            "apps/desktop/tests/unit/pipeline.test.mjs",
+            "apps/desktop/tests/unit/ipc.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "ProjectManager": {
+      "card": ".ans/roles/ProjectManager/role-card.md",
+      "boundary": ".ans/roles/ProjectManager/boundary.md",
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "writeFiles": [
+        "bin/chat.mjs",
+        "package.json",
+        "package-lock.json",
+        "apps/desktop/package.json",
+        "apps/desktop/package-lock.json",
+        "README.md",
+        "apps/desktop/README.md",
+        "docs/roles/ProjectManager/docs/feature/cli-project-workflow.md",
+        "tests/package/test_package.mjs",
+        "tests/cli/test_chat.test.mjs",
+        "apps/desktop/tests/package/desktop-package.test.mjs",
+        "docs/roles/ProjectManager/feature-map.md",
+        "docs/roles/ProjectManager/changelog.md",
+        "docs/roles/ProjectManager/docs/feature/desktop-distribution.md",
+        "apps/desktop/scripts/verify-dependencies.mjs"
+      ],
+      "checks": {
+        "cli": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/package/test_package.mjs",
+            "tests/cli/test_chat.test.mjs",
+            "apps/desktop/tests/package/desktop-package.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "desktop_dependency": {
+          "argv": [
+            "node",
+            "apps/desktop/scripts/verify-dependencies.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Tester": {
+      "card": ".ans/roles/Tester/role-card.md",
+      "boundary": ".ans/roles/Tester/boundary.md",
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "writeFiles": [
+        "tests/integration/test_cli_installed_flow.mjs",
+        "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs"
+      ],
+      "checks": {
+        "installed": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "tests/integration/test_cli_installed_flow.mjs"
+          ],
+          "timeoutSeconds": 300
+        },
+        "gui": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

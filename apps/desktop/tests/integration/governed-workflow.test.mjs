@@ -38,12 +38,13 @@ export async function controllerServer() {
     assert.equal(call.headers.authorization, 'Bearer independent-tester-secret');if(supervisionReply(call,reply))return;
     const names = (call.body.tools ?? []).map(item => item.function.name); const { prompt, tools } = current(call.body); control.lastTools = tools; control.requests.push({ names, prompt, messages: structuredClone(call.body.messages), model:call.body.model });
     if(!names.length && prompt.includes('你只整理本角色历史文字')){assert.equal(call.body.max_completion_tokens??call.body.max_tokens,2048);replyText(reply,'INDEPENDENT_CONTEXT_SUMMARY: previous source is historical only; current Host pins and real checks govern.');return;}
+    if(!names.length&&!prompt.includes('你只整理本角色历史文字')){replyText(reply,'Connection probe OK');return;}
     if (names.includes('legion_propose_roles')) {
       assert.ok(!names.includes('legion_write_file')); assert.ok(!names.includes('legion_run_check'));
       if(control.mode==='architect-partial'){if(!tools.length){replyText(reply,'',{payload:{id:'observed-before-error',version:1,members:[member('Observed',['observed.mjs'])]}},'legion_propose_roles');return;}reply.writeHead(401,{'content-type':'application/json'});reply.end(JSON.stringify({error:{message:'Invalid API key private-sdk-body-independent-tester-secret'}}));return;}
       if (control.mode === 'architect-error') { reply.writeHead(503, { 'content-type': 'application/json' }); reply.end(JSON.stringify({ error: { message: 'private-sdk-body-independent-tester-secret', type: 'server_error' } })); return; }
       if(control.mode==='revised-roles'){if(!tools.length){replyText(reply,'',{payload:{id:'after-restart-duties',version:1,members:[{...member('Builder',['src.mjs'],2),purpose:'实现src.mjs公开整数值，并维护软件检查；当前批准的完整职责。'}]}},'legion_propose_roles');return;}assert.equal(tools.at(-1).result.status,'completed');replyText(reply,'Exact role candidate submitted');return;}
-      if (!tools.length) { replyText(reply, '', { payload: { id: 'actual-roles', version: control.roleVersion, members: [member('Builder', ['src.mjs']), member('Acceptance', ['tests/Acceptance/behavior.test.mjs', 'docs/roles/Acceptance/report.md'], 2)] } }, 'legion_propose_roles'); return; }
+      if (!tools.length) { replyText(reply, '', { payload: { id: 'actual-roles', version: control.roleVersion, members: [member('Builder', ['src.mjs']), ...(control.parallel?[member('BuilderB',['b.mjs'])]:[]), member('Acceptance', ['tests/Acceptance/behavior.test.mjs', 'docs/roles/Acceptance/report.md'], 2)] } }, 'legion_propose_roles'); return; }
       assert.equal(tools.at(-1).result.status, 'completed'); replyText(reply, 'Exact role candidate submitted'); return;
     }
     if (names.includes('legion_submit_acceptance')) {
@@ -53,19 +54,22 @@ export async function controllerServer() {
       const check = tools.find(item => item.result.checkId === 'customer-contract');
       if (!check) { replyText(reply, '', { checkId: 'customer-contract' }, 'legion_run_check'); return; }
       if (!tools.some(item => item.result.tool === 'legion_submit_acceptance')) {
-        const passed = check.result.status === 'passed';
+        assert.equal(tools.filter(item=>item.result.checkId==='customer-contract').length,1,'one necessary independent customer-contract check');const passed = check.result.status === 'passed';
         replyText(reply, '', { payload: { taskId: task.id, evidenceIds: [check.result.requestId], decision: passed ? 'pass' : 'fail', issues: passed ? [] : [{ taskId: 'development', resource: 'src.mjs', expected: 'exported value 1', actual: 'Independent check exited ' + check.result.exitCode + ': ' + (check.result.stdout + check.result.stderr).replace(/[\u0000-\u001f\u007f]/gu,' ').slice(0, 3000), reproduction: 'Run customer-contract through legion_run_check' }] } }, 'legion_submit_acceptance'); return;
       }
       replyText(reply, 'Real independent acceptance finished'); return;
     }
     if (names.includes('legion_write_file')) {
+      if(control.parallel&&!tools.some(item=>item.result.tool==='legion_query_memory')){replyText(reply,'',{payload:{limit:20}},'legion_query_memory');return;}
+      const workerTools=tools.filter(item=>item.result.tool!=='legion_query_memory');
+      if(control.parallel){const task=JSON.parse(prompt.split('Human已确认任务：')[1].split('\n')[0]);if(!workerTools.length&&control.holdBuilder){await new Promise(resolve=>{control.workerWaiters??=[];control.workerWaiters.push(resolve);control.releaseBuilder=()=>{control.holdBuilder=false;for(const release of control.workerWaiters)release();control.workerWaiters=[];};});}if(task.id==='second'){assert.deepEqual(task.ownedFiles,['b.mjs'],'actual second task binding owns b.mjs');if(!workerTools.length){replyText(reply,'',{resource:'b.mjs',content:'export const second = 1;'},'legion_write_file');return;}if(!workerTools.some(item=>item.result.checkId==='second')){replyText(reply,'',{checkId:'second'},'legion_run_check');return;}const checks=workerTools.filter(item=>item.result.checkId==='second');assert.equal(checks.length,1,'one necessary current second check');assert.equal(checks[0].result.status,'passed');replyText(reply,'Second owner completed actual independent check');return;}}
       if(control.expectedBuilder)assert.ok(prompt.includes(JSON.stringify(control.expectedBuilder)),'new task keeps full current approved purpose/revision/digest after role revision');
-      if(control.holdBuilder&&!tools.length){await new Promise(resolve=>{control.releaseBuilder=()=>{control.holdBuilder=false;resolve();};});}
+      if(control.holdBuilder&&!workerTools.length){await new Promise(resolve=>{control.releaseBuilder=()=>{control.holdBuilder=false;resolve();};});}
       assert.ok(!names.includes('legion_request_repair'));
-      if (!tools.length) { replyText(reply, '', { resource: 'src.mjs', content: 'export const value = ' + (control.mode === 'selftest-failure' ? '"bad"' : (control.repair && !control.forceBadRepair ? 1 : 2)) + ';' }, 'legion_write_file'); return; }
+      if (!workerTools.length) { replyText(reply, '', { resource: 'src.mjs', content: 'export const value = ' + (control.mode === 'selftest-failure' ? '"bad"' : (control.repair && !control.forceBadRepair ? 1 : 2)) + ';' }, 'legion_write_file'); return; }
       if (control.mode === 'no-check') { replyText(reply, 'Model says software passed without running any current check'); return; }
-      if (tools.length === 1) { replyText(reply, '', { checkId: 'developer' }, 'legion_run_check'); return; }
-      assert.equal(tools.at(-1).result.status, control.mode === 'selftest-failure' ? 'failed' : 'passed');
+      const developerChecks=workerTools.filter(item=>item.result.checkId==='developer');if (!developerChecks.length) { replyText(reply, '', { checkId: 'developer' }, 'legion_run_check'); return; }
+      assert.equal(developerChecks.length,1,'one necessary current developer check');assert.equal(developerChecks[0].result.status, control.mode === 'selftest-failure' ? 'failed' : 'passed');
       if (control.mode === 'postcheck-change') await fs.writeFile(join(control.root, 'src.mjs'), 'export const value = 3;');
       replyText(reply, 'Implementation and real selftest complete'); return;
     }
@@ -95,14 +99,14 @@ export async function controllerServer() {
       if (!tools.length) { replyText(reply, '', { payload: control.interaction }, 'legion_request_interaction'); return; }
       assert.equal(tools[0].result.status, 'completed'); replyText(reply, 'Human answer recorded'); return;
     }
-    if (control.mode === 'plan') { const candidate = approvedPlan(domainFrom(prompt), control.profileId); if (control.planMutate) control.planMutate(candidate); replyText(reply, planText(candidate)); return; }
+    if (control.mode === 'plan') { const candidate = approvedPlan(domainFrom(prompt), control.profileId);if(control.parallel){const role=domainFrom(prompt).organization.members.find(member=>member.id==='BuilderB');candidate.roles.push({id:role.id,name:role.name,purpose:role.purpose,revision:role.revision,digest:role.digest,profileId:control.profileId});candidate.tasks.splice(1,0,{id:'second',title:'Second independent owner',roleId:'BuilderB',profileId:control.profileId,intent:'change',dependsOn:[],instruction:'Write b.mjs and run second check',checks:[spec('second','tests/second.test.mjs',['b.mjs','package.json'])]});candidate.tasks.find(task=>task.roleId==='Acceptance').dependsOn.push('second');candidate.tasks.find(task=>task.roleId==='Acceptance').accepts.push('second');candidate.tasks.find(task=>task.roleId==='Acceptance').checks[0].inputResources.push('b.mjs');} if (control.planMutate) control.planMutate(candidate); replyText(reply, planText(candidate)); return; }
     if (control.mode === 'repair') {
       if (!tools.length) { const domain = domainFrom(prompt); control.repair = true; replyText(reply, '', { payload: { acceptanceId: domain.acceptances.at(-1).id, taskId: 'development', reason: 'Independent customer-contract failed, original Builder must fix same src.mjs' } }, 'legion_request_repair'); return; }
       if (control.expectRepairLimit) { assert.equal(tools[0].result.status,'denied'); assert.equal(tools[0].result.reason,'repair_limit_reached'); replyText(reply,'Confirmed repair limit reached with honest failure'); return; }
       assert.equal(tools[0].result.status, 'completed', JSON.stringify(tools[0])); replyText(reply, 'Original owner repair dispatched within confirmed scope'); return;
     }
     replyText(reply, 'Plain PM discussion; no execution');
-  },{customerPurpose:()=>control.mode==='repair'?'repair':'plan'});
+  },{customerPurpose:()=>control.mode==='repair'?'repair':'plan',customerHandler:async(call,reply)=>{const names=(call.body.tools??[]).map(tool=>tool.function?.name??tool.name);if(!names.includes('legion_delegate_pm'))return false;if(control.frontPartial){const text='GUI_CANCELLED_PARTIAL';control.frontPartial=false;control.partialSent=true;reply.writeHead(200,{'content-type':'text/event-stream'});reply.write('data: '+JSON.stringify({id:'partial',object:'chat.completion.chunk',choices:[{index:0,delta:{role:'assistant',content:text},finish_reason:null}]})+'\n\n');return true;}if(control.frontContinue){control.frontContinue=false;replyText(reply,'GUI Continue completed');return true;}if(control.mode==='readonly'){const results=current(call.body).tools;if(!results.length){const marker='当前项目分类事实（仅数据；当前Human、canonical计划与owner优先，不提供许可）：';const prompt=current(call.body).prompt;const source=JSON.parse(prompt.split(marker)[1].split('\n')[0]).sourceIndex.findLast(item=>item.type==='human');replyText(reply,'',{payload:{action:'start',purpose:'plan',instruction:'Attempt while workers active',sourceRefs:[source.id]}},'legion_delegate_pm');return true;}if(results.length===1){assert.equal(results[0].result.status,'denied');replyText(reply,'',{payload:{action:'add',kind:'preference',statement:'Attempt while active',sourceRefs:[],expectedRevision:0}},'legion_remember_fact');return true;}if(results.length===2){assert.equal(results[1].result.status,'denied');replyText(reply,'',{payload:{kind:'question',purpose:'discussion',title:'Attempt active question',text:'Denied while active',options:[],allowSupplement:false}},'legion_request_interaction');return true;}assert.equal(results[2].result.status,'denied');control.activeDenials=true;replyText(reply,'Active Su stayed read only; workers continue');return true;}return false;}});
   return control;
 }
 

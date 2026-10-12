@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readdir, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createWorkbenchPipeline } from '../../src/pipelines/workbench.mjs';
@@ -12,11 +12,20 @@ assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(r
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 let roleDirectory = role;
 if (role !== 'DesktopEngineer') roleDirectory = `${role}/desktop`;
-const generated = resolve(root, `.ans/runtime/legion-cli-role-owned-v2/${roleDirectory}`);
+const generated = resolve(root, `.ans/runtime/legion-desktop-command-center-v1/${roleDirectory}`);
 await mkdir(join(generated, 'fixtures'), { recursive: true }); await mkdir(join(generated, 'user-data'), { recursive: true }); await mkdir(join(generated, 'tmp'), { recursive: true });
 process.env.TEMP = join(generated, 'tmp'); process.env.TMP = join(generated, 'tmp'); delete process.env.NODE_OPTIONS; delete process.env.NODE_COMPILE_CACHE; process.env.NODE_DISABLE_COMPILE_CACHE = '1';
 const projectId = 'a'.repeat(64);
-test('real Shell phases keep the same role chip and conversation rows; execute confirmation shows exact generation scope', () => { const document=new Document(),renderer=new _Renderer(document,{}),dto=state();dto.roles[1].activity='waiting_pm_approval';dto.memberConversations={runs:[{id:'r',runId:'r',instanceId:'i',roleId:'Builder',taskId:'build',status:'running',startedAt:'2026-10-10T00:00:00.000Z'}],events:[{id:'older',conversationId:'r',kind:'assistant_text',text:'先前真实文字',orderKnown:true,createdAt:'2026-10-10T00:00:00.000Z'}]};dto.shellRequests=[{id:'s',roleId:'Builder',taskId:'build',runId:'r',command:'printf <script>safe</script>',cwd:'',reason:'具体请求',network:'none',generatedEffects:['dist/'],timeoutSeconds:30,status:'reviewing',review:null,output:{stdout:'',stderr:'',truncated:false},result:null,createdAt:'2026-10-10T00:00:01.000Z',updatedAt:'2026-10-10T00:00:01.000Z'}];renderer.render(dto);document.getElementById('details-drawer').hidden=true;const chip=renderer.activityNodes.get('Builder');assert.match(chip.textContent,/待PM审批/u);chip.focus();chip.dispatchEvent(new Event('click'));assert.equal(renderer.tab,'conversation');const older=renderer.memberEventNodes.get('older').node;dto.roles[1].activity='executing_shell';dto.shellRequests[0].status='running';dto.shellRequests[0].output.stdout='实际有限输出';renderer.render(dto);assert.equal(renderer.activityNodes.get('Builder'),chip);assert.match(chip.textContent,/执行Shell/u);assert.equal(renderer.memberEventNodes.get('older').node,older);assert.match(document.getElementById('member-conversation-log').textContent,/实际有限输出/u);assert.equal(document.getElementById('member-conversation-log').querySelectorAll('script').length,0);const scope=document.createElement('div');renderer.taskDefinition(scope,{id:'build',title:'任务',roleId:'Builder',profileId:'p1',dependsOn:[],writeSet:[],checks:[],instruction:'实际指令',generatedEffects:['dist/'],artifactScopes:[{scope:'dist/',kind:'build'}]});assert.match(scope.textContent,/Shell生成写入范围：dist\//u);renderer.toggleDetails(false);assert.equal(document.activeElement,chip); });
+test('Shell phase chip stays stable while private member and Shell output text stay out of the customer view',()=>{
+ const document=new Document(),renderer=new _Renderer(document,{}),dto=state();dto.roles[1].activity='waiting_pm_approval';
+ dto.memberConversations={runs:[{id:'r',runId:'r',instanceId:'i',roleId:'Builder',taskId:'build',status:'running',startedAt:'2026-10-10T00:00:00.000Z'}],events:[{id:'private',conversationId:'r',kind:'assistant_text',text:'PRIVATE_MEMBER_TEXT',orderKnown:true,createdAt:'2026-10-10T00:00:00.000Z'}]};
+ dto.shellRequests=[{id:'s',roleId:'Builder',taskId:'build',runId:'r',status:'reviewing',review:null,result:null,generatedEffects:['dist/'],createdAt:'2026-10-10T00:00:01.000Z',updatedAt:'2026-10-10T00:00:01.000Z'}];
+ renderer.render(dto);const chip=renderer.activityNodes.get('Builder');assert.match(chip.textContent,/待PM审批/u);chip.dispatchEvent(new Event('click'));
+ const log=document.getElementById('member-conversation-log');assert.equal(log.textContent.includes('PRIVATE_MEMBER_TEXT'),false);
+ dto.roles[1].activity='executing_shell';dto.shellRequests[0].status='running';renderer.render(dto);assert.equal(renderer.activityNodes.get('Builder'),chip);assert.match(chip.textContent,/执行Shell/u);
+ const scope=document.createElement('div');renderer.taskDefinition(scope,{id:'build',title:'任务',roleId:'Builder',profileId:'p1',dependsOn:[],checks:[],instruction:'实际指令',generatedEffects:['dist/'],artifactScopes:[{scope:'dist/',kind:'build'}]});assert.match(scope.textContent,/Shell生成写入范围：dist\//u);
+});
+
 test('both real evidence surfaces show authorized absence without SHA null and retained delivery is separate from new modifications',()=>{const document=new Document(),renderer=new _Renderer(document,{}),dto=state();dto.evidence=[{id:'e',roleId:'Builder',taskId:'t',planDigest:'a'.repeat(64),result:{checkId:'c',status:'passed',testCount:1,executed:true,exitCode:0,reason:'passed',inputVersions:[{resource:'old.bin',state:'absent',sha256:null,byteLength:0}],stdout:'',stderr:''}}];renderer.render(dto);renderer.openMember('Builder');assert.match(document.getElementById('member-current-evidence').textContent,/old.bin.*获准缺失/u);assert.match(document.getElementById('execution-results').textContent,/old.bin.*获准缺失/u);assert.equal(document.getElementById('member-current-evidence').textContent.includes('SHA null'),false);assert.equal(document.getElementById('execution-results').textContent.includes('SHA null'),false);assert.match(resultSummary({writeSet:['asset.bin'],results:[],retainedOutputs:[{resource:'asset.bin'}],checkStatus:'passed'}),/实际修改 0.*恢复核验保留 1.*非新写/u);});
 function state() {
   return { ...workbenchDTO({ profiles: [{ id: 'p1', name: '本地连接', protocol: 'openai-completions', provider: 'local', modelId: 'test', baseUrl: 'http://localhost:1234', hasSavedKey: true }, { id: 'p2', name: '备用连接', protocol: 'openai-responses', provider: 'local', modelId: 'test', baseUrl: 'http://localhost:1234', hasSavedKey: true }], assignments: [], projects: [], history: { messages: [] } }), defaultProfileId: 'p1', currentProject: { id: projectId, name: '示例项目', organizationVersion: 'customer-v1', hasManager: true }, roles: [{ id: 'ProjectManager', name: '项目管理', purpose: '澄清需求', profileId: 'p1' }, { id: 'Builder', name: '执行成员', purpose: '执行确认后的任务', profileId: 'p1' }] };
@@ -60,7 +69,15 @@ class Document {
 
 test('real public Pipeline selection accepts arbitrary customer folder, hides roots and has no copied development roles', async () => {
   const fixture = await mkdtemp(join(generated, 'fixtures', 'interface-pipeline-')); const customer = join(fixture, 'customer'); await mkdir(customer); const userDataDir = await mkdtemp(join(generated, 'user-data', 'interface-pipeline-')); const pipeline = createWorkbenchPipeline({userDataDir,leaseRoot:join(fixture,'isolated-project-leases')});
-  try { const selected = await pipeline.selectProject(customer); assert.equal(selected.ok, true,JSON.stringify(selected)); assert.deepEqual(selected.value.roles.map((item) => item.id), ['Acceptance', 'ProjectManager', 'RoleArchitect', 'Supervisor']); assert.equal(selected.value.roles.every((item) => item.status === 'system' && item.boundary.length === 0), true); assert.equal(selected.value.observation.status, 'unavailable'); assert.deepEqual(await readdir(customer), []); assert.equal(JSON.stringify(selected).includes('canonicalPath'), false); assert.equal((await pipeline.sendMessage({ projectId: selected.value.currentProject.id, roleId: 'Builder', text: '直接执行' })).error.code, 'manager_only'); } finally { await pipeline.close(); }
+  try { const selected = await pipeline.selectProject(customer); assert.equal(selected.ok, true,JSON.stringify(selected)); assert.deepEqual(selected.value.roles.map((item) => item.id), ['Acceptance', 'ProjectManager', 'RoleArchitect', 'Supervisor']); assert.equal(selected.value.roles.every((item) => item.status === 'system' && item.boundary.length === 0), true); assert.equal(selected.value.observation.status, 'unavailable'); assert.deepEqual(await readdir(customer), []); assert.equal(JSON.stringify(selected).includes('canonicalPath'), false); assert.equal((await pipeline.sendMessage({ projectId: selected.value.currentProject.id, roleId: 'Builder', text: '直接执行' })).error.code, 'manager_only');
+    await writeFile(join(customer,'README.md'),'真实项目正文');
+    const projectId=selected.value.currentProject.id,listed=await pipeline.listProjectFiles({projectId,resource:''});assert.equal(listed.ok,true,JSON.stringify(listed));assert.ok(listed.value.entries.some(item=>item.name==='README.md'));
+    const read=await pipeline.readProjectFile({projectId,resource:'README.md',maxBytes:65536});assert.equal(read.ok,true,JSON.stringify(read));assert.equal(read.value.text,'真实项目正文');assert.equal(read.value.sha256.length,64);
+    const activity=await pipeline.queryRoleActivity({projectId});assert.equal(activity.ok,true,JSON.stringify(activity));assert.ok(activity.value.roles.some(item=>item.id==='Supervisor'));
+    const log=await pipeline.queryRoleLog({projectId,roleId:'Supervisor'});assert.equal(log.ok,true,JSON.stringify(log));assert.deepEqual(log.value.events,[]);
+    const memory=await pipeline.queryProjectMemory({projectId});assert.equal(memory.ok,true,JSON.stringify(memory));assert.deepEqual(memory.value.facts,[]);
+    assert.equal((await pipeline.readProjectFile({projectId,resource:'../outside'})).ok,false);
+  } finally { await pipeline.close(); }
 });
 test('renderer polling preserves message/key/action/mapping/filter/scroll; workers remain view only', () => {
   const document = new Document(); const renderer = new _Renderer(document, {}); const dto = state(); renderer.render(dto); document.getElementById('message-input').value = '正在编辑的需求'; document.getElementById('api-key').value = 'new-secret-draft'; document.getElementById('key-action').value = 'replace'; document.getElementById('status-filter').value = 'failed'; document.getElementById('context-input').value = 'src/a.mjs'; document.getElementById('chat-scroll').scrollTop = 170; document.getElementById('details-drawer').scrollTop = 60; renderer.mappingDrafts.set('ProjectManager', 'p2'); renderer.defaultDraft = 'p2'; renderer.render({ ...dto, probe: { ...dto.probe, status: 'running' } });
@@ -78,8 +95,8 @@ test('renderer polling preserves message/key/action/mapping/filter/scroll; worke
   assert.equal(renderer.roleRows.get('Builder').select.disabled, false);
   assert.equal(renderer.roleRows.get('Builder').button.hidden, false);
   document.getElementById('member-list').children[1].dispatchEvent(new Event('click'));
-  assert.equal(document.getElementById('member-details').open, true);
-  assert.equal(document.getElementById('details-drawer').hidden, false);
+  assert.equal(renderer.zone, 'roles');
+  assert.equal(renderer.selectedRoleId, 'Builder');
   assert.equal(document.getElementById('chat-scroll').scrollTop, 170);
   assert.equal(document.getElementById('details-drawer').scrollTop, 60);
   document.activeElement = document.getElementById('default-profile');
@@ -98,11 +115,29 @@ test('renderer polling preserves message/key/action/mapping/filter/scroll; worke
   renderer.navigate('conversation');
   assert.equal(document.getElementById('chat-scroll').scrollTop, 170);
 });
-test('send and credential saves retain drafts on failure; successful send uses PM only and clears exact accepted draft', async () => {
+test('send and credential saves retain drafts on failure; successful send uses the internal Supervisor role and clears the accepted draft', async () => {
   const document = new Document(); const calls = []; let fail = true; const dto = state(); const api = { sendMessage: async (input) => { calls.push(input); if (fail) return { ok: false, error: { message: '安全错误' } }; return { ok: true, value: dto }; }, saveProfile: async () => ({ ok: false, error: { message: '加密不可用' } }) }; const renderer = new _Renderer(document, api); renderer.render(dto); document.getElementById('message-input').value = '需求'; await renderer.send(); assert.equal(document.getElementById('message-input').value, '需求'); fail = false; await renderer.send(); assert.equal(document.getElementById('message-input').value, ''); assert.equal(calls.every((input) => input.roleId === 'Supervisor'), true); document.getElementById('api-key').value = 'secret-draft'; document.getElementById('key-action').value = 'replace'; await renderer.saveProfile(); assert.equal(document.getElementById('api-key').value, 'secret-draft');
+});
+test('customer connection copy names 二哥 while preserving the real background PM and only invalidates active plans',async()=>{
+ const document=new Document(),dto=state();let response=dto;
+ const renderer=new _Renderer(document,{saveProfile:async()=>({ok:true,value:response})});renderer.render(dto);
+ assert.match(document.getElementById('default-profile-hint').textContent,/二哥.*后台 PM.*没有活动计划/u);
+ assert.equal(renderer.memberName(dto.roles[0]),'后台项目管理');
+ await renderer.saveProfile();assert.match(document.getElementById('notice').textContent,/后续讨论可使用/u);assert.equal(document.getElementById('notice').textContent.includes('失效'),false);
+ const active={...dto,plan:governedUiState().plan};response=active;renderer.render(active);await renderer.saveProfile();assert.match(document.getElementById('notice').textContent,/原活动计划已失效/u);
+});
+test('customer model identity and Human confirmation say 二哥 without renaming the internal Supervisor instance',async()=>{
+ const source=await readFile(new URL('../../src/pipelines/workbench.mjs',import.meta.url),'utf8');
+ assert.match(source,/const prompt = \['你是二哥（内部Supervisor），唯一客户对话入口/u);
+ assert.match(source,/boundedModelPrompt\(\['你是二哥（内部Supervisor）。真实Human答复已记录/u);
+ assert.match(source,/二哥建议 \$\{supervision\.recommendation\}/u);
+ assert.match(source,/name: 'Supervisor'/u);
+ assert.match(source,/name:'Supervisor'/u);
+ assert.match(source,/const GUIDE = `你是项目唯一ProjectManager/u);
 });
 test('display hides plan JSON without mutating history, missing outputs and software checks remain honest', async () => {
   const text = '自然语言方案\n```legion-plan\n{"goal":"内部数据"}\n```'; assert.equal(conversationDisplay(text), '自然语言方案'); assert.ok(text.includes('内部数据')); const task = { results: [], writeSet: ['a.txt', 'b.txt'] }; assert.match(resultSummary(task), /实际修改 0 个文件/u); assert.match(resultSummary(task), /not_executed/u);
+  assert.match(conversationDisplay('```legion-plan\n{"goal":"尚在生成"'), /^二哥已带来一份待确认的计划/u);
   const source = await readFile(new URL('../../src/interface/renderer.mjs', import.meta.url), 'utf8'); assert.equal(/innerHTML|outerHTML|insertAdjacentHTML|eval\(|new Function|require\(/u.test(source), false); assert.match(source, /setInterval[\s\S]*1000/u);
 });
 
@@ -165,11 +200,11 @@ test('welcome uses complete timeline, preserves actual system members and return
   assert.match(renderer.memberNodes.get('RoleArchitect').button.attributes['aria-label'], /正在工作/u);
 });
 
-test('every actual member mapping delegates existing assignProfile; clicking members only opens the members tab and returns focus', async () => {
+test('member selection opens the role workspace while connection mapping still uses assignProfile', async () => {
   const document = new Document(); const calls = []; const dto = state(); const renderer = new _Renderer(document, { assignProfile: async (input) => { calls.push(input); return { ok: true, value: dto }; } });
   document.getElementById('details-drawer').hidden = true; renderer.render(dto); const input = document.getElementById('message-input'); input.focus();
   renderer.memberNodes.get('Builder').button.dispatchEvent(new Event('click'));
-  assert.deepEqual(calls, []); assert.equal(renderer.tab, 'members'); assert.equal(document.getElementById('detail-members').hidden, false); assert.equal(document.getElementById('detail-task').hidden, true); renderer.toggleDetails(false); assert.equal(document.activeElement, input);
+  assert.deepEqual(calls, []); assert.equal(renderer.zone, 'roles'); assert.equal(renderer.selectedRoleId, 'Builder'); renderer.selectZone('conversation'); assert.equal(document.activeElement, input);
   const row = renderer.roleRows.get('Builder'); row.select.value = 'p2'; row.select.dispatchEvent(new Event('change')); row.button.dispatchEvent(new Event('click')); await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(calls, [{ roleId: 'Builder', profileId: 'p2' }]); assert.equal(renderer.mappingDrafts.has('Builder'), false);
 });
@@ -275,9 +310,9 @@ test('real role activity waiting means waiting for tasks; only waiting_answer is
     { id: 'Questioner', name: '等待答复成员', purpose: '提问', profileId: 'p1', status: 'approved', activity: 'waiting_answer' },
     { id: 'Legacy', name: '历史成员', purpose: '', profileId: 'p1', status: 'legacy', activity: 'waiting' }
   ]; renderer.render(dto);
-  const waiting = renderer.memberNodes.get('Builder').button; assert.equal(waiting.dataset.activity, 'waiting'); assert.equal(waiting.attributes.title, '执行成员 · 项目角色 · 等待任务'); assert.match(waiting.attributes['aria-label'], /等待任务/u); assert.equal(waiting.attributes['aria-label'].includes('等待答复'), false); assert.match(renderer.roleRows.get('Builder').purpose.textContent, /当前状态：等待任务/u);
-  const waitingAnswer = renderer.memberNodes.get('Questioner').button; assert.equal(waitingAnswer.dataset.activity, 'waiting_answer'); assert.equal(waitingAnswer.attributes.title, '等待答复成员 · 项目角色 · 等待答复'); assert.match(renderer.roleRows.get('Questioner').purpose.textContent, /当前状态：等待答复/u);
-  assert.equal(renderer.memberNodes.get('Legacy').button.attributes.title, '历史成员 · 来源未记录 · 职责待补全'); assert.match(renderer.roleRows.get('Legacy').purpose.textContent, /当前状态：职责待补全/u);
+  const waiting = renderer.memberNodes.get('Builder').button; assert.equal(waiting.dataset.activity, 'waiting'); assert.equal(waiting.attributes.title, '执行成员 · 项目角色 · 实现 · 等待任务'); assert.match(waiting.attributes['aria-label'], /等待任务/u); assert.equal(waiting.attributes['aria-label'].includes('等待答复'), false); assert.match(renderer.roleRows.get('Builder').purpose.textContent, /当前状态：等待任务/u);
+  const waitingAnswer = renderer.memberNodes.get('Questioner').button; assert.equal(waitingAnswer.dataset.activity, 'waiting_answer'); assert.equal(waitingAnswer.attributes.title, '等待答复成员 · 项目角色 · 提问 · 等待答复'); assert.match(renderer.roleRows.get('Questioner').purpose.textContent, /当前状态：等待答复/u);
+  assert.equal(renderer.memberNodes.get('Legacy').button.attributes.title, '历史成员 · 来源未记录 · 职责摘要未记录 · 职责待补全'); assert.match(renderer.roleRows.get('Legacy').purpose.textContent, /当前状态：职责待补全/u);
   assert.equal(document.getElementById('pending-interaction').hidden, true); assert.equal(dto.turn, null);
 });
 
@@ -289,7 +324,7 @@ test('production has exactly two official navigation markers while the independe
   const renderer = new _Renderer(document, { getState: async () => ({ ok: true, value: dto }) }); renderer.start(); await new Promise((resolve) => setImmediate(resolve));
   try {
     assert.equal(document.getElementById('welcome-settings').hidden, false); assert.equal(document.querySelectorAll('[data-page]').length, 2); document.getElementById('welcome-settings').dispatchEvent(new Event('click'));
-    assert.equal(renderer.page, 'settings'); assert.equal(document.getElementById('settings-page').hidden, false); assert.equal(document.getElementById('conversation-page').hidden, true); assert.equal(document.getElementById('settings-nav').attributes['aria-current'], 'page');
+    assert.equal(renderer.page, 'settings'); assert.equal(document.getElementById('settings-page').hidden, false); assert.equal(document.getElementById('command-grid').hidden, true); assert.equal(document.getElementById('settings-nav').attributes['aria-current'], 'page');
   } finally { renderer.stop(); }
 });
 
@@ -324,22 +359,17 @@ test('missing Lexer or display budget keeps complete readable plaintext with a l
   const long = '内容'.repeat(140000); const over = _markdownContent(document, long, Lexer); assert.equal(over.status, 'plain_fallback'); assert.equal(over.root.children[0].textContent, long); assert.match(over.root.textContent, /完整纯文本/u);
 });
 
-test('closing a viewed member clears only selected state and keeps its keyboard return focus', () => {
-  const document = new Document(); const renderer = new _Renderer(document, {}); const dto = state(); renderer.render(dto); document.getElementById('details-drawer').hidden = true; const member = renderer.memberNodes.get('Builder').button; member.focus(); member.dispatchEvent(new Event('click')); assert.equal(renderer.selectedMember, 'Builder'); assert.equal(renderer.roleRows.get('Builder').card.classList.contains('selected'), true); renderer.toggleDetails(false); assert.equal(renderer.selectedMember, null); assert.equal(renderer.roleRows.get('Builder').card.classList.contains('selected'), false); assert.equal(document.activeElement, member);
+test('sidebar role selection opens the role workspace without taking the Su draft or changing the task drawer',()=>{
+ const document=new Document(),renderer=new _Renderer(document,{}),dto=state();renderer.render(dto);const input=document.getElementById('message-input');input.value='未提交需求';const member=renderer.memberNodes.get('Builder').button;member.focus();member.dispatchEvent(new Event('click'));
+ assert.equal(renderer.selectedRoleId,'Builder');assert.equal(renderer.zone,'roles');assert.equal(document.getElementById('command-grid').dataset.zone,'roles');assert.equal(document.getElementById('details-drawer').hidden,false);assert.equal(input.value,'未提交需求');assert.equal(document.activeElement,member);
+ renderer.selectZone('conversation');assert.equal(input.value,'未提交需求');
 });
 
-
-test('pending regression: active non-PM member opens only its real run and stable older Markdown rows retain focus during newer events', () => {
-  const original = globalThis.marked; globalThis.marked = { Lexer };
-  try {
-    const document = new Document(); const renderer = new _Renderer(document, {}); const dto = state(); dto.roles.push({ id: 'RoleArchitect', name: 'RoleArchitect', purpose: '完整设计', profileId: 'p1', activity: 'working' }); dto.memberConversations = { runs: [{ id: 'actual-run', roleId: 'RoleArchitect', taskId: 'role-design', instanceId: 'actual-instance', runId: 'actual-run', status: 'running', startedAt: '2026-10-09T00:00:00.000Z', finishedAt: null }], events: [{ id: 'older', conversationId: 'actual-run', kind: 'assistant_text', text: '[真实文档](https://example.com/docs)', orderKnown: true, createdAt: '2026-10-09T00:00:00.000Z' }] }; renderer.render(dto);
-    const button = renderer.activityNodes.get('RoleArchitect'); assert.ok(button); assert.match(button.textContent, /角色架构师.*完整角色方案/u); button.dispatchEvent(new Event('click')); assert.equal(renderer.selectedMember, 'RoleArchitect'); assert.match(document.getElementById('member-conversation-title').textContent, /角色架构师/u); const old = renderer.memberEventNodes.get('older').node; const anchor = old.querySelectorAll('a')[0]; anchor.focus();
-    dto.memberConversations.events.push({ id: 'newer', conversationId: 'actual-run', kind: 'assistant_text', text: '标题', orderKnown: true, createdAt: '2026-10-09T00:00:01.000Z' }); renderer.render(dto); assert.equal(renderer.memberEventNodes.get('older').node, old); assert.equal(document.activeElement, anchor);
-    dto.memberConversations.events[1].text = '标题\n==='; renderer.render(dto); assert.equal(renderer.memberEventNodes.get('newer').node.querySelectorAll('h1')[0].textContent, '标题'); assert.equal(document.activeElement, anchor);
-    dto.roles.at(-1).activity = 'waiting'; dto.memberConversations.runs[0].status = 'completed'; renderer.render(dto); assert.equal(renderer.activityNodes.has('RoleArchitect'), false); assert.equal(renderer.memberEventNodes.get('older').node, old);
-  } finally { if (original === undefined) delete globalThis.marked; else globalThis.marked = original; }
+test('private member replies never create renderer nodes while safe actions remain visible in role records',()=>{
+ const document=new Document(),renderer=new _Renderer(document,{}),dto=state();dto.roles.push({id:'RoleArchitect',name:'RoleArchitect',purpose:'完整设计',profileId:'p1',activity:'working'});
+ dto.memberConversations={runs:[{id:'actual-run',roleId:'RoleArchitect',taskId:'role-design',instanceId:'actual-instance',runId:'actual-run',status:'running',startedAt:'2026-10-09T00:00:00.000Z'}],events:[{id:'private',conversationId:'actual-run',kind:'assistant_text',text:'PRIVATE_ARCHITECT_TEXT',createdAt:'2026-10-09T00:00:00.000Z'},{id:'read',conversationId:'actual-run',kind:'tool_result',tool:'legion_read_file',status:'read',resource:'src/a.mjs',createdAt:'2026-10-09T00:00:01.000Z'}]};
+ renderer.render(dto);renderer.openMember('RoleArchitect',null,'conversation');const log=document.getElementById('member-conversation-log');assert.equal(log.textContent.includes('PRIVATE_ARCHITECT_TEXT'),false);assert.match(log.textContent,/legion_read_file.*src\/a.mjs/u);assert.equal(log.querySelectorAll('a').length,0);
 });
-
 
 test('pending regression: an ended activity trigger falls back to its stable sidebar member on Escape and leaves intentionally moved focus alone', async () => {
   const document = new Document(); const dto = state(); dto.roles.find((role) => role.id === 'Builder').activity = 'working'; const renderer = new _Renderer(document, { getState: async () => ({ ok: true, value: dto }) }); renderer.render(dto); document.getElementById('details-drawer').hidden = true; renderer.start(); await new Promise((resolve) => setImmediate(resolve));
@@ -364,16 +394,93 @@ test('architect current role-design is shown alongside its older plan document t
   dto.memberConversations.runs = []; renderer.render(dto); const noRun = document.getElementById('member-current-tasks').textContent; assert.equal(noRun.includes('当前实际角色设计'), false); assert.equal(noRun.includes('完整角色方案设计 · 正在工作'), false); assert.ok(noRun.includes('旧角色文档计划'));
 });
 
-test('five detail tabs share the role while working opens dialogue, sidebar opens member and tab/poll preserve drafts/focus/scroll', async () => {
-  const document = new Document(); const dto = state(); dto.roles[1].status = 'approved'; dto.roles[1].activity = 'working'; dto.memberConversations = { runs: [{ id: 'current', roleId: 'Builder', taskId: 'build', instanceId: 'i', runId: 'current', status: 'running', startedAt: '2026-10-09T00:00:00.000Z', finishedAt: null }], events: [{ id: 'reply', conversationId: 'current', kind: 'assistant_text', text: '真实成员回复', createdAt: '2026-10-09T00:00:00.000Z', orderKnown: true }] }; const renderer = new _Renderer(document, { getState: async () => ({ ok: true, value: dto }) }); renderer.render(dto); renderer.start(); await new Promise((done) => setImmediate(done));
-  try {
-    renderer.activityNodes.get('Builder').dispatchEvent(new Event('click')); assert.equal(renderer.tab, 'conversation'); assert.equal(document.getElementById('detail-members').hidden, true); assert.equal(document.getElementById('detail-conversation').hidden, false); assert.equal(renderer.selectedMember, 'Builder');
-    document.getElementById('message-input').value = '未发送新需求'; document.getElementById('details-scroll').scrollTop = 80; renderer.selectTab('members'); renderer.selectTab('conversation'); assert.equal(document.getElementById('details-scroll').scrollTop, 80); assert.equal(document.getElementById('message-input').value, '未发送新需求');
-    const button = document.getElementById('tab-members'); button.focus(); const arrow = new Event('keydown', { cancelable: true }); Object.assign(arrow, { key: 'ArrowRight' }); button.dispatchEvent(arrow); assert.equal(renderer.tab, 'conversation'); assert.equal(document.activeElement, document.getElementById('tab-conversation')); const row = renderer.memberEventNodes.get('reply').node; renderer.render({ ...dto }); assert.equal(renderer.memberEventNodes.get('reply').node, row); assert.equal(document.activeElement, document.getElementById('tab-conversation'));
-    renderer.memberNodes.get('Builder').button.dispatchEvent(new Event('click')); assert.equal(renderer.tab, 'members'); assert.equal(renderer.selectedMember, 'Builder');
-  } finally { renderer.stop(); }
+test('drawer tabs preserve Su draft and scroll while sidebar role selection opens the independent role area',async()=>{
+ const document=new Document(),dto=state(),renderer=new _Renderer(document,{getState:async()=>({ok:true,value:dto})});renderer.render(dto);renderer.start();await new Promise(resolve=>setImmediate(resolve));
+ try{document.getElementById('message-input').value='未发送新需求';renderer.selectTab('conversation');document.getElementById('details-scroll').scrollTop=80;renderer.selectTab('members');renderer.selectTab('conversation');assert.equal(document.getElementById('details-scroll').scrollTop,80);assert.equal(document.getElementById('message-input').value,'未发送新需求');
+ const button=document.getElementById('tab-members');button.focus();const arrow=new Event('keydown',{cancelable:true});Object.assign(arrow,{key:'ArrowRight'});button.dispatchEvent(arrow);assert.equal(renderer.tab,'conversation');assert.equal(document.activeElement,document.getElementById('tab-conversation'));
+ renderer.memberNodes.get('Builder').button.dispatchEvent(new Event('click'));assert.equal(renderer.zone,'roles');assert.equal(renderer.selectedRoleId,'Builder');assert.equal(document.getElementById('message-input').value,'未发送新需求');}finally{renderer.stop();}
 });
-test('system origin survives approval and revision, project/legacy origin stay truthful and PM dialogue uses actual timeline', () => {
-  const document = new Document(); const renderer = new _Renderer(document, {}); const dto = state(); dto.roles[0].status = 'approved'; dto.roles[0].revision = 9; dto.roles[1].status = 'approved'; dto.roles.push({ id: 'Old', name: '旧成员', status: 'legacy', profileId: 'p1' }); dto.timeline = { legacyMessages: [], turns: [{ id: 'pm-run', status: 'completed' }], messages: [{ id: 'human', turnId: 'pm-run', kind: 'human', text: '真实需求', createdAt: '2026-10-09T00:00:00.000Z', orderKnown: true }, { id: 'pm', turnId: 'pm-run', kind: 'assistant', text: '真实Su回复', createdAt: '2026-10-09T00:00:01.000Z', orderKnown: true }] }; renderer.render(dto);
-  assert.equal(renderer.memberNodes.get('ProjectManager').origin.textContent, '系统角色'); assert.equal(renderer.memberNodes.get('Builder').origin.textContent, '项目角色'); assert.equal(renderer.memberNodes.get('Old').origin.textContent, '来源未记录'); dto.roles.push({id:'Supervisor',name:'Supervisor',profileId:'p1',status:'system'});renderer.render(dto);renderer.openMember('Supervisor', null, 'conversation'); assert.equal(document.getElementById('member-conversation').hidden, false); assert.match(document.getElementById('member-conversation-log').textContent, /真实需求.*真实Su回复/u); assert.match(document.getElementById('member-run-binding').textContent, /实例和结束时间未记录/u);
+
+test('system and project origin stay truthful while the historical Supervisor timeline displays the 二哥 identity',()=>{
+ const document=new Document(),renderer=new _Renderer(document,{}),dto=state();dto.roles[0].status='approved';dto.roles[1].status='approved';dto.roles.push({id:'Old',name:'旧成员',status:'legacy',profileId:'p1'},{id:'Supervisor',name:'Supervisor',profileId:'p1',status:'system'});dto.timeline={legacyMessages:[],turns:[{id:'su-run',status:'completed'}],messages:[{id:'human',turnId:'su-run',kind:'human',text:'真实需求',createdAt:'2026-10-09T00:00:00.000Z',orderKnown:true},{id:'su',turnId:'su-run',kind:'assistant',text:'真实Su回复',createdAt:'2026-10-09T00:00:01.000Z',orderKnown:true},{id:'question',turnId:'su-run',requestId:'question-request',kind:'question',text:'后台PM原问题：请补充文件格式',createdAt:'2026-10-09T00:00:02.000Z',orderKnown:true}]};renderer.render(dto);
+ assert.match(renderer.memberNodes.get('ProjectManager').origin.textContent,/^系统角色 · 澄清需求/u);assert.match(renderer.memberNodes.get('Builder').origin.textContent,/^项目角色 · 执行确认后的任务/u);assert.match(renderer.memberNodes.get('Old').origin.textContent,/^来源未记录/u);assert.equal(renderer.memberNodes.get('ProjectManager').name.textContent,'后台项目管理');assert.match(document.getElementById('messages').textContent,/真实需求.*真实Su回复.*后台PM原问题/u);
+ assert.equal(renderer.messageNodes.get('human').name.textContent,'你');assert.equal(renderer.messageNodes.get('su').name.textContent,'二哥');assert.equal(renderer.messageNodes.get('su').avatar.textContent,'二哥');assert.equal(renderer.messageNodes.get('question').name.textContent,'二哥 · 转达待答复问题');assert.equal(renderer.messageNodes.get('question').avatar.textContent,'二哥');assert.equal(document.getElementById('task-next-step').textContent.includes('项目管理'),false);assert.match(document.getElementById('task-next-step').textContent,/二哥/u);
+ assert.equal(renderer.memberNodes.has('Supervisor'),false);assert.equal(document.getElementById('entry-status').textContent,'待讨论');assert.equal(document.getElementById('entry-badge').hidden,false);assert.equal(document.getElementById('role-count').textContent,'3');assert.equal(renderer.roleRows.get('Supervisor').select.attributes['aria-label'],'二哥 AI 连接');assert.match(renderer.roleRows.get('Supervisor').name.textContent,/二哥 · Supervisor/u);
+ assert.equal(document.getElementById('conversation-page').attributes['aria-label'],'二哥客户对话');assert.equal(document.getElementById('message-input').attributes['aria-label'],'给二哥的消息');
+ renderer.openMember('Supervisor',null,'conversation');assert.equal(document.getElementById('member-conversation-log').textContent.includes('真实Su回复'),false);
+});
+test('sidebar separates the single customer entry from view-only roles and uses real plan, turn and request states',()=>{
+ const document=new Document(),renderer=new _Renderer(document,{}),dto=state();dto.roles[1].status='approved';dto.roles.push({id:'Supervisor',name:'Supervisor',purpose:'当前客户对话',profileId:'p1',status:'system',activity:'waiting'});renderer.render(dto);
+ const entry=document.getElementById('conversation-nav'),status=document.getElementById('entry-status'),other=renderer.memberNodes.get('Builder');
+ assert.equal(entry.disabled,false);assert.equal(status.textContent,'待讨论');assert.equal(document.getElementById('entry-badge').hidden,false);assert.equal(renderer.memberNodes.has('Supervisor'),false);assert.equal(document.getElementById('role-count').textContent,'2');
+ assert.match(other.origin.textContent,/执行确认后的任务/u);assert.equal(other.statusText.textContent,'等待任务');assert.match(other.button.attributes.title,/项目角色.*执行确认后的任务.*等待任务/u);
+ document.getElementById('message-input').value='保留的客户草稿';document.getElementById('message-input').focus();renderer.render({...dto});assert.equal(renderer.memberNodes.get('Builder').button,other.button);assert.equal(document.getElementById('message-input').value,'保留的客户草稿');assert.equal(document.activeElement,document.getElementById('message-input'));
+ renderer.state={...dto,plan:{status:'draft'},interactions:[]};renderer.renderSidebar();assert.equal(status.textContent,'计划草案');
+ renderer.state={...dto,plan:{status:'draft'},interactions:[{status:'pending',purpose:'execute_plan'}]};renderer.renderSidebar();assert.equal(status.textContent,'等待你确认');
+ renderer.state={...dto,turn:{status:'waiting'},interactions:[{status:'pending',purpose:'discussion'}]};renderer.renderSidebar();assert.equal(status.textContent,'等待你的答复');
+ renderer.state={...dto,plan:{status:'running'},turn:{status:'completed'},interactions:[]};renderer.renderSidebar();assert.match(status.textContent,/执行中.*可问进度/u);
+ renderer.state=dto;renderer.zone='roles';renderer.syncEntrySelection();assert.equal(entry.attributes['aria-current'],'false');renderer.openCustomerEntry();assert.equal(renderer.zone,'conversation');assert.equal(entry.attributes['aria-current'],'page');assert.equal(document.activeElement,document.getElementById('message-input'));assert.equal(document.getElementById('message-input').value,'保留的客户草稿');
+ renderer.navigate('settings');other.button.dispatchEvent(new Event('click'));assert.equal(renderer.page,'conversation');assert.equal(renderer.zone,'roles');assert.equal(renderer.selectedRoleId,'Builder');assert.equal(entry.attributes['aria-current'],'false');
+ renderer.state={...dto,roles:dto.roles.filter(role=>role.id!=='Supervisor')};renderer.renderSidebar();assert.equal(entry.disabled,true);assert.equal(status.textContent,'入口不可用');assert.equal(document.getElementById('entry-badge').hidden,true);
+ renderer.projectId=null;renderer.state={...dto,currentProject:null,roles:[]};renderer.renderSidebar();assert.equal(entry.disabled,true);assert.equal(status.textContent,'先选择项目');
+});
+test('project command workspace reads real files and paged facts without touching Su draft',async()=>{
+ const document=new Document(),dto=state(),calls=[];
+ dto.roles.push({id:'Supervisor',name:'Supervisor',profileId:'p1',status:'system'});
+ dto.plan={planDigest:'a'.repeat(64),status:'running',tasks:[],roles:[],governance:{maxRepairRounds:2},profileBindings:[],fileOwnership:{claims:[],transfers:[]},organizationVersion:'v1',revision:1,goal:'真实交付'};
+ const api={
+  listProjectFiles:async input=>{calls.push(['list',input]);return {ok:true,value:{status:'listed',resource:input.resource,entries:[{name:'src',kind:'directory'},{name:'README.md',kind:'file'}],nextCursor:''}};},
+  readProjectFile:async input=>{calls.push(['read',input]);return {ok:true,value:{status:'read',resource:input.resource,text:'真实当前文件',sha256:'b'.repeat(64),byteLength:18,nextLine:2,complete:true}};},
+  queryRoleActivity:async()=>({ok:true,value:{planDigest:dto.plan.planDigest,history:false,roles:[{id:'Supervisor',activity:'working',phase:'reasoning',sourceRef:'organization:a'}],tasks:[]}}),
+  queryRoleLog:async input=>{calls.push(['log',input]);return {ok:true,value:{filters:{roleId:'Supervisor',taskId:null,planDigest:dto.plan.planDigest},events:[{id:'event',kind:'tool_result',tool:'legion_read_file',status:'completed',taskId:'task',resource:'README.md',createdAt:'2026-10-12',sourceRef:'journal:event'}],nextCursor:null,sourceDigest:'c'.repeat(64)}};},
+  queryProjectFacts:async input=>({ok:true,value:{planDigest:dto.plan.planDigest,kind:input.kind,items:[{id:'change',taskId:'task',roleId:'Builder',resource:'README.md',status:'written',sourceRef:'task-result:real',observedMutation:true}],nextCursor:null,total:1}}),
+  queryProjectOutputs:async()=>({ok:true,value:{planDigest:dto.plan.planDigest,kind:'outputs',items:[],nextCursor:null,total:0}}),
+  queryProjectMemory:async input=>{calls.push(['memory',input]);return {ok:true,value:{facts:[{factId:'fact',kind:'preference',ownerRoleId:'Supervisor',status:'active',statement:'使用当前项目主题',revision:1,sources:[{id:'human:one',label:'Human原话'}]}],cursor:null,total:1}};}
+ };
+ const renderer=new _Renderer(document,api);renderer.render(dto);document.getElementById('message-input').value='未提交问题';await new Promise(resolve=>setImmediate(resolve));
+ assert.match(document.getElementById('project-file-list').textContent,/README.md/u);
+ renderer.selectZone('project');document.getElementById('project-file-list').children[1].dispatchEvent(new Event('click'));await new Promise(resolve=>setImmediate(resolve));
+ assert.match(document.getElementById('file-preview-text').textContent,/真实当前文件/u);assert.equal(calls.some(item=>item[0]==='read'&&item[1].resource==='README.md'),true);
+ renderer.selectProjectTab('changes');await new Promise(resolve=>setImmediate(resolve));assert.match(document.getElementById('project-changes-list').textContent,/task-result:real/u);
+ renderer.selectZone('roles');await new Promise(resolve=>setImmediate(resolve));assert.match(document.getElementById('role-log-list').textContent,/legion_read_file/u);assert.match(document.getElementById('memory-list').textContent,/Human原话/u);
+ assert.ok(calls.filter(item=>['list','log','memory'].includes(item[0])).every(item=>!Object.hasOwn(item[1],'cursor')));
+ assert.equal(document.getElementById('message-input').value,'未提交问题');
+});
+test('first role and memory pages omit cursor; stale next pages stop and return keyboard focus to refresh',async()=>{
+ const document=new Document(),calls=[],dto=state();dto.roles.push({id:'Supervisor',name:'Supervisor',profileId:'p1',status:'system'});
+ const api={
+  queryRoleLog:async input=>{calls.push(['log',input]);if(Object.hasOwn(input,'cursor'))return {ok:false,error:{code:'stale_cursor',message:'日志来源已改变'}};return {ok:true,value:{filters:{roleId:'Supervisor',taskId:null,planDigest:null},events:[],nextCursor:'opaque-log-cursor',sourceDigest:'a'.repeat(64)}};},
+  queryProjectMemory:async input=>{calls.push(['memory',input]);if(Object.hasOwn(input,'cursor'))return {ok:false,error:{code:'invalid_input',message:'记忆游标无效'}};return {ok:true,value:{facts:[],cursor:'opaque-memory-cursor',total:2}};}
+ };
+ const renderer=new _Renderer(document,api);renderer.state=dto;renderer.projectId=projectId;renderer.selectedRoleId='Supervisor';
+ await renderer.loadRoleLog();await renderer.loadMemory();
+ assert.equal(calls.length,2);assert.equal(calls.every(([,input])=>!Object.hasOwn(input,'cursor')),true);
+ const logMore=document.getElementById('role-log-more');assert.equal(logMore.hidden,false);logMore.focus();await renderer.loadRoleLog(true);
+ assert.equal(calls[2][1].cursor,'opaque-log-cursor');assert.equal(renderer.pages.has('role-log'),false);assert.equal(logMore.hidden,true);assert.equal(document.activeElement,document.getElementById('role-log-refresh'));assert.match(document.getElementById('role-log-status').textContent,/日志来源已改变/u);
+ const memoryMore=document.getElementById('memory-more');assert.equal(memoryMore.hidden,false);memoryMore.focus();await renderer.loadMemory(true);
+ assert.equal(calls[3][1].cursor,'opaque-memory-cursor');assert.equal(renderer.pages.has('memory'),false);assert.equal(memoryMore.hidden,true);assert.equal(document.activeElement,document.getElementById('memory-refresh'));assert.match(document.getElementById('memory-status').textContent,/记忆游标无效/u);
+ await renderer.loadRoleLog();await renderer.loadMemory();assert.equal(calls.slice(4).every(([,input])=>!Object.hasOwn(input,'cursor')),true);
+});
+test('idle role text remains truthful and a project without a plan saves its default connection without a false invalidation notice',async()=>{
+ const document=new Document(),dto=state();dto.roles.push({id:'Supervisor',name:'Supervisor',profileId:'p1',status:'system'});
+ const api={queryRoleActivity:async()=>({ok:true,value:{planDigest:null,history:false,roles:[{id:'Supervisor',activity:'waiting',phase:'not_recorded',sourceRef:'organization:current'},{id:'Builder',activity:'waiting_answer',phase:'awaiting_human',sourceRef:'organization:current'}],tasks:[]}}),getState:async()=>({ok:true,value:dto}),setDefaultProfile:async()=>({ok:true,value:{...dto,defaultProfileId:'p2'}})};
+ const renderer=new _Renderer(document,api);renderer.render(dto);await renderer.loadRoleActivity();
+ const roleText=document.getElementById('role-activity-list').textContent;assert.match(roleText,/二哥.*等待任务.*尚未运行/u);assert.match(roleText,/执行成员.*等待你的答复/u);assert.equal(roleText.includes('not_recorded'),false);
+ assert.match(document.getElementById('default-profile-hint').textContent,/当前没有活动计划/u);
+ renderer.start();await new Promise(resolve=>setImmediate(resolve));document.getElementById('default-profile').value='p2';document.getElementById('default-profile').dispatchEvent(new Event('change'));await new Promise(resolve=>setImmediate(resolve));
+ assert.match(document.getElementById('notice').textContent,/后续讨论使用新连接/u);assert.equal(document.getElementById('notice').textContent.includes('失效'),false);renderer.stop();
+});
+test('narrow navigation reuses existing project/settings/theme controls with Escape and project focus return',async()=>{
+ const document=new Document(),dto=state(),calls=[];
+ document.getElementById('conversation-nav').dataset.page='conversation';document.getElementById('settings-nav').dataset.page='settings';
+ const renderer=new _Renderer(document,{getState:async()=>({ok:true,value:dto}),chooseProject:async()=>{calls.push('chooseProject');return {ok:true,value:dto};}});
+ renderer.render(dto);renderer.start();await new Promise(resolve=>setImmediate(resolve));
+ try{
+  const trigger=document.getElementById('mobile-nav-toggle');trigger.focus();trigger.dispatchEvent(new Event('click'));
+  assert.equal(renderer.isMobileNavOpen(),true);assert.equal(document.getElementById('project-sidebar').dataset.open,'true');assert.equal(document.getElementById('nav-backdrop').hidden,false);assert.equal(document.getElementById('project-sidebar').attributes['aria-expanded'],undefined);assert.equal(trigger.attributes['aria-expanded'],'true');assert.equal(document.activeElement,document.getElementById('choose-project'));
+  const escape=new Event('keydown',{cancelable:true});Object.assign(escape,{key:'Escape'});document.getElementById('project-sidebar').dispatchEvent(escape);assert.equal(renderer.isMobileNavOpen(),false);assert.equal(document.getElementById('nav-backdrop').hidden,true);assert.equal(document.activeElement,trigger);
+  trigger.dispatchEvent(new Event('click'));const before=document.documentElement.dataset.theme;document.getElementById('theme-toggle').dispatchEvent(new Event('click'));assert.notEqual(document.documentElement.dataset.theme,before);
+  document.getElementById('choose-project').dispatchEvent(new Event('click'));await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(calls,['chooseProject']);assert.equal(renderer.isMobileNavOpen(),false);assert.equal(document.activeElement,trigger);
+  trigger.dispatchEvent(new Event('click'));document.getElementById('settings-nav').dispatchEvent(new Event('click'));assert.equal(renderer.isMobileNavOpen(),false);assert.equal(renderer.page,'settings');assert.equal(document.activeElement,document.getElementById('new-profile'));
+ }finally{renderer.stop();}
 });

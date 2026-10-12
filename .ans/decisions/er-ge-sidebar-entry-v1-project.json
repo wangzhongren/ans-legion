@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "maxConcurrentWorkers": 3,
+  "allowRequirementRevision": false,
+  "allowDesignRevision": false,
+  "projectName": "二哥 sidebar primary entry v1",
+  "authorizationSource": ".ans/decisions/er-ge-sidebar-entry-v1-authorization.md",
+  "designFiles": [
+    ".ans/decisions/er-ge-sidebar-entry-v1-scope.md"
+  ],
+  "roles": {
+    "DesktopEngineer": {
+      "card": ".ans/roles/DesktopEngineer/role-card.md",
+      "boundary": ".ans/roles/DesktopEngineer/boundary.md",
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "writeFiles": [
+        "apps/desktop/src/interface/index.html",
+        "apps/desktop/src/interface/renderer.mjs",
+        "apps/desktop/src/interface/styles.css",
+        "apps/desktop/tests/unit/pipeline.test.mjs",
+        "apps/desktop/tests/unit/ipc.test.mjs",
+        "docs/roles/DesktopEngineer/docs/feature/desktop-console.md"
+      ],
+      "checks": {
+        "display": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/unit/pipeline.test.mjs",
+            "apps/desktop/tests/unit/ipc.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    },
+    "Tester": {
+      "card": ".ans/roles/Tester/role-card.md",
+      "boundary": ".ans/roles/Tester/boundary.md",
+      "operations": [
+        "implement",
+        "repair",
+        "review",
+        "test"
+      ],
+      "autoDispatch": true,
+      "writeFiles": [
+        "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs"
+      ],
+      "checks": {
+        "gui": {
+          "argv": [
+            "node",
+            "--test",
+            "--test-concurrency=1",
+            "apps/desktop/tests/e2e/governed-workflow-ui.test.mjs"
+          ],
+          "timeoutSeconds": 300
+        }
+      }
+    }
+  }
+}

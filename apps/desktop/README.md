@@ -1,87 +1,54 @@
-# Legion 工作台 0.2.0
+#二哥项目指挥台 0.3.3
 
-Windows 完整 ZIP 经当前版本验证后，用户解压并双击 **LegionDesktop.exe**。Electron 和运行依赖随 ZIP 提供，不需要另装 Python 或 Node。请保留解压目录中的 resources、DLL 等文件；单独复制 exe 无法启动。当前 0.8.2 Shell runtime 更新的 Windows ZIP 尚未在 Windows 主机验证。
+桌面与 `legion-runtime` 1.2.3 共用唯一 Workbench Host，底层运行 Pi SDK 1.0.4。客户助手气泡与任务引导明确显示二哥，客户只与二哥（内部角色 Supervisor）连续对话，后台 PM 编排长期角色、文件归属、任务依赖与验收；角色运行区的 PM 职责和实际连接独立显示，不被误标为客户二哥连接。当前指挥台源码已通过 Desktop owner 门；本阶段包、真实 Electron 完整流和视觉验收仍以[当前任务](../../docs/scheduling/er-ge-display-name-v1-final-package-integration.md)为准，不能拿历史 GUI 成绩当本候选通过。
 
-选择一个客户项目文件夹，然后到“AI 连接设置”添加连接并选择默认项目管理连接。返回“项目管理对话”，发送第一条消息后会建立或绑定此项目唯一的项目管理会话。文件夹不需要本仓库的 .ans、七个开发角色或任何初始化文件；应用数据目录与客户项目必须互不包含。选择目录本身不会调用模型，也不会写客户文件。
+## 从仓库启动
 
-对话是默认工作区。任务、成员、上下文和来源放在按需展开的“任务详情”，AI 设置是次级页面；支持浅色、深色及最小 960×640 窗口。执行成员仅显示状态和任务，不能直接向其聊天或启动。
-
-## 连接与对话
-
-连接支持 OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 三种明确协议。填入 provider 名称、自定义 model ID、HTTPS base URL（本地测试可用 localhost HTTP）和 API key。协议与 base URL 必须适配你的服务；provider/model 选择不是 HTTP/SOCKS 代理配置。未知模型能力、metadata 和费用保持 unknown，应用不会把 SDK 占位零值当报价。
-
-密钥由主进程通过 Electron safeStorage / Windows DPAPI 在本机加密保存。输入框保存后清空，只显示是否已保存；可保留、替换或清除密钥。重启后在同一 Windows 用户与机器上解密使用，换机器需重新输入。加密不可用会明确失败，没有明文后备方式。
-
-“测试”会向选定服务发一次无工具、有 token / 重试 / 总时限预算的真实请求，可取消。保存设置本身不会请求模型。发送消息、确认计划后的执行和点击连接测试会产生真实推理请求，可能按服务计费；本项目发行验证只使用 localhost 受控服务，付费调用为零。
-
-## 确认范围后执行
-
-项目管理使用真实 Pi 多轮会话澄清目标、返回文本与结构化方案。它可按需使用 `legion_list_files` 列出当前项目的普通目录，并用 `legion_read_file` 按行分段读取普通 UTF-8 文件；讨论期间没有写权限。文本、项目定义和历史仅保存在应用 userData，读取正文不写客户目录审计或持久历史。可停止当前回复，之后继续同一项目会话。
-
-需要把重要文件固定到计划确认时，在详情中逐行指定精确相对路径并点击读取。最多16文件、单文件256KiB、总计2MiB；固定上下文不递归发现。内容与 SHA 绑定当前计划，变化要求重新读取并确认。模型自主读取的文件不会自动进入这份固定上下文，后续变化也不会自动撤销计划。
-
-项目读取只限当前客户项目：控制目录（如 `.git`、`.ans`）、常见凭据文件、链接、越根路径、非普通文件、二进制和超预算文本会被拒绝。目录每页最多200项，文本每次最多64 KiB，每轮累计最多2 MiB；失败会返回明确原因。切换项目、取消或关闭会使旧读取请求失效。
-
-检查结构化方案的角色、依赖、连接、精确文件列表及“本计划的文件归属”，再点击“确认以上计划及文件归属并执行”。同一文件只能属于一个角色；不同角色同时申领会被拒绝。同一角色的后续任务再次修改该文件时，需要明确依赖前一任务。归属保存在此项目的应用数据中，跨后续计划持续有效；旧项目的历史文件不会被自动认领。若要交给另一角色，新计划会逐项显示文件、旧角色和新角色，等待你确认后才转交。文件即使被外部删除，原归属仍保留。
-
-宿主验证整个 DAG、固定上下文、项目归属和版本后，才建立一次性确认及受控 Agent 实例。执行成员可读取当前项目允许读取的普通文件；写入只限本任务确认的精确 `writeSet`。`legion_write_file` 可写完整文件；`legion_edit_file` 可对已有普通 UTF-8 文件做局部编辑，必须提交读取时得到的完整文件 SHA-256 和最多16组文本替换。旧SHA、缺失或重复匹配、越权路径会拒绝整次编辑，不部分修改。两种写入都经过 Kernel Policy / Mutation / Storage 权限和审计链；读操作不产生写许可。没有默认 SDK 文件/编辑/Shell 工具、插件发现或任意 Shell。确认后会在客户目录生成 Kernel `.ans` 审计；这是执行的明确效果，不复制开发组织。
-
-“停止当前执行”、关闭、切换项目或更改连接/范围会撤销旧确认并等待本次资源结束。成功写入、拒绝、缺少目标、审计失败与取消分别显示；任务写了测试文件也不表示运行过测试。软件检查在实际执行前显示“未运行（not_executed）”，批准的检查运行后显示真实通过、失败、取消、不支持、过期或错误；仅当前证据通过并完成独立验收才可交付。重启恢复文本和记录，将原运行标为 interrupted，不自动重放确认或调用模型。
-
-详情中的治理、任务与审计是实际文件记录，独立于当前 Agent 在线状态。任务记录读取上限16MiB、4096事件、本轮64MiB，完整验证后才缓存并记录观察/验证时间；force 刷新重新验证。缺损、预算超限和未知格式显示来源不可用，保留快照会标过期，不宣称文件损坏或任务业务失败。
-
-## 本地开发与验证
+要求 Node.js ≥22.19.0。PM 当前包门在本地生成 runtime tar，并将它实际安装为桌面 `file:` 依赖；包不来自 npm registry。本次包目录为 `.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/er-ge-display-name-v1-final-v2-a689a7d63d7dfc26/`。
 
 从仓库根目录运行：
 
-```powershell
+```sh
+npm --prefix apps/desktop ci --ignore-scripts
+npm --prefix apps/desktop run install:electron
 npm --prefix apps/desktop start
-npm --prefix apps/desktop test --ignore-scripts
-npm --prefix apps/desktop run make --ignore-scripts
-node --test apps/desktop/tests/package/desktop-package.test.mjs
 ```
 
-公开 test 固定20模块串行运行，包含原13模块及组织/交互/验收4项单元、工作流边界、工作流集成与UI模块；阶段尚未全部验收时不能把单阶段结果当全套通过。root npm test 是独立的 Node26模块回归，包含三项Check单元、受控工具与Check集成。当前 macOS 包检查验证实际安装的依赖、runtime 公共入口和源码身份；Windows ZIP 检查只在 Windows 执行，仍须验证真实 ZIP、窗口与 DPAPI。
+需先存在 Desktop manifest/lock 引用的本地 `legion-runtime-1.2.3.tgz`；`npm ci` 依照锁文件安装该真实包和固定依赖。`--ignore-scripts` 不下载或安装 Electron 二进制；`install:electron` 使用项目已有官方安装能力。Electron 固定44.6.0、Forge8.0.1、Playwright1.63.0。本机macOS已具备真实Electron启动条件，尚不能据此宣称新UI已独立验收或macOS发行包完成。
 
-固定 Electron44.6.0、Forge8.0.1、Playwright1.63.0、两个 Pi SDK1.0.4。生产依赖使用新阶段46文件本地 tarball 的 legion-runtime0.8.2，包含44个实际 .mjs 源文件，提供62个具名工作台 Model/纯函数及 Shell Service 子路径；Desktop 通过公共 subpath 调用，无开发树相对 imports 或 symlink。当前 macOS arm64 已安装 Electron 二进制，不能代替 Windows archive 与 ZIP 验证。
+Windows打包配置仍存在；当前没有经本候选Windows ZIP/DPAPI/exe验证的交付，不把旧ZIP当0.3.3。未向registry发布，不全局安装，不修改依赖源码。
 
-Windows ZIP 目标路径：
-`.ans/runtime/legion-desktop-workbench-v2/ProjectManager/desktop/packaging/LegionDesktop-0.2.0-win32-x64.zip`。
-当前 0.8.2 更新尚无已验证的 Windows ZIP 或对应的 desktop-package.json。Windows 主机运行 make 和严格包检查后，才可依据当前绝对路径、SHA、bytes 和源码证据交付。该检查须实际解压、运行 exe、操作两页面、浅深色/最小窗口、三协议连接、PM计划确认/归属转交/受控写与编辑/停止、DPAPI保存重启与 renderer 隔离，并守卫清理本次临时目录。独立 Reviewer/Tester 仍须完成验收。
+## 打开项目并与二哥协作
 
-旧0.1观察原型 ZIP、0.3核心 tarball、历史失败和缓存保持只读；它们不代表此工作台目标完成。未向 registry 发布。当前设计与接口见 [工作台设计](../../docs/design/2026-10-07_design_desktop-workbench-v2.md) 和 [Desktop API](../../docs/roles/DesktopEngineer/api-spec.md)。
+1. 选择普通项目文件夹。客户目录不需要本仓库开发组织，也不会仅因选择就执行模型或修改文件。私有应用数据目录与客户项目互不包含。
+2. 在“AI连接”添加服务并选择默认连接。支持 OpenAI Completions、OpenAI Responses、Anthropic Messages；协议、provider、model和base URL应匹配服务。未知模型能力和费用显示未知。
+3. 回到二哥对话说明需求。后台PM的问题通过二哥转达；答复问题、选项或完整当前计划确认是不同交互。普通聊天里的“同意”不会赋予执行权限。
+4. 查看Host当前完整目标、角色职责/连接、任务依赖、检查/独立验收、文件归属及转交，再确认执行。拒绝或稍后不授权。
 
-## runtime 0.8.2 package bridge integration
+桌面由主进程通过Electron safeStorage保存客户主动输入的密钥；加密不可用明确失败，没有明文后备。密钥不返回renderer或日志。连接测试与模型会话会产生实际请求；本阶段验收仅使用受控localhost与真实SDK，不宣称付费远端服务测试。
 
-The desktop dependency now points to the actual local 0.8.2 tarball in `.ans/runtime/handwell-pm-approved-project-shell-v1/ProjectManager/packaging/bridge-v3/`. Installation uses npm with `--ignore-scripts` and preserves the existing official Electron 44.6.0 binary; skipping scripts does not install an Electron binary. Package verification checks lock integrity, all 46 package files, 44 .mjs source hashes, 62 named Model exports and eight public Service/Model subpaths. On macOS it additionally runs CheckService under the real Electron Node host with the same isolated process execution used in production.
+## 三个工作区
 
-The runtime check/control contracts and SDK tools are implemented. Desktop connects persistent organization, interaction and acceptance Services, the Workbench Pipeline and governance UI. An approved execution can invoke actual checks and retains their observed status. The current architect diagnostic repair and independent integration/UI verification are pending; package smoke proves only the installed runtime and its Electron executor scenarios. Windows ZIP and native Windows flows require separate platform evidence.
+- **二哥对话**：完整客户历史、二哥回复、后台PM原问题、当前Host确认、未发送输入。切换工作区仍保留同一个客户入口。
+- **项目工作**：普通目录分页、UTF-8分段预览、真实修改/发布/生成产物、当前Check与Acceptance。计划提到不等于已写；缺失、删除、partial、未运行与过期证据分别显示。没有旧正文时不伪造历史diff。
+- **角色运行**：长期职责、当前状态、依赖阻塞、按角色/任务/计划分页的行动元数据、带实际来源的坑/决策/偏好。私有成员原文、briefing、恢复摘要和Shell原始命令/输出不发往界面。
 
-The first check executor accepts approved Node tests on macOS, fixes test isolation to none and denies child processes. Tests that launch another process cannot run under this capability; other platforms return unsupported rather than a passing result.
+宽屏三列且独立滚动；≤1280px使用二哥与当前工作区两列，≤900px用顶层页签。可折叠布局、深浅主题、键盘焦点与轮询保留草稿，900px窄窗顶部“项目与设置”打开可发现的项目导航，AI连接与主题入口仍可访问；Escape关闭后回到入口焦点，切换设置/主题保留客户输入。首屏各查询省略空cursor，仅下一页使用实际返回游标；角色阶段显示“尚未运行”等真实中文状态。实际表现仍须新Electron视觉门核验。
 
-The current reporter uses a fresh run key delivered only through initialization, authenticated frames and increasing sequence numbers; directly writing JSON to fd 3 is rejected. Captured methods and fixed stream entry points cover the tested replacement scenarios. A fixed Node permission mode adds restrictions on inspector, native addons, workers and process.binding; Seatbelt remains responsible for actual filesystem, network and process isolation. Tests requiring those APIs or replacing fixed stream entry points are outside this mode. Candidate code and reporter still share a JavaScript process, so this is limited verification of the documented cases, with no general tamper proof guarantee for arbitrary hostile JavaScript. Approved test inputs and coverage still require review and independent acceptance. The Electron package smoke verifies a normal test with the actual permission flags, API restrictions and rejection of direct fd3 forgery.
+## 读取、执行与停止边界
 
-The executor passes its fixed permission options explicitly in argv: `--permission --allow-fs-read=* --allow-fs-write=* --allow-child-process`, followed by `--test-isolation=none`, the fixed reporter and approved test arguments. `NODE_OPTIONS` is neither set nor inherited. This allows Electron hosts that ignore that environment variable to apply the same restrictions. The filesystem and child process API grants still defer actual effects to Seatbelt; no arbitrary command options are accepted.
+文件浏览与 `selectContext` 分开：浏览不把正文注入固定模型上下文，不改计划/owner，不撤销运行grant。普通文件仍遵循项目根身份、no-follow、受保护控制/凭据资源、二进制和预算拒绝。列表每页最多200项、正文分段最多64KiB；角色行动日志默认20、最多50项且每页≤32KiB，游标绑定项目、筛选和来源快照。分类事实inspect只读，不保存记忆修订。
 
-当前conversation宿主预算默认及最大为输出8192、累计模型活动180000ms，调用方只能缩小。原60秒真实 `pi_turn_timeout` 后由Adapter owner必要修复；等待Human/读取/检查等host工具暂停计时，回应只恢复剩余预算，取消仍立即中止请求。8192不代表已核实的供应商能力，未知模型能力与价格保持unknown。0.8.2新版本本地包真实安装后，新桌面进程才消费本次修复；完整交互、纯对话和独立UI验收另见当前任务结果。
+执行中二哥只允许读取和查询；Host拒绝PM委托、remember/revise/retract事实及新增讨论交互等变更工具，不依赖提示词自觉。预检/monitor是独立后台channel，建议不能替代用户批准、Check或Acceptance。
 
+写权来自持久角色精确文件归属，产品任务没有 `writeSet`。新归属和转交须实际Human确认；当前计划/context/profile/owner版本、根身份与物理租约在实际提交前再核。界面不提供自由编辑器或直接给角色发执行消息。
 
-## 项目 Shell 包桥及后续接线
+停止当前项目会撤销当前运行权限并等待受控操作结束，已成功写入保留。取消完成后可在同Host继续新二哥消息；原Human保留，未完成assistant片段不恢复为有效历史。关闭或变更连接/项目仍遵循原失效边界。重启读取已有客户历史与分类事实，旧PM历史标为只读历史；旧pending确认、死委托与grant不重放。
 
-本阶段只交付新的真实 runtime 包、公共契约和安装身份，不把包 smoke 当作新 PM 审批界面或完整 SSH 项目验收。下一 Desktop 阶段使用 `legion-runtime/services/shell`，PM 独立审核队列必须保持原 active run，审批、执行、发布结果回到原角色同一个 pending 请求；不并发复用 PM SDK session，不恢复旧许可。
+## 包身份和验证
 
-Host 必须提供已存在的私有物理 `lockRoot`，同项目 Shell/Check 共用；`artifactScopes` 从 Human 已确认计划推导，授权包含完整 fileOwners 和 authoredResources 库存。生成 node_modules/dist 不赋予角色永久源码目录权限。源码通过原角色 Mutation 受控发布，二进制由 Host-only `readCandidateData` 读取，正文、opaque receipt 和 permit 不进入 SDK、renderer 或历史。安全执行位和删除墓碑纳入实际交付。部分发布与依赖 generation 变化失效相关检查证据。
+真实包门核 tar/sourceHashes/安装字节、Desktop manifest+lock的resolved/integrity和SDK来源；固定PM `cli` 再运行真实消费者bin、三协议、取消续轮、双draft旧yes拒绝、owner/Check/Acceptance/Shell和已知key负例。README自包含二哥示例保持原字节并在消费者实际执行。
 
-macOS Shell 需要本机 CLT clang/SDK，私有 native supervisor 只编译到角色运行目录；缺失或安全探针失败返回 unsupported，不全局安装工具、不裸 Shell 降级。进程追踪采用私有 canary 的权限签名，不是内核 sandbox 对象 ID；可信 Host 或同 OS 用户在沙箱外故意 clone profile 不在该信任边界内。Windows 目前不支持该 Shell 后端，旧 ZIP 与本机结果不证明 Windows 支持。
+本阶段独立Tester负责桌面完整流程和真实Electron截图；Reviewer负责五层调用、有限IPC、私有DTO与包闭包。新增macOS指挥台用例不得skip，原Windows平台用例未执行单列unsupported，不计为通过。旧GUI最终验收继续暂停。
 
-每次 Shell 调用批准完整命令及继承隔离的子进程，默认断网，localhost/外网逐次审批；不承诺域名隔离。禁止全局安装、sudo、控制目录和凭据读取。退出码0不表示自测或独立验收通过，原 `legion_run_check` 和 Acceptance 保留。完整 GUI/旧 SSH app 的继续开发由后续独立验收记录。
-
-
-### 0.8.1依赖读取修复（0.8.2继续保留）
-
-`artifactScopes` 中固定 `kind: dependencies` 的目录属于受验证输入，不必为了使用已有 `.bin` 工具而加入本条输出申请。Host 原样使用 `prepare` 的 inputVersions/snapshotDigest/generationDigest；该 generation 覆盖固定读取依赖和本条获准输出，不自行仅计算 dist。只请求 dist 时只发布 dist，node_modules 的内容、链接、执行位或目录发生改变会拒绝整批；审批后的真实输入或同字节链接重定向使旧批准过期。新安装包使用 bridge-v3，原 bridge-v1 的0.8.0与全部证据保留。
-
-
-### 0.8.2 Host时间事实接线
-
-Shell/Mutation Service 的 `observeTime()` 从相邻Provider取得新的safe epoch毫秒事实，纯Model只比较数据，不查询时钟或接受clock callback。每项源码proposal调用 `controller.issueShellPublication(proposal, receipt, shell.observeTime())`；不能整批缓存旧时间。Storage在consume/recheck及真正create/replace/delete前继续重新观察，过期、无效/回退事实、abort和replay均拒绝。SDK/renderer/历史没有新的clock字段，factory与62项具名导出不变。当前包测试Host caller已接线；实际Desktop Pipeline由后继原owner按新签名修复，包桥不冒称其完整UI新候选已验证。新包bridge-v3，0.8.0/0.8.1与final旧证据归档保持。
+[当前桌面功能](../../docs/roles/DesktopEngineer/docs/feature/desktop-console.md) · [已确认设计](../../docs/roles/ProjectManager/docs/design/2026-10-12_design_desktop-command-center.md) · [Desktop API](../../docs/roles/DesktopEngineer/api-spec.md) · [发行说明](../../docs/roles/ProjectManager/docs/feature/desktop-distribution.md)

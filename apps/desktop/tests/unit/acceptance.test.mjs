@@ -8,7 +8,7 @@ import { createProjectService as realCreateProjectService } from '../../src/serv
 import { createOrganizationService } from '../../src/services/public/organization.mjs';
 import { createCheckService } from 'legion-runtime/services/check';
 import { CheckSpec, CheckRequest, CheckAuthorization, CheckDecision, ProjectFileOwners, digestValue } from 'legion-runtime/workbench-models';
-const generated = fileURLToPath(new URL('../../../../.ans/runtime/legion-cli-role-owned-v2/DesktopEngineer/', import.meta.url));
+const generated = fileURLToPath(new URL('../../../../.ans/runtime/legion-desktop-command-center-v1/DesktopEngineer/', import.meta.url));
 await mkdir(join(generated, 'fixtures'), { recursive: true }); await mkdir(join(generated, 'user-data'), { recursive: true });
 async function fixture() {
  const directory = await mkdtemp(join(generated, 'fixtures', 'acceptance-')); const root = join(directory, 'customer'); await mkdir(join(root, 'tests/Acceptance'), { recursive: true });

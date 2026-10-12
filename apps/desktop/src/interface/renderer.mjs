@@ -2,7 +2,7 @@
 export function conversationDisplay(text) {
   const clean = text.replace(/```legion-plan\s*\n[\s\S]*?\n```/gu, '').replace(/```legion-plan[^\n]*(?:\n[\s\S]*)?$/gu, '').trim();
   if (clean) return clean;
-  if (text.includes('```legion-plan')) return '项目管理提出了计划，请查看当前任务并答复执行确认。';
+  if (text.includes('```legion-plan')) return '二哥已带来一份待确认的计划，请查看当前任务并答复执行确认。';
   return text;
 }
 /** Pure HTTP(S) projection; parsing text never opens a URL or loads an image. */
@@ -106,6 +106,9 @@ export class _Renderer {
     this.defaultDraft = null; this.pendingHuman = null; this.modalRequest = null; this.interactionDrafts = new Map();
     this.interactionBusy = false; this.interactionStale = false; this.timer = null; this.page = 'conversation'; this.tab = 'task';
     this.tabScroll = new Map(); this.focusReturn = null; this.modalFocusReturn = null; this.selectedMember = null; this.memberRuns = new Map(); this.memberReading = new Map(); this.activityNodes = new Map(); this.currentMemberView = null; this.memberEventNodes = new Map();
+    this.zone = 'conversation'; this.projectTab = 'files'; this.fileDirectory = ''; this.fileCursor = ''; this.previewResource = null; this.previewNextLine = 1;
+    this.queryEpoch = 0; this.factSignature = ''; this.selectedRoleId = null; this.pages = new Map(); this.queryTokens = new Map();
+    this.mobileNavReturn = null; this.mobileResize = null;
   }
   get(id) { return this.document.getElementById(id); }
   node(tag, text = '', className = '') { const node = this.document.createElement(tag); node.textContent = text; node.className = className; return node; }
@@ -184,13 +187,48 @@ export class _Renderer {
   }
   navigate(page) {
     if (!['conversation', 'settings'].includes(page)) return;
+    const openedNavigation = this.isMobileNavOpen();
+    if (openedNavigation) this.closeMobileNav(false);
     this.page = page;
-    this.get('conversation-page').hidden = page !== 'conversation'; this.get('settings-page').hidden = page !== 'settings';
+    this.get('command-grid').hidden = page !== 'conversation'; this.get('workspace-switcher').hidden = page !== 'conversation'; this.get('settings-page').hidden = page !== 'settings';
     for (const button of this.document.querySelectorAll('[data-page]')) {
       const active = button.dataset.page === page; button.classList.toggle('active', active);
       button.setAttribute('aria-current', 'false'); if (active) button.setAttribute('aria-current', 'page');
     }
+    this.syncEntrySelection();
     if (page === 'settings') { this.toggleDetails(false); this.get('new-profile').focus(); }
+    if (page === 'conversation' && openedNavigation) this.get('message-input').focus();
+  }
+  syncEntrySelection() {
+    const entry = this.get('conversation-nav'); const active = this.page === 'conversation' && this.zone === 'conversation';
+    let current = 'false'; if (active) current = 'page';
+    entry.classList.toggle('active', active); entry.setAttribute('aria-current', current);
+  }
+  openCustomerEntry() {
+    this.navigate('conversation'); this.selectZone('conversation');
+    const input = this.get('message-input');
+    if (!input.disabled) input.focus();
+    else if (!this.projectId) this.get('welcome-choose').focus();
+    else this.get('welcome-settings').focus();
+  }
+  isMobileNavOpen() { return this.get('project-sidebar').dataset.open === 'true'; }
+  openMobileNav() {
+    if (this.isMobileNavOpen()) return;
+    this.mobileNavReturn = this.document.activeElement;
+    this.get('project-sidebar').dataset.open = 'true';
+    this.get('nav-backdrop').hidden = false;
+    this.get('mobile-nav-toggle').setAttribute('aria-expanded','true');
+    this.get('choose-project').focus();
+  }
+  closeMobileNav(returnFocus = true) {
+    if (!this.isMobileNavOpen()) return;
+    this.get('project-sidebar').dataset.open = 'false';
+    this.get('nav-backdrop').hidden = true;
+    this.get('mobile-nav-toggle').setAttribute('aria-expanded','false');
+    const previous = this.mobileNavReturn;
+    this.mobileNavReturn = null;
+    if (returnFocus && previous?.isConnected !== false) previous.focus();
+    else if (returnFocus) this.get('mobile-nav-toggle').focus();
   }
   keyAction() {
     const action = this.get('key-action').value; this.get('api-key').disabled = action !== 'replace';
@@ -212,7 +250,9 @@ export class _Renderer {
     const input = { id: this.get('profile-id').value, name: this.get('profile-name').value, protocol: this.get('protocol').value, provider: this.get('provider').value, modelId: this.get('model-id').value, baseUrl: this.get('base-url').value, keyAction: this.get('key-action').value, apiKey: this.get('api-key').value };
     if (input.keyAction !== 'replace') input.apiKey = '';
     const before = new Set(this.state.profiles.map((item) => item.id)); this.get('save-profile').disabled = true;
-    const result = await this.update('saveProfile', input, '连接已保存，旧计划已失效，请重新讨论。'); this.get('save-profile').disabled = false;
+    const hadActivePlan = ['draft','confirmed','running'].includes(this.state.plan?.status);
+    let notice = '连接已保存，后续讨论可使用。'; if (hadActivePlan) notice = '连接已保存，原活动计划已失效，请重新讨论。';
+    const result = await this.update('saveProfile', input, notice); this.get('save-profile').disabled = false;
     if (!result.ok) { this.inlineError('profile-error', result.error.message); return; }
     let saved = result.value.profiles.find((item) => item.id === input.id);
     if (!saved) saved = result.value.profiles.find((item) => !before.has(item.id)); this.editProfile(saved ?? null);
@@ -222,8 +262,12 @@ export class _Renderer {
     const edit = this.node('button', '编辑', 'secondary'); edit.addEventListener('click', () => this.editProfile(this.state.profiles.find((item) => item.id === profile.id)));
     const probe = this.node('button', '测试', 'secondary'); probe.addEventListener('click', () => void this.testProfile(profile.id));
     const remove = this.node('button', '删除', 'danger'); remove.addEventListener('click', async () => {
-      const current = this.state.profiles.find((item) => item.id === profile.id); if (!current || !globalThis.confirm(`删除连接「${current.name}」与关联映射？旧计划将失效。`)) return;
-      const result = await this.update('deleteProfile', { id: profile.id }, '连接已删除，旧计划已失效。'); if (result.ok && this.get('profile-id').value === profile.id) this.editProfile();
+      const current = this.state.profiles.find((item) => item.id === profile.id); if (!current) return;
+      const hadActivePlan = ['draft','confirmed','running'].includes(this.state.plan?.status);
+      let question = `删除连接「${current.name}」与关联映射？`; if (hadActivePlan) question += '当前活动计划会失效。';
+      if (!globalThis.confirm(question)) return;
+      let notice = '连接已删除。'; if (hadActivePlan) notice = '连接已删除，原活动计划已失效。';
+      const result = await this.update('deleteProfile', { id: profile.id }, notice); if (result.ok && this.get('profile-id').value === profile.id) this.editProfile();
     }); actions.append(edit, probe, remove); card.append(name, model, protocol, key, actions); return { card, name, model, protocol, key, probe };
   }
   async testProfile(profileId) {
@@ -243,6 +287,9 @@ export class _Renderer {
     for (const [id, row] of this.profileNodes) if (!seen.has(id)) { row.card.remove(); this.profileNodes.delete(id); }
     this.renderProfileSelection();
     this.syncSelect(this.get('default-profile'), this.defaultDraft ?? this.state.defaultProfileId ?? '', '选择默认连接');
+    let defaultHint = '二哥使用默认连接；后台 PM 可单独映射。当前没有活动计划。';
+    if (['draft','confirmed','running'].includes(this.state.plan?.status)) defaultHint = '二哥使用默认连接；后台 PM 可单独映射。更改连接会使当前活动计划失效并停止其执行。';
+    this.setText(this.get('default-profile-hint'),defaultHint);
     const probe = this.state.probe; const profile = this.state.profiles.find((item) => item.id === probe.profileId);
     let text = '尚未测试 · 只测试已保存连接'; if (probe.status === 'running') text = '正在测试已保存连接…';
     if (probe.status === 'success') text = `请求成功 · ${probe.latencyMs} ms · 费用未知`;
@@ -257,15 +304,16 @@ export class _Renderer {
   makeRoleRow(role) {
     const card = this.node('article', '', 'role-card'); const name = this.node('h3'); const purpose = this.node('p', '', 'muted'); const connection = this.node('p', '', 'muted'); card.append(name, purpose, connection);
     const mappingCard = this.node('div', '', 'mapping-row'); const mappingLabel = this.node('div'); const mappingName = this.node('strong'); const hint = this.node('p', '', 'muted'); mappingLabel.append(mappingName, hint);
-    const select = this.node('select'); select.setAttribute('aria-label', `${role.id} AI 连接`); const button = this.node('button', '保存映射', 'secondary'); mappingCard.append(mappingLabel, select, button);
+    const select = this.node('select'); select.setAttribute('aria-label', `${this.memberName(role)} AI 连接`); const button = this.node('button', '保存映射', 'secondary'); mappingCard.append(mappingLabel, select, button);
     select.addEventListener('change', () => this.mappingDrafts.set(role.id, select.value));
     button.addEventListener('click', async () => {
       if (button.disabled) return; const projectId = this.projectId; let profileId = null; if (select.value) profileId = select.value; button.disabled = true;
+      const hadActivePlan = ['draft','confirmed','running'].includes(this.state.plan?.status);
       const result = await this.update('assignProfile', { roleId: role.id, profileId }); button.disabled = false;
-      if (result.ok && projectId === this.projectId) { this.mappingDrafts.delete(role.id); this.renderSidebar(); this.notice('映射已保存，原计划已失效，请重新讨论。'); }
+      if (result.ok && projectId === this.projectId) { this.mappingDrafts.delete(role.id); this.renderSidebar(); let notice = '映射已保存，后续任务使用新连接。'; if (hadActivePlan) notice = '映射已保存，原活动计划已失效，请重新讨论。'; this.notice(notice); }
     }); return { card, name, purpose, connection, mappingCard, mappingName, hint, select, button };
   }
-  memberName(role) { if(role.id==='Supervisor')return '项目监督（Su）';if (role.id === 'ProjectManager') return '后台项目管理'; if (role.id === 'RoleArchitect') return '角色架构师'; return role.name; }
+  memberName(role) { if(role.id==='Supervisor')return '二哥';if (role.id === 'ProjectManager') return '后台项目管理'; if (role.id === 'RoleArchitect') return '角色架构师'; return role.name; }
   activity(role) {
     if (role.activity) return role.activity;
     if (role.id === 'Supervisor') { if (this.state.turn?.status === 'running') return 'working'; if (this.state.turn?.status === 'waiting') return 'waiting_answer'; }
@@ -274,31 +322,53 @@ export class _Renderer {
     if (tasks.some((task) => task.status === 'failed')) return 'failed';
     if (tasks.some((task) => ['blocked', 'pending'].includes(task.status))) return 'waiting_dependency'; return 'waiting';
   }
+  customerEntryState(role) {
+    if (!this.projectId) return { activity: 'inactive', text: '先选择项目' };
+    if (!role || role.activity === 'inactive') return { activity: 'inactive', text: '入口不可用' };
+    const pending = this.state.interactions ?? [];
+    if (this.state.turn?.status === 'waiting' || role.activity === 'waiting_answer' || pending.some(item => item.status === 'pending' && item.purpose === 'discussion')) return { activity: 'waiting_answer', text: '等待你的答复' };
+    if (this.state.plan?.status === 'running') return { activity: 'working', text: '执行中 · 可问进度' };
+    if (this.state.turn?.status === 'running') return { activity: 'working', text: '正在回复' };
+    if (this.state.plan?.status === 'confirmed') return { activity: 'waiting_dependency', text: '已确认 · 待执行' };
+    if (this.state.plan?.status === 'draft' && pending.some(item => item.status === 'pending' && item.purpose === 'execute_plan')) return { activity: 'waiting_answer', text: '等待你确认' };
+    if (this.state.plan?.status === 'draft') return { activity: 'waiting_dependency', text: '计划草案' };
+    if (role.activity === 'failed') return { activity: 'failed', text: '上次回复失败' };
+    return { activity: 'waiting', text: '待讨论' };
+  }
   renderSidebar() {
     this.region('project-list', [this.state.projects, this.projectId], (list) => {
       if (!this.state.projects.length) list.append(this.node('p', '选一个真实项目文件夹', 'empty-note'));
       for (const project of this.state.projects) {
         const button = this.node('button', '', 'project-button'); button.append(this.node('strong', project.name)); button.classList.toggle('active', project.id === this.projectId);
         button.setAttribute('aria-current', 'false'); if (project.id === this.projectId) button.setAttribute('aria-current', 'true');
-        button.setAttribute('title', '通过系统目录框重新选择同一目录可恢复会话'); button.addEventListener('click', () => { if (project.id !== this.projectId) void this.update('chooseProject'); }); list.append(button);
+        button.setAttribute('title', '通过系统目录框重新选择同一目录可恢复会话'); button.addEventListener('click', async () => { if (project.id !== this.projectId) await this.update('chooseProject'); this.closeMobileNav(true); }); list.append(button);
       }
     });
     const members = this.get('member-list'); const roles = this.get('role-list'); const mappings = this.get('mapping-list'); const seen = new Set();
-    this.setText(this.get('role-count'), String(this.state.roles.length));
+    const entry = this.get('conversation-nav'); const customer = this.state.roles.find(role => role.id === 'Supervisor'); const entryState = this.customerEntryState(customer);
+    entry.disabled = !this.projectId || !customer || customer.activity === 'inactive'; entry.dataset.activity = entryState.activity;
+    this.setText(this.get('entry-status'), entryState.text); this.get('entry-badge').hidden = !this.projectId || !customer;
+    entry.setAttribute('title', `二哥 · ${entryState.text} · 当前项目客户对话`);
+    let badge = ''; if (customer && this.projectId) badge = '内置，';
+    entry.setAttribute('aria-label', `二哥主入口，${badge}${entryState.text}，当前项目对话`);
+    this.syncEntrySelection();
+    this.setText(this.get('role-count'), String(this.state.roles.filter(role => role.id !== 'Supervisor').length));
     for (const role of this.state.roles) {
       seen.add(role.id); let member = this.memberNodes.get(role.id);
-      if (!member) {
-        const button = this.node('button', '', 'member-button'); button.dataset.roleId = role.id; const initial = this.node('span', '', 'member-initial'); const name = this.node('strong'); const origin = this.node('small', '', 'member-origin'); const dot = this.node('span', '', 'activity-dot'); dot.setAttribute('aria-hidden', 'true'); button.append(initial, name, origin, dot); member = { button, initial, name, origin, dot }; this.memberNodes.set(role.id, member); members.append(button);
-        button.addEventListener('click', () => this.openMember(role.id));
+      if (role.id !== 'Supervisor' && !member) {
+        const button = this.node('button', '', 'member-button'); button.dataset.roleId = role.id; const initial = this.node('span', '', 'member-initial'); const name = this.node('strong'); const origin = this.node('small', '', 'member-origin'); const status = this.node('span', '', 'member-status'); const dot = this.node('span', '', 'activity-dot'); const statusText = this.node('small'); dot.setAttribute('aria-hidden', 'true'); status.append(dot, statusText); button.append(initial, name, origin, status); member = { button, initial, name, origin, statusText }; this.memberNodes.set(role.id, member); members.append(button);
+        button.addEventListener('click', () => { const wasMobileOpen = this.isMobileNavOpen(); this.closeMobileNav(false); this.navigate('conversation'); this.selectedRoleId = role.id; this.selectZone('roles'); void this.refreshRoleZone(); if (wasMobileOpen) this.get('role-selector').focus(); });
       }
       const activity = this.activity(role); let stateLabel = label(activity); if (activity === 'waiting') stateLabel = '等待任务'; if (role.status === 'legacy' && activity === 'waiting') stateLabel = '职责待补全';
-      this.setText(member.origin, this.roleOrigin(role)); this.setText(member.name, this.memberName(role)); this.setText(member.initial, role.id.slice(0, 2).toUpperCase()); member.button.dataset.activity = activity;
-      member.button.setAttribute('title', `${this.memberName(role)} · ${this.roleOrigin(role)} · ${stateLabel}`); member.button.setAttribute('aria-label', `${this.memberName(role)}，${stateLabel}，查看成员资料`);
+      if (member) {
+        this.setText(member.origin, `${this.roleOrigin(role)} · ${role.purpose || '职责摘要未记录'}`); this.setText(member.name, this.memberName(role)); this.setText(member.initial, role.id.slice(0, 2).toUpperCase()); this.setText(member.statusText, stateLabel); member.button.dataset.activity = activity;
+        member.button.setAttribute('title', `${this.memberName(role)} · ${this.roleOrigin(role)} · ${role.purpose || '职责摘要未记录'} · ${stateLabel}`); member.button.setAttribute('aria-label', `${this.memberName(role)}，${role.purpose || '职责摘要未记录'}，${stateLabel}，查看角色工作`);
+      }
       let row = this.roleRows.get(role.id); if (!row) { row = this.makeRoleRow(role); this.roleRows.set(role.id, row); roles.append(row.card); mappings.append(row.mappingCard); }
       this.setText(row.name, `${this.memberName(role)} · ${role.id}`); row.card.classList.toggle('selected', role.id === this.selectedMember); row.card.hidden = role.id !== this.selectedMember;
       this.setText(row.purpose, `${this.roleOrigin(role)}\n${role.purpose || '职责待补全'}\n定义版本 ${role.revision ?? '历史未知'} · ${label(role.status ?? 'legacy')}\n当前状态：${stateLabel}\n接口：${(role.interfaces ?? []).join('、') || '尚未记录'}\n精确边界：${(role.boundary ?? []).join('、') || '无业务写边界'}\n定义摘要：${role.digest ?? '历史未知'}\n文档：${(role.documents ?? []).map((item) => item.resource + ' · SHA ' + item.contentDigest + ' · ' + item.summary).join('；') || '尚未发布'}`);
       const profile = this.state.profiles.find((item) => item.id === role.profileId); this.setText(row.connection, `连接：${profile?.name ?? '未配置'} · ${profile?.modelId ?? '模型未知'}`);
-      this.setText(row.mappingName, this.memberName(role)); this.setText(row.hint, '保存后旧计划失效');
+      this.setText(row.mappingName, this.memberName(role)); let mappingHint = '保存后用于后续任务'; if (['draft','confirmed','running'].includes(this.state.plan?.status)) mappingHint = '保存后当前活动计划失效'; this.setText(row.hint, mappingHint);
       const assignment = this.state.assignments.find((item) => item.projectId === this.projectId && item.roleId === role.id); let profileId = '';
       if (assignment) profileId = assignment.profileId; if (this.mappingDrafts.has(role.id)) profileId = this.mappingDrafts.get(role.id);
       this.syncSelect(row.select, profileId, '使用默认连接'); row.select.disabled = !this.projectId;
@@ -338,60 +408,57 @@ export class _Renderer {
   }
   memberRunStatus(status) { return { running: '正在工作', completed: '模型已结束', failed: '失败', cancelled: '已取消', interrupted: '已中断' }[status] ?? status; }
   renderMemberConversation() {
-    const container = this.get('member-conversation'); container.hidden = !this.selectedMember; if (container.hidden) return;
-    const journal = this.state.memberConversations; const pm = this.selectedMember === 'Supervisor'; let runs = (journal?.runs ?? []).filter((run) => run.roleId === this.selectedMember); if (pm) { runs = (this.state.timeline?.turns ?? []).map((turn) => ({ id: turn.id, taskId: 'discussion', status: turn.status, startedAt: this.state.timeline.messages.find((message) => message.turnId === turn.id)?.createdAt ?? '未记录', instanceId: null, runId: turn.id, finishedAt: null })); if (this.state.timeline?.legacyMessages.length) runs.unshift({ id: 'legacy-records', taskId: 'legacy-records', status: 'interrupted', startedAt: '未记录', instanceId: null, runId: null, finishedAt: null }); } const key = this.projectId + '|' + this.selectedMember; const select = this.get('member-run-select');
-    if (pm) for (const shell of this.state.shellRequests ?? []) if (shell.reviewText || shell.review) runs.push({ id: 'shell-review-' + shell.id, taskId: 'shell-review', status: shell.reviewStatus ?? 'interrupted', startedAt: shell.createdAt, instanceId: shell.reviewer?.instanceId ?? null, runId: shell.reviewer?.runId ?? null, finishedAt: null });
-    const requested = this.memberRuns.get(key); let run = runs.find((run) => run.id === requested); if (!run) run = runs.at(-1); if (run) this.memberRuns.set(key, run.id);
-    const view = key + '|' + (run?.id ?? 'none'); const log = this.get('member-conversation-log');
-    if (this.currentMemberView !== view) { if (this.currentMemberView) this.memberReading.set(this.currentMemberView, log.scrollTop); this.currentMemberView = view; }
-    const signature = JSON.stringify(runs.map((run) => [run.id, run.taskId, run.status]));
-    if (this.document.activeElement !== select && select.dataset.signature !== signature) { select.replaceChildren(); for (const item of runs) { let task = this.state.plan?.tasks.find((task) => task.id === item.taskId)?.title ?? item.taskId; if (item.taskId === 'role-design') task = '完整角色方案'; if (item.taskId === 'discussion') task = '项目讨论'; if (item.taskId === 'shell-review') task = '真实PM Shell审核'; if (item.taskId === 'legacy-records') task = '旧消息（运行来源未记录）'; select.append(this.option(item.id, task + ' · ' + this.memberRunStatus(item.status) + ' · ' + item.startedAt)); } select.dataset.signature = signature; }
-    if (this.document.activeElement !== select) select.value = run?.id ?? ''; select.disabled = runs.length === 0;
-    const role = this.state.roles.find((role) => role.id === this.selectedMember); let shownName = this.selectedMember; if (role) shownName = this.memberName(role); this.setText(this.get('member-conversation-title'), shownName + ' · 实际运行对话');
-    let binding = '没有已记录的成员对话；旧版本的内容不会补造。';
-    if (run) { let ended = run.finishedAt ?? '未记录'; if (run.status === 'running' && !run.finishedAt) ended = '未结束'; binding = '任务 ' + run.taskId + ' · 实例 ' + run.instanceId + ' · run ' + run.runId + '\n' + this.memberRunStatus(run.status) + ' · 开始 ' + run.startedAt + ' · 结束 ' + ended + '\n来源：实际 SDK 文字/工具与宿主终止记录；中断不代表模型正常完成。工具仅公开元数据。'; }
-    if (pm && run) binding = '来源：本项目持久PM原始消息与真实讨论记录；实例和结束时间未记录时不补造。\n运行 ' + (run.runId ?? '未记录') + ' · ' + this.memberRunStatus(run.status);
-    this.setText(this.get('member-run-binding'), binding);
-    const channel=this.selectedMember==='Supervisor'?'su_customer':this.selectedMember==='ProjectManager'?'pm_delegate':'member_task';const memory = this.state.roleMemory?.entries.find((entry) => entry.roleId === this.selectedMember&&(entry.channel===undefined||entry.channel===channel)); const notice = this.state.memoryNotices?.find((item) => item.roleId === this.selectedMember&&(item.channel===undefined||item.channel===channel)); let memoryText = '角色工作记忆尚未记录；原始对话独立保存。模型窗口与费用未知。'; if (memory) memoryText = '角色记忆版本 ' + memory.revision + ' · 已摘要覆盖 ' + memory.coveredMessages + ' 条 · 最近完整消息 ' + memory.recentMessages + ' 条。模型摘要仅用于工作上下文，原文保留；本地字符计量，模型窗口与费用未知。'; if (notice) memoryText += '\n' + notice.message; this.setText(this.get('member-memory-state'), memoryText);
-    let events = (journal?.events ?? []).filter((event) => event.conversationId === run?.id); if (pm && run) { if (run.id === 'legacy-records') events = (this.state.timeline?.legacyMessages ?? []).map((message, index) => ({ id: 'legacy-' + index, kind: message.role === 'user' ? 'human_text' : 'assistant_text', text: message.text, createdAt: '未记录', orderKnown: false })); else events = (this.state.timeline?.messages ?? []).filter((message) => message.turnId === run.id).map((message) => ({ ...message, kind: ['human', 'answer'].includes(message.kind) ? 'human_text' : 'assistant_text' })); } const top = log.scrollTop; const follow = this.tab === 'conversation' && !this.get('details-drawer').hidden && log.scrollHeight - log.scrollTop - log.clientHeight < 80;
-    if (run) {
-      const shells = (this.state.shellRequests ?? []).filter((shell) => pm ? run.id === 'shell-review-' + shell.id : shell.runId === run.id && shell.roleId === this.selectedMember);
-      for (const shell of shells) {
-        events.push({ id: 'shell-request-' + shell.id, kind: 'host_shell', text: '请求 ' + shell.id + '\n角色 ' + shell.roleId + ' · 任务 ' + shell.taskId + '\n命令：' + shell.command + '\n项目相对cwd：' + (shell.cwd || '.') + '\n原因：' + shell.reason + '\n网络：' + shell.network + ' · 命令预算 ' + shell.timeoutSeconds + ' 秒\n生成范围：' + (shell.generatedEffects.join('、') || '无') + '\n状态：' + label(shell.status), createdAt: shell.createdAt, orderKnown: true });
-        if (pm && shell.reviewText) events.push({ id: 'shell-review-text-' + shell.id, kind: 'assistant_text', text: shell.reviewText, createdAt: shell.updatedAt, orderKnown: true });
-        if (shell.review) events.push({ id: 'shell-review-decision-' + shell.id, kind: 'host_shell', text: 'PM结构化审核：' + (shell.review.approved ? '批准' : '拒绝') + '\n原因：' + shell.review.reason + '\n请求 ' + shell.id + ' · 当前审批摘要 ' + shell.review.requestDigest + '\n这是历史审核事实，不能重新执行旧命令。', createdAt: shell.updatedAt, orderKnown: true });
-        if (!pm && (shell.output.stdout || shell.output.stderr || shell.result)) events.push({ id: 'shell-output-' + shell.id, kind: 'host_shell', text: '请求 ' + shell.id + ' · ' + label(shell.result?.status ?? shell.status) + '\n实际执行：' + (shell.result?.executed ?? '执行中') + ' · 退出码：' + (shell.result?.exitCode ?? '未记录') + '\n标准输出：\n' + shell.output.stdout + '\n错误输出：\n' + shell.output.stderr + (shell.output.truncated ? '\n预览已按预算裁剪，完整日志保留在宿主限额归档。' : '') + '\n实际发布：' + (shell.result?.publishedResources.map((item) => item.resource + (item.missing ? '（已删除）' : '')).join('、') || '无') + '\nShell结束不代表自测或独立验收通过。', createdAt: shell.updatedAt, orderKnown: true });
+    const container = this.get('member-conversation');
+    container.hidden = !this.selectedMember;
+    if (container.hidden) return;
+    const role = this.state.roles.find(item => item.id === this.selectedMember);
+    let name = this.selectedMember; if (role) name = this.memberName(role);
+    this.setText(this.get('member-conversation-title'), name + ' · 工作记录');
+    this.setText(this.get('member-run-binding'), '成员原始对话与宿主任务输入只在私有记录保存。此处仅显示安全行动事实；完整分页日志请使用角色运行区。');
+    const runs = (this.state.memberConversations?.runs ?? []).filter(item => item.roleId === this.selectedMember);
+    const select = this.get('member-run-select');
+    const signature = JSON.stringify(runs.map(item => [item.id,item.status]));
+    if (this.document.activeElement !== select && select.dataset.signature !== signature) {
+      select.replaceChildren();
+      for (const run of runs) select.append(this.option(run.id, run.taskId + ' · ' + this.memberRunStatus(run.status)));
+      select.dataset.signature = signature;
+    }
+    const key = this.projectId + '|' + this.selectedMember;
+    let run = runs.find(item => item.id === this.memberRuns.get(key));
+    if (!run) run = runs.at(-1);
+    if (run) this.memberRuns.set(key,run.id);
+    if (this.document.activeElement !== select) select.value = run?.id ?? '';
+    select.disabled = runs.length === 0;
+    let channel = 'member_task'; if (this.selectedMember === 'Supervisor') channel = 'su_customer'; else if (this.selectedMember === 'ProjectManager') channel = 'pm_delegate';
+    const memory = this.state.roleMemory?.entries.find(item => item.roleId === this.selectedMember && item.channel === channel);
+    let memoryText = '工作记忆尚未记录。分类事实在角色运行区查看。';
+    if (memory) memoryText = '私有工作记忆版本 ' + memory.revision + ' · 最近消息 ' + memory.recentMessages + ' 条；摘要正文不公开。';
+    this.setText(this.get('member-memory-state'),memoryText);
+    const events = (this.state.memberConversations?.events ?? []).filter(item => item.conversationId === run?.id && !['assistant_text','host_briefing'].includes(item.kind));
+    this.region('member-conversation-log',[run?.id,events],node => {
+      if (!events.length) node.append(this.node('p','尚无可公开的行动记录。','muted'));
+      for (const event of events) {
+        const row = this.node('article','','member-event');
+        row.append(this.node('small',event.createdAt + ' · ' + event.kind));
+        row.append(this.node('p',[event.tool,event.status,event.resource,event.checkId,event.reason].filter(Boolean).join(' · '),'member-run-source'));
+        node.append(row);
       }
-    }
-    const changedRun = this.lastMemberRendered !== view;
-    if (changedRun) { log.replaceChildren(); this.memberEventNodes.clear(); this.memberEmpty = null; }
-    if (!events.length && !this.memberEmpty) { this.memberEmpty = this.node('p', '尚未产生可显示的实际对话。', 'muted'); log.append(this.memberEmpty); }
-    if (events.length && this.memberEmpty) { this.memberEmpty.remove(); this.memberEmpty = null; }
-    const seen = new Set();
-    for (const event of events) {
-      seen.add(event.id); let row = this.memberEventNodes.get(event.id);
-      if (!row) { row = { node: this.node('article', '', 'member-event'), signature: null }; this.memberEventNodes.set(event.id, row); log.append(row.node); }
-      const signature = JSON.stringify(event); if (row.signature === signature) continue; row.signature = signature; row.node.replaceChildren();
-      if (['assistant_text', 'human_text', 'host_briefing', 'host_shell'].includes(event.kind)) { let heading = '实际回复'; if (event.kind === 'human_text') heading = 'Human原始消息 / 答复'; if (event.kind === 'host_briefing') heading = '宿主任务输入（非成员回复）'; if (event.kind === 'host_shell') heading = '真实Shell请求 / 审核 / 执行记录'; row.node.append(this.node('small', heading + ' · ' + event.createdAt)); if (!event.orderKnown) row.node.append(this.node('p', '终态返回文字，流式位置未知。', 'muted')); const body = this.node('div', '', 'message-text'); let shown = event.text; if (pm && event.kind === 'assistant_text') shown = conversationDisplay(event.text); if (event.kind === 'assistant_text' && globalThis.marked?.Lexer) body.append(_markdownContent(this.document, shown).root); else body.textContent = shown; row.node.append(body); if (shown !== event.text) { const raw = this.disclosure('member-raw-' + event.id, '查看原始回复'); raw.append(this.node('pre', event.text)); row.node.append(raw); } }
-      else { let title = '工具请求'; if (event.kind === 'tool_result') title = '工具结果'; if (event.kind === 'terminal') title = '运行终态'; row.node.append(this.node('small', title + ' · ' + event.createdAt)); const lines = []; if (event.tool) lines.push(event.tool + ' · 请求 ' + event.requestId); if (event.resource) lines.push('文件：' + event.resource); if (event.checkId) lines.push('检查：' + event.checkId); if (event.status) { let status = event.status; if (event.kind === 'terminal') status = this.memberRunStatus(status); else if (status === 'completed') status = '响应完成'; lines.push('状态：' + status); } if (event.reason) lines.push('原因：' + event.reason); if (event.digest) lines.push('摘要：' + event.digest); row.node.append(this.node('p', lines.join('\n'), 'member-run-source')); }
-    }
-    for (const [id, row] of this.memberEventNodes) if (!seen.has(id)) { row.node.remove(); this.memberEventNodes.delete(id); }
-    if (changedRun) log.scrollTop = this.memberReading.get(view) ?? 0; else if (follow) log.scrollTop = log.scrollHeight; else log.scrollTop = top; this.lastMemberRendered = view;
+    });
   }
   conversationItems() {
     const items = []; const timeline = this.state.timeline;
     if (timeline) {
-      for (let index = 0; index < timeline.legacyMessages.length; index += 1) { const message = timeline.legacyMessages[index]; items.push({ id: 'legacy-' + index, role: message.role, raw: message.text, text: '旧记录（未记录交互顺序）\n' + message.text }); }
+      for (let index = 0; index < timeline.legacyMessages.length; index += 1) { const message = timeline.legacyMessages[index]; items.push({ id: 'legacy-' + index, role: message.role, kind: 'legacy', raw: message.text, text: '旧记录（未记录交互顺序）\n' + message.text }); }
       for (const message of timeline.messages) {
         let role = 'assistant'; if (['human', 'answer'].includes(message.kind)) role = 'user'; let text = message.text;
-        if (!message.orderKnown) text = '旧记录或终态校准（顺序未知）\n' + text; items.push({ id: message.id, role, text, raw: message.text });
+        if (!message.orderKnown) text = '旧记录或终态校准（顺序未知）\n' + text; items.push({ id: message.id, role, kind: message.kind, text, raw: message.text });
       }
     } else {
       for (let index = 0; index < this.state.history.messages.length; index += 1) { const message = this.state.history.messages[index]; items.push({ ...message, id: 'history-' + index }); }
       const turn = this.state.turn;
       if (turn && this.pendingHuman && this.pendingHuman.turnId === turn.id && this.pendingHuman.projectId === this.projectId && turn.status !== 'completed') items.push({ id: 'human-' + turn.id, role: 'user', text: this.pendingHuman.text });
       for (const request of this.state.interactions ?? []) {
-        items.push({ id: 'question-' + request.requestId, role: 'assistant', text: '旧交互记录（顺序未知）\n' + request.title + '\n' + request.text });
+        items.push({ id: 'question-' + request.requestId, role: 'assistant', kind: 'question', text: '旧交互记录（顺序未知）\n' + request.title + '\n' + request.text });
         if (request.answer) items.push({ id: 'answer-' + request.answer.answerId, role: 'user', text: '答复「' + request.title + '」：' + JSON.stringify(request.answer.value) });
       }
       if (['running', 'waiting'].includes(turn?.status) && turn.text) items.push({ id: 'turn-' + turn.id, role: 'assistant', text: turn.text });
@@ -403,10 +470,11 @@ export class _Renderer {
     for (const item of this.conversationItems()) {
       seen.add(item.id); let row = this.messageNodes.get(item.id);
       if (!row) {
-        const article = this.node('article', '', 'message ' + item.role); const avatar = this.node('span', 'PM', 'message-avatar'); const body = this.node('div', '', 'message-body'); const name = this.node('div', '项目管理', 'message-label'); const content = this.node('div', '', 'message-text');
+        const article = this.node('article', '', 'message ' + item.role); const avatar = this.node('span', '二哥', 'message-avatar'); const body = this.node('div', '', 'message-body'); const name = this.node('div', '二哥', 'message-label'); const content = this.node('div', '', 'message-text');
         if (item.role === 'user') { name.textContent = '你'; avatar.textContent = 'H'; }
-        body.append(name, content); article.append(avatar, body); row = { article, body, content, source: null, raw: null, original: null }; this.messageNodes.set(item.id, row); messages.append(article);
+        body.append(name, content); article.append(avatar, body); row = { article, avatar, name, body, content, source: null, raw: null, original: null }; this.messageNodes.set(item.id, row); messages.append(article);
       }
+      if (item.role === 'assistant') { let speaker = '二哥'; if (item.kind === 'question') speaker = '二哥 · 转达待答复问题'; this.setText(row.avatar, '二哥'); this.setText(row.name, speaker); }
       let text = item.text; if (item.role === 'assistant') text = conversationDisplay(item.text);
       if (row.source !== text) {
         row.source = text;
@@ -437,7 +505,7 @@ export class _Renderer {
   }
   renderPlan() {
     const plan = this.state.plan; this.get('plan-panel').hidden = !plan;
-    this.setText(this.get('task-next-step'), '和项目管理讨论目标，确认完整文件范围后开始。');
+    this.setText(this.get('task-next-step'), '把目标告诉二哥，确认角色归属、检查和计划后开始。');
     if (plan) this.setText(this.get('task-next-step'), `当前阶段：${label(plan.status)}。可在任务、文件与上下文、成员、记录中查看完整事实。`);
     if (plan?.status === 'draft') this.setText(this.get('task-next-step'), '计划等待确认：核对文件、归属、检查与独立验收，再答复执行确认。');
     if (!plan) {
@@ -547,26 +615,34 @@ export class _Renderer {
     const detailsTop = this.get('details-scroll').scrollTop; const settingsTop = this.get('settings-page').scrollTop;
     const id = value.currentProject?.id ?? null; const initial = this.state === null; const changedProject = id !== this.projectId;
     if (changedProject) {
+      this.queryEpoch += 1; this.pages.clear(); this.fileDirectory = ''; this.fileCursor = ''; this.previewResource = null; this.previewNextLine = 1; this.selectedRoleId = null; this.factSignature = '';
       if (this.projectId) { this.messageDrafts.set(this.projectId, this.get('message-input').value); this.contextDrafts.set(this.projectId, this.get('context-input').value); }
       this.projectId = id; this.get('message-input').value = this.messageDrafts.get(id) ?? ''; this.get('context-input').value = this.contextDrafts.get(id) ?? value.context.files.map((file) => file.resource).join('\n');
       this.mappingDrafts.clear(); this.roleRows.clear(); this.memberNodes.clear(); this.get('member-list').replaceChildren(); this.get('role-list').replaceChildren(); this.get('mapping-list').replaceChildren(); this.messageNodes.clear(); this.get('messages').replaceChildren();
       if (this.get('interaction-modal').open) { this.saveInteractionDraft(); this.closeDialog(); } this.modalRequest = null; this.pendingHuman = null; this.selectedMember = null; this.activityNodes.clear(); this.get('member-activity').replaceChildren(); this.currentMemberView = null; this.lastMemberRendered = null; this.regions.clear(); this.tabScroll.clear();
     }
-    this.get('conversation-page').setAttribute('aria-label','Su客户对话');this.get('message-input').setAttribute('aria-label','给Su的消息');this.get('message-input').placeholder='描述你的想法，和Su一起想清楚…';this.state = value; this.setText(this.get('project-name'), value.currentProject?.name ?? '及时雨 · Handwell');
+    this.get('conversation-page').setAttribute('aria-label','二哥客户对话');this.get('message-input').setAttribute('aria-label','给二哥的消息');this.get('message-input').placeholder='描述你的想法，和二哥一起想清楚…';this.state = value; this.setText(this.get('project-name'), value.currentProject?.name ?? '二哥项目指挥台');
     const manager = value.roles.find((role) => role.id === 'Supervisor'); let profileId = value.defaultProfileId;
     const mapping = value.assignments.find((item) => item.projectId === id && item.roleId === 'Supervisor'); if (manager?.profileId) profileId = manager.profileId; if (mapping) profileId = mapping.profileId;
-    const profile = value.profiles.find((item) => item.id === profileId); this.setText(this.get('manager-connection'), profile?.name ?? '配置一个 AI 连接，和Su开始讨论');
-    const empty = this.conversationItems().length === 0; this.get('welcome').hidden = !empty; this.get('suggestions').hidden = !empty; this.get('conversation-page').classList.toggle('welcome-mode', empty);
+    const profile = value.profiles.find((item) => item.id === profileId); this.setText(this.get('manager-connection'), profile?.name ?? '配置一个 AI 连接，和二哥开始讨论');
+    const empty = this.conversationItems().length === 0; this.get('welcome').hidden = !empty && Boolean(profile); this.get('suggestions').hidden = !empty; this.get('conversation-page').classList.toggle('welcome-mode', empty);
     this.get('welcome-choose').hidden = id !== null; this.get('welcome-settings').hidden = !id || Boolean(profile);
-    this.setText(this.get('welcome-description'), '选择一个项目，带着你的想法开始。'); if (id) this.setText(this.get('welcome-description'), '把目标告诉Su，一起理清方案。'); if (id && !profile) this.setText(this.get('welcome-description'), '项目已准备好，配置一个 AI 连接即可开始。');
+    this.setText(this.get('welcome-description'), '选择一个项目，和二哥从你的想法开始。'); if (id) this.setText(this.get('welcome-description'), '把目标告诉二哥，一起理清方案。'); if (id && !profile) this.setText(this.get('welcome-description'), '项目已准备好，配置一个 AI 连接后即可和二哥开始。');
     const running = ['running', 'waiting'].includes(value.turn?.status); const executing = ['confirmed', 'running'].includes(value.plan?.status);
     this.get('message-input').disabled = !id; this.get('send-message').disabled = !id || !profile || running || this.sending; this.get('cancel-turn').hidden = !running;
-    let status = '选择项目后开始对话'; if (id) status = '需求只发送给Su'; if (running) status = 'Su正在回复'; if (value.turn?.status === 'waiting') status = '等待你的答复，请打开待答复请求'; if (executing) status = '按已确认计划执行中 · 可向Su只读询问进度与文件';
+    let status = '选择项目后开始对话'; if (id) status = '需求只发送给二哥'; if (running) status = '二哥正在回复'; if (value.turn?.status === 'waiting') status = '等待你的答复，请打开待答复请求'; if (executing) status = '按已确认计划执行中 · 可向二哥只读询问进度与文件';
     if (!profile && id) status = '先配置有效的 AI 连接'; this.setText(this.get('conversation-status'), status);
+    const runningTasks = value.tasks.filter(task => task.status === 'running').length;
+    const blockedTasks = value.tasks.filter(task => task.status === 'blocked').length;
+    const failedTasks = value.tasks.filter(task => task.status === 'failed').length;
+    let planStatus = '尚无计划'; if (value.plan) planStatus = label(value.plan.status); let pendingStatus = ''; if ((value.interactions ?? []).some(item => item.status === 'pending')) pendingStatus = ' · 待答复'; this.setText(this.get('command-status'), `${planStatus} · 运行 ${runningTasks} · 阻塞 ${blockedTasks} · 失败 ${failedTasks}${pendingStatus}`);
     this.get('select-context').disabled = !id || running || executing;
     this.renderProfiles(); this.renderSidebar(); this.renderMemberActivity(); this.renderMemberCurrent(); this.renderMemberConversation(); this.renderMessages(); this.renderPlan(); this.renderFileOwners(); this.renderResults(); this.renderAcceptance(); this.renderObservation(); this.renderInteractions();
     this.setText(this.get('context-state'), `已读取 ${value.context.files.length} 个文件 · 校验 ${time(value.context.verifiedAt)}`);
     this.region('context-files', value.context, (node) => { for (const file of value.context.files) node.append(this.node('p', `${file.resource} · ${file.byteLength} bytes · SHA ${file.contentDigest ?? file.sha256 ?? '未提供'}`, 'muted')); });
+    this.renderCommandZones();
+    const signature = JSON.stringify({projectId:id,planDigest:value.plan?.planDigest,tasks:value.tasks.map(task => [task.id,task.status,task.checkStatus,task.results.length,task.generatedOutputs?.length]),evidence:value.evidence?.length,acceptances:value.acceptances?.length,owners:value.fileOwners?.version});
+    if (signature !== this.factSignature) { this.factSignature = signature; void this.refreshCommandFacts(changedProject); }
     if (value.error) this.notice(value.error.message, true);
     if (changedProject || initial) scroll.scrollTop = scroll.scrollHeight;
     else if (follow && scroll.scrollHeight !== height) scroll.scrollTop = scroll.scrollHeight;
@@ -670,6 +746,245 @@ export class _Renderer {
     try { const result = await this.call('getState', {}); if (!result.ok) this.fail(result); else if (projectId === this.projectId) this.render(result.value); }
     finally { this.reading = false; }
   }
+  renderCommandZones() {
+    this.get('command-grid').dataset.zone = this.zone;
+    for (const button of this.document.querySelectorAll('[data-zone][role="tab"]')) button.setAttribute('aria-selected',String(button.dataset.zone === this.zone));
+    for (const button of this.document.querySelectorAll('[data-project-tab]')) button.setAttribute('aria-selected',String(button.dataset.projectTab === this.projectTab));
+    for (const tab of ['files','changes','outputs','checks']) this.get('project-' + tab + '-panel').hidden = this.projectTab !== tab;
+    const selector = this.get('role-selector');
+    const signature = JSON.stringify(this.state.roles.map(role => [role.id,role.name]));
+    if (selector.dataset.signature !== signature && this.document.activeElement !== selector) {
+      selector.replaceChildren();
+      for (const role of this.state.roles) selector.append(this.option(role.id,this.memberName(role)));
+      selector.dataset.signature = signature;
+    }
+    if (!this.selectedRoleId || !this.state.roles.some(role => role.id === this.selectedRoleId)) this.selectedRoleId = this.state.roles.find(role => role.id === 'Supervisor')?.id ?? this.state.roles[0]?.id ?? null;
+    if (this.document.activeElement !== selector) selector.value = this.selectedRoleId ?? '';
+    selector.disabled = !this.projectId;
+  }
+  selectZone(zone,focus = false) {
+    if (!['conversation','project','roles'].includes(zone)) return;
+    this.zone = zone; this.renderCommandZones(); this.syncEntrySelection();
+    if (focus) this.get('zone-' + zone).focus();
+    if (zone === 'project' && this.projectId) void this.refreshProjectTab();
+    if (zone === 'roles' && this.projectId) void this.refreshRoleZone();
+  }
+  selectProjectTab(tab,focus = false) {
+    if (!['files','changes','outputs','checks'].includes(tab)) return;
+    this.projectTab = tab; this.renderCommandZones();
+    if (focus) this.document.querySelector('[data-project-tab="' + tab + '"]')?.focus();
+    if (this.projectId) void this.refreshProjectTab();
+  }
+  async commandQuery(operation,input,slot) {
+    const projectId = this.projectId, epoch = this.queryEpoch;
+    const token = (this.queryTokens.get(slot) ?? 0) + 1;
+    this.queryTokens.set(slot,token);
+    const result = await this.call(operation,{projectId,...input});
+    if (epoch !== this.queryEpoch || projectId !== this.projectId || this.queryTokens.get(slot) !== token) return null;
+    return result;
+  }
+  pageFailure(result,statusId,moreId,refreshId,key) {
+    this.setText(this.get(statusId),result.error?.message ?? '查询未完成，请刷新。');
+    if (key === 'files') this.fileCursor = '';
+    else this.pages.delete(key);
+    const more = this.get(moreId), focused = this.document.activeElement === more;
+    more.hidden = true;
+    if (focused) this.get(refreshId).focus();
+  }
+  pageMore(moreId,refreshId,nextCursor) {
+    const more = this.get(moreId), focused = this.document.activeElement === more;
+    more.hidden = !nextCursor;
+    if (focused && more.hidden) this.get(refreshId).focus();
+  }
+  async loadFiles(resource = this.fileDirectory, append = false) {
+    if (!this.projectId) return;
+    const input = {resource,limit:50};
+    if (append) { if (!this.fileCursor) return; input.cursor = this.fileCursor; }
+    const result = await this.commandQuery('listProjectFiles',input,'files');
+    if (!result) return;
+    if (!result.ok) { this.pageFailure(result,'file-status','file-more','project-refresh','files'); return; }
+    if (!append) this.get('project-file-list').replaceChildren();
+    this.fileDirectory = resource; this.fileCursor = result.value.nextCursor;
+    this.setText(this.get('file-path'),resource || '项目根目录');
+    let fileStatus = '此目录没有可显示文件。'; if (result.value.entries.length) fileStatus = '普通项目文件 · 只读'; this.setText(this.get('file-status'),fileStatus);
+    for (const entry of result.value.entries) {
+      let path = entry.name; if (resource) path = resource + '/' + entry.name;
+      let mark = '· '; if (entry.kind === 'directory') mark = '▸ '; const button = this.node('button',mark + entry.name,'workspace-file');
+      button.addEventListener('click',() => { if (entry.kind === 'directory') void this.loadFiles(path); else void this.previewFile(path); });
+      this.get('project-file-list').append(button);
+    }
+    this.pageMore('file-more','project-refresh',this.fileCursor);
+  }
+  async previewFile(resource,append = false) {
+    if (!this.projectId) return;
+    let startLine = 1;
+    if (append && resource === this.previewResource) startLine = this.previewNextLine;
+    const result = await this.commandQuery('readProjectFile',{resource,startLine,maxBytes:16384},'preview');
+    if (!result) return;
+    this.get('file-preview').hidden = false;
+    this.setText(this.get('file-preview-title'),resource);
+    if (!result.ok) { this.setText(this.get('file-preview-status'),result.error?.message ?? '文件不可读。'); this.get('file-preview-text').textContent = ''; this.get('file-preview-more').hidden = true; return; }
+    this.previewResource = resource; this.previewNextLine = result.value.nextLine;
+    let completion = ' · 可继续读取'; if (result.value.complete) completion = ' · 已读完'; this.setText(this.get('file-preview-status'),'当前文件 · SHA ' + (result.value.sha256 ?? '未知') + ' · ' + result.value.byteLength + ' bytes' + completion);
+    if (append) this.get('file-preview-text').textContent += result.value.text;
+    else this.get('file-preview-text').textContent = result.value.text;
+    this.get('file-preview-more').hidden = result.value.complete;
+  }
+  factRow(item,kind) {
+    const row = this.node('article','','workspace-fact');
+    let title = item.taskId ?? item.id;
+    if (kind === 'changes') title += ' · ' + (item.resource || '无资源') + ' · ' + label(item.status);
+    if (kind === 'outputs') title += ' · ' + item.resource + ' · ' + label(item.status);
+    if (kind === 'checks') title += ' · ' + item.checkId + ' · ' + label(item.status);
+    if (kind === 'acceptances') title += ' · 独立验收 ' + label(item.decision);
+    row.append(this.node('strong',title));
+    const details = [];
+    if (item.roleId) details.push('角色 ' + item.roleId);
+    if (item.sourceRef) details.push('来源 ' + item.sourceRef);
+    if (item.observedMutation !== undefined) details.push('实际修改 ' + item.observedMutation);
+    if (item.executed !== undefined) details.push('实际执行 ' + item.executed + ' · 测试 ' + item.testCount + ' 项');
+    if (item.contentDigest) details.push('SHA ' + item.contentDigest);
+    if (item.sha256) details.push('SHA ' + item.sha256);
+    if (item.history) details.push('历史记录，非当前通过');
+    row.append(this.node('p',details.join(' · '),'muted'));
+    if (item.reason) row.append(this.node('p',item.reason));
+    if (item.stdout) row.append(this.node('pre',item.stdout));
+    if (item.stderr) row.append(this.node('pre',item.stderr));
+    for (const issue of item.issues ?? []) row.append(this.node('p',issue.resource + ' · ' + issue.expected + ' / ' + issue.actual,'error-text'));
+    if (item.resource && !item.missing) { const open = this.node('button','查看当前文件','secondary compact'); open.addEventListener('click',() => { this.selectProjectTab('files'); void this.previewFile(item.resource); }); row.append(open); }
+    return row;
+  }
+  async loadFacts(kind,append = false) {
+    if (!this.projectId || !this.state.plan) return;
+    const key = kind;
+    const input = {kind,limit:20};
+    if (append) { const cursor = this.pages.get(key); if (!cursor) return; input.cursor = cursor; }
+    const result = await this.commandQuery('queryProjectFacts',input,'facts-' + kind);
+    if (!result) return;
+    let panel = 'checks'; if (kind === 'changes') panel = 'changes';
+    if (!result.ok) { this.pageFailure(result,panel + '-status',panel + '-more','project-refresh',key); return; }
+    const list = this.get('project-' + panel + '-list');
+    if (!append && kind === 'changes') list.replaceChildren();
+    if (!append && kind === 'checks') list.replaceChildren();
+    this.pages.set(key,result.value.nextCursor);
+    for (const item of result.value.items) list.append(this.factRow(item,kind));
+    let factStatus = '尚无本轮真实检查事实。'; if (kind === 'changes') factStatus = '尚无本轮真实修改事实。'; if (result.value.total) factStatus = '当前计划 · 真实来源 ' + result.value.total + ' 条'; this.setText(this.get(panel + '-status'),factStatus);
+    this.pageMore(panel + '-more','project-refresh',result.value.nextCursor);
+  }
+  async loadChecks() {
+    if (!this.projectId || !this.state.plan) return;
+    await this.loadFacts('checks');
+    await this.loadAcceptances();
+  }
+  async loadAcceptances(append = false) {
+    if (!this.projectId || !this.state.plan) return;
+    const input = {kind:'acceptances',limit:20};
+    if (append) { const cursor = this.pages.get('acceptances'); if (!cursor) return; input.cursor = cursor; }
+    const result = await this.commandQuery('queryProjectFacts',input,'facts-acceptances');
+    if (!result) return;
+    if (!result.ok) { this.pageFailure(result,'checks-status','acceptances-more','project-refresh','acceptances'); return; }
+    this.pages.set('acceptances',result.value.nextCursor);
+    for (const item of result.value.items) this.get('project-checks-list').append(this.factRow(item,'acceptances'));
+    this.pageMore('acceptances-more','project-refresh',result.value.nextCursor);
+  }
+  async loadOutputs(append = false) {
+    if (!this.projectId || !this.state.plan) return;
+    const input = {limit:20};
+    if (append) { const cursor = this.pages.get('outputs'); if (!cursor) return; input.cursor = cursor; }
+    const result = await this.commandQuery('queryProjectOutputs',input,'outputs');
+    if (!result) return;
+    if (!result.ok) { this.pageFailure(result,'outputs-status','outputs-more','project-refresh','outputs'); return; }
+    if (!append) this.get('project-outputs-list').replaceChildren();
+    this.pages.set('outputs',result.value.nextCursor);
+    for (const item of result.value.items) this.get('project-outputs-list').append(this.factRow(item,'outputs'));
+    let outputStatus = '尚未观察到产物。'; if (result.value.total) outputStatus = '真实发布 / 生成记录 ' + result.value.total + ' 条'; this.setText(this.get('outputs-status'),outputStatus);
+    this.pageMore('outputs-more','project-refresh',result.value.nextCursor);
+  }
+  async refreshProjectTab() {
+    if (!this.projectId) return;
+    if (this.projectTab === 'files') await this.loadFiles();
+    if (this.projectTab === 'changes') await this.loadFacts('changes');
+    if (this.projectTab === 'outputs') await this.loadOutputs();
+    if (this.projectTab === 'checks') await this.loadChecks();
+  }
+  async loadRoleActivity() {
+    if (!this.projectId) return;
+    const result = await this.commandQuery('queryRoleActivity',{},'role-activity');
+    if (!result) return;
+    if (!result.ok) { this.setText(this.get('role-status'),result.error?.message ?? '角色状态不可读。'); return; }
+    let roleStatus = '当前项目实际状态'; if (result.value.history) roleStatus = '历史计划 · 不代表当前执行'; this.setText(this.get('role-status'),roleStatus);
+    const selected = this.selectedRoleId;
+    this.region('role-activity-list',result.value.roles,node => {
+      for (const role of result.value.roles) {
+        let activity = label(role.activity), phase = role.phase;
+        if (role.activity === 'waiting') activity = '等待任务';
+        if (role.activity === 'waiting_answer') activity = '等待你的答复';
+        if (role.phase === 'not_recorded') phase = '尚未运行';
+        if (role.phase === 'awaiting_human') phase = '等待你的答复';
+        if (role.phase === 'reasoning') phase = '正在工作';
+        node.append(this.node('p',this.memberName(this.state.roles.find(item => item.id === role.id) ?? role) + ' · ' + activity + ' · ' + phase,'workspace-fact'));
+      }
+    });
+    this.region('role-task-list',[selected,result.value.tasks],node => {
+      const tasks = result.value.tasks.filter(item => item.roleId === selected);
+      if (!tasks.length) node.append(this.node('p','当前无分配任务。','muted'));
+      for (const task of tasks) {
+        const row = this.node('article','','workspace-fact');
+        row.append(this.node('strong',task.id + ' · ' + label(task.status)));
+        let acceptanceStatus = '未验收'; if (task.acceptanceStatus) acceptanceStatus = label(task.acceptanceStatus); row.append(this.node('p','检查 ' + label(task.checkStatus) + ' · 验收 ' + acceptanceStatus + ' · 观察变更 ' + task.observedChanges));
+        if (task.blockingTaskIds.length) row.append(this.node('p','等待上游：' + task.blockingTaskIds.join('、'),'error-text'));
+        node.append(row);
+      }
+    });
+  }
+  async loadRoleLog(append = false) {
+    if (!this.projectId || !this.selectedRoleId) return;
+    const roleId = this.selectedRoleId;
+    const input = {roleId,limit:20};
+    if (append) { const cursor = this.pages.get('role-log'); if (!cursor) return; input.cursor = cursor; }
+    const result = await this.commandQuery('queryRoleLog',input,'role-log');
+    if (!result || roleId !== this.selectedRoleId) return;
+    if (!result.ok) { this.pageFailure(result,'role-log-status','role-log-more','role-log-refresh','role-log'); return; }
+    if (!append) this.get('role-log-list').replaceChildren();
+    this.pages.set('role-log',result.value.nextCursor);
+    for (const event of result.value.events) {
+      const row = this.node('article','','workspace-fact');
+      row.append(this.node('strong',(event.tool || event.kind) + ' · ' + (event.status || '已记录')));
+      row.append(this.node('p',[event.createdAt,event.taskId,event.resource,event.checkId,event.sourceRef].filter(Boolean).join(' · '),'muted'));
+      if (event.reason) row.append(this.node('p',event.reason));
+      this.get('role-log-list').append(row);
+    }
+    let logStatus = '此角色暂无行动记录。'; if (result.value.events.length) logStatus = '行动事实；原始成员消息不公开。'; this.setText(this.get('role-log-status'),logStatus);
+    this.pageMore('role-log-more','role-log-refresh',result.value.nextCursor);
+  }
+  async loadMemory(append = false) {
+    if (!this.projectId) return;
+    const kind = this.get('memory-kind').value;
+    const input = {limit:20}; if (kind) input.kind = kind;
+    if (append) { const cursor = this.pages.get('memory'); if (!cursor) return; input.cursor = cursor; }
+    const result = await this.commandQuery('queryProjectMemory',input,'memory');
+    if (!result) return;
+    if (!result.ok) { this.pageFailure(result,'memory-status','memory-more','memory-refresh','memory'); return; }
+    if (!append) this.get('memory-list').replaceChildren();
+    this.pages.set('memory',result.value.cursor);
+    for (const fact of result.value.facts) {
+      const row = this.node('article','','workspace-fact');
+      row.append(this.node('strong',fact.kind + ' · ' + fact.ownerRoleId + ' · ' + fact.status));
+      row.append(this.node('p',fact.statement));
+      row.append(this.node('p','修订 ' + fact.revision + ' · ' + fact.sources.map(source => source.label).join('、'),'muted'));
+      this.get('memory-list').append(row);
+    }
+    let memoryStatus = '当前没有可显示的分类事实。'; if (result.value.total) memoryStatus = '本项目分类事实 ' + result.value.total + ' 条'; this.setText(this.get('memory-status'),memoryStatus);
+    this.pageMore('memory-more','memory-refresh',result.value.cursor);
+  }
+  async refreshRoleZone() { await this.loadRoleActivity(); await this.loadRoleLog(); await this.loadMemory(); }
+  async refreshCommandFacts(changedProject) {
+    if (!this.projectId) return;
+    if (changedProject) await this.loadFiles('');
+    await this.loadRoleActivity();
+    if (this.state.plan && this.projectTab !== 'files') await this.refreshProjectTab();
+    if (changedProject) { await this.loadRoleLog(); await this.loadMemory(); }
+  }
   async send() {
     if (this.sending || !this.projectId || !this.get('message-input').value.trim() || this.get('send-message').disabled) return;
     const projectId = this.projectId; const text = this.get('message-input').value; this.sending = true; this.get('send-message').disabled = true;
@@ -679,12 +994,39 @@ export class _Renderer {
     if (this.state) this.render(this.state);
   }
   start() {
+    this.get('mobile-nav-toggle').addEventListener('click',() => { if (this.isMobileNavOpen()) this.closeMobileNav(true); else this.openMobileNav(); });
+    this.get('nav-backdrop').addEventListener('click',() => this.closeMobileNav(true));
+    this.get('project-sidebar').addEventListener('keydown',event => { if (event.key === 'Escape' && this.isMobileNavOpen()) { event.preventDefault(); this.closeMobileNav(true); } });
+    this.mobileResize = () => { if (globalThis.window?.innerWidth > 900 && this.isMobileNavOpen()) { const focusedToggle = this.document.activeElement === this.get('mobile-nav-toggle'); this.closeMobileNav(false); if (focusedToggle) this.get('conversation-nav').focus(); } };
+    globalThis.window?.addEventListener('resize',this.mobileResize);
+    for (const button of this.document.querySelectorAll('[data-zone][role="tab"]')) {
+      button.addEventListener('click',() => this.selectZone(button.dataset.zone,true));
+      button.addEventListener('keydown',event => { const zones=['conversation','project','roles']; const index=zones.indexOf(button.dataset.zone); let next=index; if(event.key==='ArrowRight')next=(index+1)%zones.length;else if(event.key==='ArrowLeft')next=(index+zones.length-1)%zones.length;else return;event.preventDefault();this.selectZone(zones[next],true); });
+    }
+    for (const button of this.document.querySelectorAll('[data-project-tab]')) button.addEventListener('click',() => this.selectProjectTab(button.dataset.projectTab,true));
+    this.get('top-choose-project').addEventListener('click',() => void this.update('chooseProject'));
+    this.get('project-refresh').addEventListener('click',() => void this.refreshProjectTab());
+    this.get('roles-refresh').addEventListener('click',() => void this.refreshRoleZone());
+    this.get('file-parent').addEventListener('click',() => { const pieces=this.fileDirectory.split('/');pieces.pop();void this.loadFiles(pieces.join('/')); });
+    this.get('file-more').addEventListener('click',() => void this.loadFiles(this.fileDirectory,true));
+    this.get('file-preview-close').addEventListener('click',() => { this.get('file-preview').hidden=true;this.previewResource=null; });
+    this.get('file-preview-more').addEventListener('click',() => { if(this.previewResource)void this.previewFile(this.previewResource,true); });
+    this.get('changes-more').addEventListener('click',() => void this.loadFacts('changes',true));
+    this.get('outputs-more').addEventListener('click',() => void this.loadOutputs(true));
+    this.get('checks-more').addEventListener('click',() => void this.loadFacts('checks',true));
+    this.get('acceptances-more').addEventListener('click',() => void this.loadAcceptances(true));
+    this.get('role-selector').addEventListener('change',() => { this.selectedRoleId=this.get('role-selector').value;this.pages.delete('role-log');void this.loadRoleActivity();void this.loadRoleLog(); });
+    this.get('role-log-refresh').addEventListener('click',() => void this.loadRoleLog());
+    this.get('role-log-more').addEventListener('click',() => void this.loadRoleLog(true));
+    this.get('memory-refresh').addEventListener('click',() => void this.loadMemory());
+    this.get('memory-kind').addEventListener('change',() => { this.pages.delete('memory');void this.loadMemory(); });
+    this.get('memory-more').addEventListener('click',() => void this.loadMemory(true));
     this.get('pending-interaction').addEventListener('click', () => this.openInteraction());
     this.get('interaction-form').addEventListener('submit', (event) => { event.preventDefault(); void this.submitInteraction(); });
     this.get('interaction-reject').addEventListener('click', () => void this.submitInteraction(true));
     for (const id of ['interaction-close', 'interaction-later']) this.get(id).addEventListener('click', () => void this.dismissInteraction());
     this.get('interaction-modal').addEventListener('cancel', (event) => { event.preventDefault(); void this.dismissInteraction(); });
-    for (const button of this.document.querySelectorAll('[data-page]')) button.addEventListener('click', () => this.navigate(button.dataset.page));
+    for (const button of this.document.querySelectorAll('[data-page]')) button.addEventListener('click', () => { if (button === this.get('conversation-nav')) this.openCustomerEntry(); else this.navigate(button.dataset.page); });
     this.get('welcome-settings').addEventListener('click', () => this.navigate('settings'));
     for (const tab of ['task', 'files', 'members', 'conversation', 'records']) {
       const button = this.get('tab-' + tab); button.addEventListener('click', () => this.selectTab(tab));
@@ -695,7 +1037,7 @@ export class _Renderer {
     }
     this.get('details-drawer').addEventListener('keydown', (event) => { if (event.key === 'Escape') { event.preventDefault(); this.toggleDetails(false); } });
     for (const button of this.document.querySelectorAll('[data-suggestion]')) button.addEventListener('click', () => { this.get('message-input').value = button.dataset.suggestion; this.get('message-input').focus(); });
-    for (const id of ['choose-project', 'welcome-choose']) this.get(id).addEventListener('click', () => void this.update('chooseProject'));
+    for (const id of ['choose-project', 'welcome-choose']) this.get(id).addEventListener('click', async () => { await this.update('chooseProject'); this.closeMobileNav(true); });
     this.get('details-toggle').addEventListener('click', () => this.toggleDetails(this.get('details-drawer').hidden)); this.get('details-close').addEventListener('click', () => this.toggleDetails(false));
     this.get('member-run-select').addEventListener('change', () => { const key = this.projectId + '|' + this.selectedMember; if (this.currentMemberView) this.memberReading.set(this.currentMemberView, this.get('member-conversation-log').scrollTop); this.memberRuns.set(key, this.get('member-run-select').value); this.renderMemberConversation(); });
     this.get('member-settings').addEventListener('click', () => this.navigate('settings'));
@@ -705,7 +1047,8 @@ export class _Renderer {
     this.get('profile-form').addEventListener('submit', (event) => { event.preventDefault(); void this.saveProfile(); });
     this.get('default-profile').addEventListener('change', async () => {
       const profileId = this.get('default-profile').value; if (!profileId) return; this.defaultDraft = profileId;
-      const result = await this.update('setDefaultProfile', { profileId }); if (result.ok) { this.defaultDraft = null; this.render(result.value); this.notice('默认连接已保存，旧计划已失效。'); }
+      const hadActivePlan = ['draft','confirmed','running'].includes(this.state?.plan?.status);
+      const result = await this.update('setDefaultProfile', { profileId }); if (result.ok) { this.defaultDraft = null; this.render(result.value); let message = '默认连接已保存，后续讨论使用新连接。'; if (hadActivePlan) message = '默认连接已保存，原活动计划已失效。'; this.notice(message); }
     });
     this.get('message-form').addEventListener('submit', (event) => { event.preventDefault(); void this.send(); });
     this.get('message-input').addEventListener('keydown', (event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); void this.send(); } });
@@ -717,7 +1060,7 @@ export class _Renderer {
     this.get('status-filter').addEventListener('change', () => this.renderResults());
     this.editProfile(); void this.load(); this.timer = setInterval(() => { void this.load(); }, 1000);
   }
-  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
+  stop() { if (this.timer) clearInterval(this.timer); this.timer = null; if (this.mobileResize) globalThis.window?.removeEventListener('resize',this.mobileResize); this.mobileResize = null; }
 }
 if (typeof window !== 'undefined' && window.legionDesktop) {
   const renderer = new _Renderer(document, window.legionDesktop); renderer.start(); window.addEventListener('beforeunload', () => renderer.stop(), { once: true });

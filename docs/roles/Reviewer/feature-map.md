@@ -20,3 +20,8 @@
 - [冻结候选的有限最终评审](docs/review-governed-workflow-v1.md)：final-review只更新4份文档，原50项测试只读；当前timeline/部分提案错误副作用/有界模型预算与fresh0.7评审、范围和证据见报告。最终独立Tester阶段另行运行，新增ProductManager/UI需求尚待方案。
 
 - final-review当前以提示词修复后的冻结输入复验：旧完整DTO67,733字符超cap失败保留；当前事实投影和完整UI台账按实际不同用途输出，详细owner125/Tester临时31及2MacUI证据与未测范围见同一评审报告。ProductDesigner另行design-only不等于运行功能上线。
+
+
+## 项目指挥台 v0.3
+
+当前公共DTO/IPC、只读查询、包身份与真实macOS窗口边界审查见 [Workbench审查](docs/review-desktop-workbench-v2.md) 与 [治理工作流审查](docs/review-governed-workflow-v1.md)。完整视觉/操作证明归独立Tester；Windows在本机未执行，旧observer pin与未知marker限制保持。

@@ -47,3 +47,73 @@ su_frontdoor_delivery_doc_close:
   accepted_design_sha256: 9f6628178502f5167b641c6bfe76d7e9b223ceb780f4ff79ba6dfa622cf5b0a1
   permission_source: legion-supervisor-frontdoor-v1-authorization.md
   new_application_paths: []
+
+desktop_command_center_candidate:
+  state: AWAITING_EXACT_CUSTOMER_CONFIG_ACCEPTANCE
+  conditional_record: docs/scheduling/legion-desktop-command-center-v1.md
+  scope_reference: .ans/decisions/legion-desktop-command-center-v1-project.json
+
+desktop_command_center_accepted:
+  state: ACCEPTED
+  config: .ans/decisions/legion-desktop-command-center-v1-check-timeout-project.json
+  config_sha256: 586fa7aa28f8283b90440d512200c04dd7ead8a373ca8ace4d443c568324b5a6
+  permission_source: .ans/decisions/legion-desktop-command-center-v1-authorization.md
+  conditional_record: docs/scheduling/legion-desktop-command-center-v1.md
+  private_operator_scope: .ans/runtime/legion-desktop-command-center-v1/Supervisor/operator/
+
+desktop_command_center_shell_caller_accepted:
+  state: ACCEPTED
+  config: .ans/decisions/legion-desktop-command-center-v1-shell-caller-project.json
+  config_sha256: 86dccc571af65c3466dc60c8e3fcb4d3b8259c4f38298684eb7c303bbc092c2a
+  permission_source: .ans/decisions/legion-desktop-command-center-v1-shell-caller-authorization.md
+  conditional_record: docs/scheduling/legion-desktop-command-center-v1-shell-caller-integration.md
+  authored_file_increment: tests/reviewer/test_shell_boundaries.mjs
+
+desktop_command_center_ui_repair_accepted:
+  state: ACCEPTED
+  config: .ans/decisions/legion-desktop-command-center-v1-shell-projection-project.json
+  config_sha256: 85c6197ccad1a0b67454a42966b3fce53d701170c41092a9fdc4b355a5b37366
+  permission_source: .ans/decisions/legion-desktop-command-center-v1-shell-projection-authorization.md
+  conditional_record: docs/scheduling/legion-desktop-command-center-v1-ui-repair-integration.md
+  authored_file_increment: apps/desktop/tests/integration/shell-workflow.test.mjs
+
+desktop_command_center_su_label_repair:
+  state: AUTHORIZED_WITHIN_ACCEPTED_CONFIG
+  config_sha256: 85c6197ccad1a0b67454a42966b3fce53d701170c41092a9fdc4b355a5b37366
+  permission_source: .ans/decisions/legion-desktop-command-center-v1-shell-projection-authorization.md
+  conditional_record: docs/scheduling/legion-desktop-command-center-v1-su-label-repair-integration.md
+  scope_reference: .ans/decisions/legion-desktop-command-center-v1-su-label-repair-scope.md
+  new_authored_paths: []
+
+er_ge_display_name_v1_candidate:
+  state: ACCEPTED
+  config: .ans/decisions/er-ge-display-name-v1-project.json
+  config_sha256: f27e36af6aca342b6644d305a8c56ca4590076812b9ab740ff10f54f680b6b5a
+  scope_reference: .ans/decisions/er-ge-display-name-v1-scope.md
+  conditional_record: docs/scheduling/er-ge-display-name-v1.md
+  permission_source: .ans/decisions/er-ge-display-name-v1-authorization.md
+  new_authored_paths: []
+
+er_ge_dependency_supplement_candidate:
+  state: ACCEPTED
+  config: .ans/decisions/er-ge-display-name-v1-dependency-project.json
+  config_sha256: 68d86b8f279e23f52a335f3d704492ebe85b0632047d1f9707a0fc458e6a318f
+  permission_source: .ans/decisions/er-ge-display-name-v1-dependency-authorization.md
+  conditional_record: docs/scheduling/er-ge-display-name-v1-dependency-integration.md
+  scope_reference: .ans/decisions/er-ge-display-name-v1-dependency-scope.md
+
+er_ge_final_package_integration:
+  state: AUTHORIZED_WITHIN_ACCEPTED_CONFIG
+  config_sha256: 68d86b8f279e23f52a335f3d704492ebe85b0632047d1f9707a0fc458e6a318f
+  permission_source: .ans/decisions/er-ge-display-name-v1-dependency-authorization.md
+  conditional_record: docs/scheduling/er-ge-display-name-v1-final-package-integration.md
+  new_authored_paths: []
+
+er_ge_sidebar_entry_v1_candidate:
+  state: ACCEPTED
+  config: .ans/decisions/er-ge-sidebar-entry-v1-project.json
+  config_sha256: afbcb443c97778f501467e93d1bd3792860e31f6c76e6e9ee17a3a5d844adb7f
+  permission_source: .ans/decisions/er-ge-sidebar-entry-v1-authorization.md
+  conditional_record: docs/scheduling/er-ge-sidebar-entry-v1.md
+  scope_reference: .ans/decisions/er-ge-sidebar-entry-v1-scope.md
+  new_authored_paths: []

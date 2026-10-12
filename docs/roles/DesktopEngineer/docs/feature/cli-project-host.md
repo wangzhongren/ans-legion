@@ -1,8 +1,8 @@
-# Su 客户入口与 CLI 项目 Host
+# 二哥客户入口与 CLI 项目 Host
 
-用户选择自己的项目，与 Supervisor（Su）连续讨论需求，确认可读计划及角色文件归属后，让多个角色执行、检查并接受独立验收。Node 和 Desktop 复用唯一 Workbench Pipeline；Node 从环境取得模型密钥，归属、对话、结果及有来源的项目事实可以跨会话保留。
+用户选择自己的项目，与二哥连续讨论需求，确认可读计划及角色文件归属后，让多个角色执行、检查并接受独立验收。二哥的内部 `roleId` 仍是 `Supervisor`。Node 和 Desktop 复用唯一 Workbench Pipeline；Node 从环境取得模型密钥，归属、对话、结果及有来源的项目事实可以跨会话保留。
 
-成功时项目显示 completed，留下当前检查和独立 Acceptance 证据，执行许可撤销、租约释放。拒绝、版本变化、取消、检查或验收失败均不会算成功；已有真实效果保留，Su把有来源的失败交后台PM形成限定返修或新计划。最终 npm 安装包、CLI 完整交互及独立整体验收仍由后续节点验证，本轮Su能力以当前任务四项固定检查及下游独立验收为准。
+成功时项目显示 completed，留下当前检查和独立 Acceptance 证据，执行许可撤销、租约释放。拒绝、版本变化、取消、检查或验收失败均不会算成功；已有真实效果保留，二哥把有来源的失败交后台PM形成限定返修或新计划。当前展示改名由 `er-ge-display-name-v1` 验证；最终新安装包、CLI 与独立整体验收由下游节点核验。
 
 ## 从哪里开始
 
@@ -33,24 +33,24 @@ try {
 
 启动环境需提供 LEGION_API_KEY，示例地址需有实际模型服务。缺密钥或配置无效时拒绝；默认 profileId 为 environment。各角色可共用模型但会话独立。工厂注入公开环境 Profile Service，不调用 Electron 加解密、不写 settings 密钥文件，公开状态没有密钥。重建实例产生新 profileVersion，旧执行确认不会复活。
 
-getState 展示对话、角色、真实交互和任务。用户只向 Supervisor（Su）发需求，直接PM客户消息拒绝；confirmation/choice/question 各有真实请求，answerInteraction 的 ID/版本/digest 由可信 Host 对接，用户无需抄写或比较 SHA。普通对话中的“是”不签发执行许可。完整有限请求见 [api-spec](../../api-spec.md)。
+getState 展示对话、角色、真实交互和任务。用户只向二哥发需求，实际请求使用 `roleId:Supervisor`，直接PM客户消息拒绝；confirmation/choice/question 各有真实请求，answerInteraction 的 ID/版本/digest 由可信 Host 对接，用户无需抄写或比较 SHA。普通对话中的“是”不签发执行许可。完整有限请求见 [api-spec](../../api-spec.md)。
 
 ## 完整流程
 
 ~~~mermaid
 flowchart TD
- A[Human选项目并向Su发消息] --> B[只读旧PM历史 核known key与物理项目]
+ A[Human选项目并向二哥发消息] --> B[只读旧PM历史 核known key与物理项目]
  B --> C{旧Org schema1?}
  C -->|是| D[共享lease内drain 验旧digest CAS迁Org v2 失效旧确认]
  C -->|否| E[恢复独立su_customer渠道]
  D --> E
- E --> F[Su普通项目read与可信activity 分页行动log]
+ E --> F[二哥普通项目read与可信activity 分页行动log]
  F --> G{需要计划角色设计或返修?}
  G -->|执行中| H[只读答复 不撤权 委托改变计划拒绝]
  G -->|否| H
  G -->|是且空闲| I[Host创建有界PM委托 独立实例与pm_delegate渠道]
  I --> J{PM需真实Human补充?}
- J -->|是| K[私有questionRef Su仅引用 Host原样呈现]
+ J -->|是| K[私有questionRef 二哥仅引用 Host原样呈现]
  K --> L[Human真实答复 Host登记answerRef 原PM继续]
  L --> I
  J -->|否| M[Architect完整提案 PM审核当前候选]
@@ -68,7 +68,7 @@ flowchart TD
  V -->|否| W[有来源失败 PM原owner限定返修或新计划]
  W --> H
  V -->|是| X[撤grant drain释放lease 异步monitor渠道]
- X --> Y[Su按实际结果与typed建议交付]
+ X --> Y[二哥按实际结果与typed建议交付]
  Y --> E
  E --> Z[Human取消客户轮次或停止执行 关闭切项目]
  Z --> AA[分别撤客户委托 或全部执行实例 拒绝晚回调]
@@ -150,22 +150,22 @@ Host/CLI读取getState.supervisions即可显示当前计划preflight/monitor的p
 
 监督启动IO阶段也显示pending；完成/失败后台建议不阻塞每个ready任务，monitor失败不改已成功任务。此投影不签发授权，owner/Human确认和最终提交重验不变。
 
-## Su渠道、委托及真实工作查询
+## 二哥客户渠道、委托及真实工作查询
 
-前台是唯一客户会话，只有普通项目list/read、分类记忆、可信activity/log、discussion及delegate_pm；没有业务write/edit、Check、Shell、角色审批、submit_supervision或grant。后台preflight/monitor是独立single_run，可read/query和typed建议，不能委托PM或提客户问题。执行中Su问答不调用invalidate、不改active epoch；只读session/dispatch/grant随当前组织与owner安全刷新，旧回调拒绝。
+前台二哥是唯一客户会话，只有普通项目list/read、分类记忆、可信activity/log、discussion及delegate_pm；没有业务write/edit、Check、Shell、角色审批、submit_supervision或grant。后台preflight/monitor是独立single_run，可read/query和typed建议，不能委托PM或提客户问题。执行中二哥问答不调用invalidate、不改active epoch；只读session/dispatch/grant随当前组织与owner安全刷新，旧回调拒绝。
 
-PM start限plan/role_design/repair、8KiB instruction和32个本项目可信sourceRefs，一项目仅一活跃委托，单客户turn最多4次start/resume。Host生成身份并重核workspace、owner、org、profile/context；模型不能指定caller/profile/owner/授权。PM needs_human只返questionRef；Su不能改问题，只有Host记录的实际Human answerRef才能恢复原挂起工具。重启把无live实例的委托置stale，私有待答对应公共请求失效，不重放旧工具或确认。
+PM start限plan/role_design/repair、8KiB instruction和32个本项目可信sourceRefs，一项目仅一活跃委托，单客户turn最多4次start/resume。Host生成身份并重核workspace、owner、org、profile/context；模型不能指定caller/profile/owner/授权。PM needs_human只返questionRef；二哥不能改问题，只有Host记录的实际Human answerRef才能恢复原挂起工具。重启把无live实例的委托置stale，私有待答对应公共请求失效，不重放旧工具或确认。
 
 Org根v2保存customerTimeline v2与delegations v1；roleMemories v2按(roleId,channel)隔离。四系统渠道su_customer、pm_delegate、supervision_preflight、supervision_monitor，普通成员member_task。旧v1摘要留只读档案，不直接喂新渠道。旧History六层只load，原字节不写；Project/owner catalog仍schema2。迁移先验原digest、共享租约内drain、一次旧digest CAS，再沿公开Project API失效旧plan；rename后目录sync失败不声称回滚，下次按已提交v2恢复，无新grant。
 
-日志沿真实journal，仅行动metadata与来源，排除assistant_text、prompt、工具正文、私有摘要/凭据；默认20、最大50、页32KiB。cursor绑定筛选记录的固定order边界与sourceDigest，不绑定Org整体revision；自身查询或边界外追加可继续，相关快照记录修改/丢失返回stale_cursor。读取和查询每run及委托链共2MiB，超预算明确拒绝，完整Human与授权事实不截断。PM Shell审核是原确认执行的独立短期实例，空checkpoint，无pm_delegate摘要读写，不需Su委托；公开状态不返回原reviewText。
+日志沿真实journal，仅行动metadata与来源，排除assistant_text、prompt、工具正文、私有摘要/凭据；默认20、最大50、页32KiB。cursor绑定筛选记录的固定order边界与sourceDigest，不绑定Org整体revision；自身查询或边界外追加可继续，相关快照记录修改/丢失返回stale_cursor。读取和查询每run及委托链共2MiB，超预算明确拒绝，完整Human与授权事实不截断。PM Shell审核是原确认执行的独立短期实例，空checkpoint，无pm_delegate摘要读写，不需二哥委托；公开状态不返回原reviewText。
 
-真实调试：当前 [Su任务](../../../../scheduling/legion-supervisor-frontdoor-v1.md) 的headless/owner/host/parallel日志；源码 [Pipeline](../../../../../apps/desktop/src/pipelines/workbench.mjs)、[Organization Service](../../../../../apps/desktop/src/services/impl/organization.mjs)。源码路径本身不替代真实检查证据。获批 [v0.3设计](../../../ProjectManager/docs/design/2026-10-11_design_supervisor-frontdoor-global-read.md)，当前 [API](../../api-spec.md) 与 [变更历史](../../changelog.md)；最终CLI包与独立验收由后续owner完成。
+原 Su 能力调试见 [历史任务](../../../../scheduling/legion-supervisor-frontdoor-v1.md) 的headless/owner/host/parallel日志；当前展示改名见 [新任务](../../../../scheduling/er-ge-display-name-v1.md)。源码 [Pipeline](../../../../../apps/desktop/src/pipelines/workbench.mjs)、[Organization Service](../../../../../apps/desktop/src/services/impl/organization.mjs)。源码路径本身不替代真实检查证据。获批 [v0.3设计](../../../ProjectManager/docs/design/2026-10-11_design_supervisor-frontdoor-global-read.md)，当前 [API](../../api-spec.md) 与 [变更历史](../../changelog.md)；最终CLI包与独立验收由后续owner完成。
 
-## Su在途取消与后续对话
+## 二哥在途取消与后续对话
 
-Host取消先中断捕获的Su运行并等待该轮Host promise，再按该run的终态事件消费标记排空Adapter事件；不以公开turn已cancelled代替实际队列收束。同一Su实例下一轮重建当前安全checkpoint后正常发出新模型请求。取消轮保留Human原文，未完成assistant片段不写客户timeline/history，也不恢复旧工具或授权。阶段诊断仅输出固定prepare_memory/restore/start/drain/next_event/finalize及白名单类型/合同码，不输出异常原文、history或凭据。真实SSE取消→继续回归及原owner/known-key/并行门按当前修复图留证，不替代独立产品验收。
+Host取消先中断捕获的二哥运行并等待该轮Host promise，再按该run的终态事件消费标记排空Adapter事件；不以公开turn已cancelled代替实际队列收束。同一内部 Supervisor 实例下一轮重建当前安全checkpoint后正常发出新模型请求。取消轮保留Human原文，未完成assistant片段不写客户timeline/history，也不恢复旧工具或授权。阶段诊断仅输出固定prepare_memory/restore/start/drain/next_event/finalize及白名单类型/合同码，不输出异常原文、history或凭据。真实SSE取消→继续回归及原owner/known-key/并行门按当前修复图留证，不替代独立产品验收。
 
 ## 后台终态与新Human记忆CAS
 
-Host终态缓存以真实log.channel选择存储：Su前台只su_customer，后台预检/监控只supervision_preflight/supervision_monitor，成员member_task，PM委托pm_delegate。临时Shell review只有既有审核journal/审批事实，不写pm_delegate缓存。新Human可在真实selftest失败后立即发起草案，不等待后台监督；后台不会推进前台记忆revision。来源covered引用、整体sourceDigest和同channel expectedRevision仍分别拒绝真实失效，不忽略digest或无界重试。安全诊断区分covered/source_ref/source_digest/revision，仅投影白名单channel、64位来源id/digest和整数revision，原文/摘要/工具/凭据不输出。当前真实屏障回归与四门证据由修复图绑定，独立Tester旧失败证据保留。
+Host终态缓存以真实log.channel选择存储：二哥前台仍用 `su_customer`，后台预检/监控仍用 `supervision_preflight`/`supervision_monitor`，成员 `member_task`，PM委托 `pm_delegate`。临时Shell review只有既有审核journal/审批事实，不写pm_delegate缓存。新Human可在真实selftest失败后立即发起草案，不等待后台监督；后台不会推进前台记忆revision。来源covered引用、整体sourceDigest和同channel expectedRevision仍分别拒绝真实失效，不忽略digest或无界重试。安全诊断区分covered/source_ref/source_digest/revision，仅投影白名单channel、64位来源id/digest和整数revision，原文/摘要/工具/凭据不输出。当前真实屏障回归与四门证据由修复图绑定，独立Tester旧失败证据保留。

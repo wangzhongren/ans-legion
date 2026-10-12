@@ -12,7 +12,7 @@ import {
   FileOwnershipError,
   ProjectFileOwners,
   FileOwnershipPlan,
-  FileOwnershipTransfer, shellEffects, shellArtifacts, FileBaseline, ShellRequest, ShellReview, ShellResult
+  FileOwnershipTransfer, shellEffects, shellArtifacts, FileBaseline, ShellRequest, ShellReview, ShellResult, ProjectReadResult
 } from 'legion-runtime/workbench-models';
 import {
   exactObject,
@@ -48,7 +48,7 @@ export const WB_LIMITS = Object.freeze({
   contextBytes: 2097152,
   ownerFiles: 4096
 });
-export const WB_OPERATIONS = Object.freeze(['getState', 'chooseProject', 'refreshProject', 'setDefaultProfile', 'saveProfile', 'deleteProfile', 'assignProfile', 'sendMessage', 'selectContext', 'confirmPlan', 'answerInteraction', 'closeInteraction', 'cancelTurn', 'stopExecution', 'testConnection', 'cancelProbe']);
+export const WB_OPERATIONS = Object.freeze(['getState', 'chooseProject', 'refreshProject', 'setDefaultProfile', 'saveProfile', 'deleteProfile', 'assignProfile', 'sendMessage', 'selectContext', 'confirmPlan', 'answerInteraction', 'closeInteraction', 'cancelTurn', 'stopExecution', 'testConnection', 'cancelProbe', 'listProjectFiles', 'readProjectFile', 'queryRoleActivity', 'queryRoleLog', 'queryProjectFacts', 'queryProjectOutputs', 'queryProjectMemory']);
 export const WB_TASK_STATES = Object.freeze(['pending', 'running', 'completed', 'failed', 'blocked', 'cancelled', 'interrupted']);
 const OUTPUT_MESSAGES = Object.freeze({
   legacy_migration_requires_exit: '旧v1数据只读：尚无可信证据确认旧产品实例全部退出，迁移已停止。', owner_catalog_mismatch: '该物理项目已绑定另一份owner catalog，请使用已确认的数据目录。', lease_busy: '该项目已由另一实例持有执行租约。', lease_lost: '项目执行租约已失效。', lease_unavailable: '无法建立安全项目租约。', task_outputs_missing: 'change任务未产生本轮真实成功修改或核验恢复输出。',
@@ -61,16 +61,16 @@ const OUTPUT_MESSAGES = Object.freeze({
   transfer_without_owner: '转交文件尚无已保存归属。',
   transfer_without_claim: '文件转交缺少新角色的任务申领。',
   unnecessary_transfer: '文件归属没有改变，无需转交。',
-  stale_file_owners: '文件归属已改变，请重新讨论并确认计划。', sensitive_output:'内容包含当前已知模型密钥，已拒绝记录或执行。', preflight_incomplete:'Supervisor预检未完成，请由PM重试。', invalid_memory:'分类记忆请求无效。', invalid_memory_source:'记忆来源不可核对或已失效。', memory_source_kind:'记忆类别与可信来源不符。', memory_statement_not_observed:'记忆内容不是可信来源中的原文或结构化值。', sensitive_memory:'记忆含凭据或不安全内容，未保存。', memory_owner_mismatch:'只有原作者可修改此记忆。', stale_memory_revision:'记忆版本已改变，请刷新。', memory_budget:'分类记忆达到预算。', invalid_supervision:'监督建议结构无效。', stale_supervision:'监督建议所绑定计划或来源已改变。'
+  stale_file_owners: '文件归属已改变，请重新讨论并确认计划。', sensitive_output:'内容包含当前已知模型密钥，已拒绝记录或执行。', preflight_incomplete:'二哥的计划预检未完成，请让二哥协调重试。', invalid_memory:'分类记忆请求无效。', invalid_memory_source:'记忆来源不可核对或已失效。', memory_source_kind:'记忆类别与可信来源不符。', memory_statement_not_observed:'记忆内容不是可信来源中的原文或结构化值。', sensitive_memory:'记忆含凭据或不安全内容，未保存。', memory_owner_mismatch:'只有原作者可修改此记忆。', stale_memory_revision:'记忆版本已改变，请刷新。', memory_budget:'分类记忆达到预算。', invalid_supervision:'监督建议结构无效。', stale_supervision:'监督建议所绑定计划或来源已改变。'
 });
 const MESSAGES = Object.freeze({
   stale_cursor: '被查询日志的快照来源已改变，请刷新日志。',
   role_log_budget: '行动日志单页超过固定预算。',
   delegation_budget: '本轮PM委托已达到固定次数预算。',
   organization_migration_required: '旧组织须先完成受信迁移，当前操作未执行。',
-  invalid_plan: '计划结构或依赖无效，请与项目管理修改后重试。',
+  invalid_plan: '计划结构或依赖无效，请让二哥协调修改后重试。',
   plan_changed: '计划、连接或上下文已改变，请重新确认。',
-  manager_only: '客户消息只能发送给Supervisor（Su），后台成员不接受直接对话。',
+  manager_only: '客户消息只能发送给二哥，后台成员不接受直接对话。',
   project_missing: '当前项目不存在或未选择。',
   project_unavailable: '无法访问项目目录或项目定义。',
   project_busy: '项目目录正在由另一实例更新，请稍后重试。',
@@ -84,7 +84,7 @@ const MESSAGES = Object.freeze({
   role_memory_budget: '角色工作记忆达到固定存储预算；旧记忆和原始对话保留。', stale_role_memory: '角色记忆来源或版本已改变；本次摘要未保存。', invalid_role_memory: '角色工作记忆校验失败。', role_memory_summary_failed: '本次自动摘要未完成；旧记忆和原始对话保留。', role_memory_summary_length: '自动摘要输出不完整或超长；旧记忆保留。', role_memory_summary_conflict: '自动摘要来源或保存版本已改变；旧记忆保留。',
   context_budget: '上下文超出16个文件、单文件256KiB或合计2MiB预算。',
   record_budget: '记录读取超出本轮预算。',
-  conversation_busy: '当前项目管理仍在回复，请等待或停止本轮。',
+  conversation_busy: '二哥仍在回复，请等待或停止本轮。',
   execution_busy: '当前计划正在执行，请先停止。',
   pi_auth_error: '模型认证失败，请检查连接密钥。',
   pi_network_error: '模型网络请求失败，请检查连接。',
@@ -177,6 +177,37 @@ export function wbCaught(error, fallback = 'internal_error') {
       return wbSuccess({
         profileId: identifier(input.profileId)
       });
+    } if (['listProjectFiles', 'readProjectFile', 'queryRoleActivity', 'queryRoleLog', 'queryProjectFacts', 'queryProjectOutputs', 'queryProjectMemory'].includes(operation)) {
+      const allowed = {
+        listProjectFiles: ['projectId', 'resource', 'cursor', 'limit'],
+        readProjectFile: ['projectId', 'resource', 'startLine', 'maxBytes'],
+        queryRoleActivity: ['projectId', 'roleId', 'taskId', 'planDigest'],
+        queryRoleLog: ['projectId', 'roleId', 'taskId', 'planDigest', 'cursor', 'limit'],
+        queryProjectFacts: ['projectId', 'kind', 'taskId', 'planDigest', 'cursor', 'limit'],
+        queryProjectOutputs: ['projectId', 'taskId', 'planDigest', 'cursor', 'limit'],
+        queryProjectMemory: ['projectId', 'kind', 'cursor', 'limit']
+      };
+      exactObject(input, allowed[operation]);
+      const result = { projectId: projectIdentifier(input.projectId) };
+      if (operation === 'listProjectFiles' || operation === 'readProjectFile') {
+        if (operation === 'listProjectFiles' && (input.resource === undefined || input.resource === '')) result.resource = '';
+        else result.resource = normalizeProjectReadResource(input.resource);
+      }
+      if (input.cursor !== undefined) result.cursor = textValue(input.cursor, 'cursor', 4096, true);
+      if (input.limit !== undefined) {
+        let maximum = 50; if (operation === 'listProjectFiles') maximum = 200;
+        if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > maximum) reject('invalid_input');
+        result.limit = input.limit;
+      }
+      if (input.startLine !== undefined) { if (!Number.isSafeInteger(input.startLine) || input.startLine < 1) reject('invalid_input'); result.startLine = input.startLine; }
+      if (input.maxBytes !== undefined) { if (!Number.isSafeInteger(input.maxBytes) || input.maxBytes < 1 || input.maxBytes > 65536) reject('invalid_input'); result.maxBytes = input.maxBytes; }
+      if (input.roleId !== undefined) result.roleId = identifier(input.roleId);
+      if (input.taskId !== undefined) result.taskId = identifier(input.taskId);
+      if (input.planDigest !== undefined) result.planDigest = sha(input.planDigest);
+      if (operation === 'queryRoleLog' && !result.roleId) reject('invalid_input');
+      if (operation === 'queryProjectFacts') { if (!['changes', 'checks', 'acceptances'].includes(input.kind)) reject('invalid_input'); result.kind = input.kind; }
+      if (operation === 'queryProjectMemory' && input.kind !== undefined) { if (!['pitfall', 'decision', 'preference'].includes(input.kind)) reject('invalid_input'); result.kind = input.kind; }
+      return wbSuccess(result);
     } const fields = {
       sendMessage: ['projectId',
       'roleId',
@@ -698,9 +729,9 @@ export function governedDTO(value,project=null,pending=[]) {
   const ledger = roleProposalLedgerDocument(value.ledger);
   const queue = interactionQueueDocument(value.queue);
   return immutable({supervisions:currentSupervisionDTO(value,project,pending), organization, proposals: ledger.proposals, interactions: queue.requests,
-    evidence: value.evidence.map((entry) => ({ id: entry.id, roleId: entry.authorization.roleId, taskId: entry.authorization.taskId,
+    evidence: value.evidence.slice(-32).map((entry) => ({ id: entry.id, roleId: entry.authorization.roleId, taskId: entry.authorization.taskId,
       planDigest: entry.authorization.planDigest, result: { ...new CheckResult(entry.result), actualArgv: [], environment: entry.result.environment,
-        stdout: checkLog(entry.result.stdout), stderr: checkLog(entry.result.stderr) } })), acceptances: value.acceptances, repairs: value.repairs, timeline: conversationTimeline(value.customerTimeline?customerTimelineInner(value.customerTimeline):value.timeline), memberConversations: publicMemberJournal(value.memberConversations ?? createMemberConversations(value.organization.projectId)), roleMemory: roleMemoryDTO(value.roleMemories ?? createRoleMemories(value.organization.projectId)), memoryNotices: memoryNoticeDTO(value.memoryNotices), shellRequests: publicShellWorkflow(value.shellWorkflow ?? createShellWorkflow(value.organization.projectId)) });
+        inputVersions: [], stdout: '', stderr: '' } })), acceptances: value.acceptances.slice(-32), repairs: value.repairs.slice(-32), timeline: conversationTimeline(value.customerTimeline?customerTimelineInner(value.customerTimeline):value.timeline), memberConversations: publicMemberJournal(value.memberConversations ?? createMemberConversations(value.organization.projectId)), roleMemory: roleMemoryDTO(value.roleMemories ?? createRoleMemories(value.organization.projectId)), memoryNotices: memoryNoticeDTO(value.memoryNotices), shellRequests: publicShellFacts(value.shellWorkflow ?? createShellWorkflow(value.organization.projectId)) });
 }
 
 function optionalShellEffects(value) {
@@ -745,7 +776,7 @@ export function governedWireDTO(value) {
   const acceptances = array(value.acceptances ?? [], 512).map((item) => ({id: identifier(item.id), taskId: identifier(item.taskId), planDigest: sha(item.planDigest), decision: acceptanceDecision(item.decision), evidenceIds: array(item.evidenceIds, 64).map((id) => identifier(id)), issues: publicIssues(item.issues)}));
   const repairs = array(value.repairs ?? [], 512).map((item) => ({id: identifier(item.id), taskId: identifier(item.taskId), roleId: identifier(item.roleId), planDigest: sha(item.planDigest), round: item.round, checks: item.checks.map((spec) => new CheckSpec(spec)), reason: displayText(item.reason, 4000)}));
   let timeline = null; if (value.timeline) { timeline = conversationTimeline(value.customerTimeline?customerTimelineInner(value.customerTimeline):value.timeline); if (timeline.projectId !== organization.projectId) reject(); }
-  const members = memberConversations(value.memberConversations ?? createMemberConversations(organization.projectId)); if (members.projectId !== organization.projectId) reject();
+  const members = publicMemberJournal(value.memberConversations ?? createMemberConversations(organization.projectId)); if (members.projectId !== organization.projectId) reject();
   return immutable({supervisions:supervisionWire(value.supervisions,value.plan?.planDigest), organization, proposals, interactions, evidence, acceptances, repairs, timeline, memberConversations: members, roleMemory: publicRoleMemory(value.roleMemory ?? roleMemoryDTO(createRoleMemories(organization.projectId))), memoryNotices: memoryNoticeDTO(value.memoryNotices), shellRequests: shellWireFacts(value.shellRequests ?? []) });
 }
 
@@ -912,18 +943,48 @@ export function dependencyOutputMetadata(values) {
 
 function optionalShellPhase(value) { if (value.shellPhase === undefined || value.shellPhase === null) return {}; exactObject(value.shellPhase, ['requestId', 'status']); if (!['waiting_pm_approval', 'executing_shell', 'publishing', 'idle', 'recovery_required'].includes(value.shellPhase.status)) reject('invalid_input'); return { shellPhase: { requestId: identifier(value.shellPhase.requestId), status: value.shellPhase.status } }; }
 function optionalTombstone(value) { const out = {}; if (value.missing !== undefined) { if (typeof value.missing !== 'boolean') reject('invalid_input'); out.missing = value.missing; } if (value.tombstone !== undefined) { exactObject(value.tombstone, ['resource', 'priorSha256', 'proposalDigest']); out.tombstone = { resource: normalizeResource(value.tombstone.resource), priorSha256: sha(value.tombstone.priorSha256), proposalDigest: sha(value.tombstone.proposalDigest) }; } if (value.byteLength !== undefined) { if (!Number.isSafeInteger(value.byteLength) || value.byteLength < 0) reject('invalid_input'); out.byteLength = value.byteLength; } return out; }
+function publicShellFacts(value) {
+  const journal = shellWorkflowDocument(value);
+  return immutable(journal.requests.slice(-32).map((entry) => {
+    let review = null;
+    if (entry.review) review = { approved: entry.review.approved };
+    let result = null;
+    if (entry.result) result = { status: entry.result.status, reason: entry.result.reason,
+      executed: entry.result.executed, exitCode: entry.result.exitCode,
+      logsTruncated: entry.result.logsTruncated, generationDigest: entry.result.generationDigest,
+      publishedResources: [] };
+    return { id: entry.id, roleId: entry.origin.roleId, taskId: entry.origin.taskId,
+      runId: entry.origin.runId, requestDigest: entry.requestDigest, status: entry.status,
+      generatedEffects: entry.request.generatedEffects, review, result,
+      createdAt: entry.createdAt, updatedAt: entry.updatedAt };
+  }));
+}
 function shellWireFacts(values) {
   return array(values, 256).map((entry) => {
-    exactObject(entry, ['id', 'revision', 'roleId', 'taskId', 'instanceId', 'runId', 'command', 'cwd', 'reason', 'network', 'generatedEffects', 'timeoutSeconds', 'requestDigest', 'status', 'review', 'reviewer', 'reviewStatus', 'reviewText', 'output', 'result', 'recovery', 'createdAt', 'expiresAt', 'updatedAt']);
-    const request = new ShellRequest({ requestId: entry.id, runId: entry.runId, command: entry.command, cwd: entry.cwd, reason: entry.reason, network: entry.network, generatedEffects: entry.generatedEffects, timeoutSeconds: entry.timeoutSeconds });
-    if (request.digest !== entry.requestDigest || !Number.isSafeInteger(entry.revision) || entry.revision < 1 || !['pending','reviewing','approved','denied','consumed','running','publishing','published','partial_published','failed','cancelled','expired','stale','unsupported','error','interrupted','recovery_required','recovered'].includes(entry.status)) reject('invalid_input');
-    const out = { ...entry, id: identifier(entry.id), roleId: identifier(entry.roleId), taskId: identifier(entry.taskId), instanceId: identifier(entry.instanceId), runId: identifier(entry.runId), reviewText: conversationText(entry.reviewText), command: request.command, createdAt: timestamp(entry.createdAt), expiresAt: timestamp(entry.expiresAt), updatedAt: timestamp(entry.updatedAt) };
-    if (entry.review) { out.review = new ShellReview(entry.review); if (out.review.requestId !== entry.id || out.review.requestDigest !== request.digest || out.review.revision !== entry.revision) reject('invalid_input'); }
-    if (entry.result) { out.result = new ShellResult(entry.result); if (out.result.requestId !== entry.id || out.result.runId !== entry.runId || out.result.requestDigest !== request.digest || out.result.status === 'ready_for_publication') reject('invalid_input'); }
-    if (entry.reviewer) { exactObject(entry.reviewer, ['instanceId','sessionId','runId','profileVersion']); out.reviewer = { instanceId: identifier(entry.reviewer.instanceId), sessionId: identifier(entry.reviewer.sessionId), runId: identifier(entry.reviewer.runId), profileVersion: sha(entry.reviewer.profileVersion) }; }
-    if (entry.reviewStatus !== undefined && !['running','completed','failed','cancelled','interrupted'].includes(entry.reviewStatus)) reject('invalid_input');
-    if (entry.recovery) { exactObject(entry.recovery, ['planDigest','resources','evidenceIds','recoveredAt','retainedOutputs']); out.recovery = { planDigest: sha(entry.recovery.planDigest), resources: array(entry.recovery.resources, 10000).map((file) => new FileBaseline(file)), evidenceIds: array(entry.recovery.evidenceIds, 4096).map((id) => identifier(id)), recoveredAt: timestamp(entry.recovery.recoveredAt), ...(entry.recovery.retainedOutputs === undefined ? {} : { retainedOutputs: array(entry.recovery.retainedOutputs, 64).map(recoveryRetainedFact) }) }; if (entry.status !== 'recovered') reject('invalid_input'); }
-    exactObject(entry.output, ['stdout','stderr','truncated']); if (typeof entry.output.truncated !== 'boolean') reject('invalid_input'); out.output = { stdout: conversationText(entry.output.stdout), stderr: conversationText(entry.output.stderr), truncated: entry.output.truncated }; return out;
+    exactObject(entry, ['id','roleId','taskId','runId','requestDigest','status','generatedEffects','review','result','createdAt','updatedAt']);
+    if (!['pending','reviewing','approved','denied','consumed','running','publishing','published','partial_published','failed','cancelled','expired','stale','unsupported','error','interrupted','recovery_required','recovered'].includes(entry.status)) reject('invalid_input');
+    let review = null;
+    if (entry.review !== null) { exactObject(entry.review, ['approved']); if (typeof entry.review.approved !== 'boolean') reject('invalid_input'); review = { approved: entry.review.approved }; }
+    let result = null;
+    if (entry.result !== null) {
+      exactObject(entry.result, ['status','reason','executed','exitCode','logsTruncated','generationDigest','publishedResources']);
+      if (typeof entry.result.executed !== 'boolean' || typeof entry.result.logsTruncated !== 'boolean') reject('invalid_input');
+      if (entry.result.exitCode !== null && (!Number.isSafeInteger(entry.result.exitCode) || entry.result.exitCode < 0 || entry.result.exitCode > 255)) reject('invalid_input');
+      result = { status: displayText(entry.result.status, 50), reason: displayText(entry.result.reason, 300),
+        executed: entry.result.executed, exitCode: entry.result.exitCode, logsTruncated: entry.result.logsTruncated,
+        generationDigest: sha(entry.result.generationDigest),
+        publishedResources: array(entry.result.publishedResources, 10000).map((item) => {
+          exactObject(item, ['resource','action','sha256','missing']);
+          if (!['create','replace','delete','generated'].includes(item.action) || typeof item.missing !== 'boolean') reject('invalid_input');
+          let sha256 = null; if (item.sha256 !== null) sha256 = sha(item.sha256);
+          return { resource: normalizeProjectReadResource(item.resource), action: item.action,
+            sha256, missing: item.missing };
+        }) };
+    }
+    return immutable({ id: identifier(entry.id), roleId: identifier(entry.roleId), taskId: identifier(entry.taskId),
+      runId: identifier(entry.runId), requestDigest: sha(entry.requestDigest), status: entry.status,
+      generatedEffects: shellEffects(entry.generatedEffects), review, result,
+      createdAt: timestamp(entry.createdAt), updatedAt: timestamp(entry.updatedAt) });
   });
 }
 
@@ -1027,4 +1088,125 @@ export function roleActivityFacts(domain,project,input={}) {
  return immutable({planDigest,history,roles,tasks:tasks.map(task=>({id:task.id,roleId:task.roleId,status:task.status,phase:task.shellPhase?.status??task.status,checkStatus:task.checkStatus,acceptanceStatus:task.acceptanceStatus,blockingTaskIds:(project.plan?.tasks.find(item=>item.id===task.id)?.dependsOn??[]).filter(id=>project.tasks.find(item=>item.id===id)?.status!=='completed'),observedChanges:task.results.filter(result=>result.success&&result.observedMutation).length,checks:domain.evidence.filter(entry=>entry.authorization.planDigest===currentPlan&&entry.authorization.taskId===task.id&&entry.result.runId===task.runId).length,acceptances:domain.acceptances.filter(entry=>entry.planDigest===currentPlan&&entry.taskId===task.id).length,sourceRef:'task:'+digestValue({planDigest:currentPlan,id:task.id,runId:task.runId})}))});
 }
 
-export function publicMemberJournal(value){const journal=memberConversations(value);return memberConversations({...journal,events:journal.events.filter(event=>{const run=journal.runs.find(item=>item.id===event.conversationId);return (run.channel??'member_task')==='member_task'||!['assistant_text','host_briefing'].includes(event.kind);}),digest:undefined});}
+export function publicMemberJournal(value){const journal=memberConversations(value);return createMemberConversations(journal.projectId);}
+
+/** Rebuild finite customer query results at the IPC boundary; never forward private service values. */
+export function publicQueryDTO(operation, value) {
+  if (operation === 'listProjectFiles' || operation === 'readProjectFile') {
+    const result = new ProjectReadResult(value);
+    let expected = 'read'; if (operation === 'listProjectFiles') expected = 'listed';
+    if (result.status !== expected) reject('invalid_projection');
+    const fields = { status:result.status, reason:result.reason, resource:result.resource, entries:result.entries,
+      nextCursor:result.nextCursor, text:result.text, nextLine:result.nextLine, complete:result.complete,
+      byteLength:result.byteLength };
+    if (result.sha256) fields.sha256 = result.sha256;
+    return immutable(fields);
+  }
+  const roots = {
+    queryRoleActivity:['planDigest','history','roles','tasks'],
+    queryRoleLog:['filters','events','nextCursor','sourceDigest'],
+    queryProjectFacts:['planDigest','kind','items','nextCursor','sourceDigest','total'],
+    queryProjectOutputs:['planDigest','kind','items','nextCursor','sourceDigest','total'],
+    queryProjectMemory:['facts','cursor','total','sourceDigest']
+  };
+  if (!Object.hasOwn(roots,operation)) reject('unknown_operation');
+  exactObject(value,roots[operation]);
+  const rowSchemas = {
+    queryRoleActivity:{roles:['id','activity','phase','sourceRef'],tasks:['id','roleId','status','phase','checkStatus','acceptanceStatus','blockingTaskIds','observedChanges','checks','acceptances','sourceRef']},
+    queryRoleLog:{events:['id','sourceRef','roleId','taskId','planDigest','kind','tool','status','reason','resource','checkId','createdAt','order','sourceDigest']},
+    queryProjectFacts:{items:['id','sourceRef','taskId','roleId','runId','resource','action','status','success','observedMutation','auditFailed','reason','contentDigest','missing','history','checkId','executed','testCount','exitCode','inputDigest','stdout','stderr','logsTruncated','decision','evidenceIds','issues']},
+    queryProjectOutputs:{items:['id','sourceRef','taskId','roleId','resource','action','status','generationDigest','sha256','missing','history']},
+    queryProjectMemory:{facts:['factId','ownerRoleId','kind','statement','revision','status','sources']}
+  };
+  for (const [field, keys] of Object.entries(rowSchemas[operation])) {
+    let maximum = 50; if (operation === 'queryRoleActivity') maximum = WB_LIMITS.tasks;
+    if (!Array.isArray(value[field]) || value[field].length > maximum) reject('invalid_projection');
+    for (const item of value[field]) {
+      exactObject(item,keys);
+      if (operation === 'queryRoleLog' && ['assistant_text','host_briefing'].includes(item.kind)) reject('invalid_projection');
+      if (item.issues !== undefined) publicIssues(item.issues);
+      if (item.sources !== undefined) { if (!Array.isArray(item.sources) || item.sources.length > 8) reject('invalid_projection'); for (const source of item.sources) exactObject(source,['id','label']); }
+      if (item.blockingTaskIds !== undefined && (!Array.isArray(item.blockingTaskIds) || item.blockingTaskIds.length > WB_LIMITS.tasks)) reject('invalid_projection');
+    }
+  }
+  if (operation === 'queryRoleLog') exactObject(value.filters,['roleId','taskId','planDigest']);
+  const bytes = Buffer.byteLength(JSON.stringify(value),'utf8');
+  if (bytes > 131072) reject('invalid_projection');
+  return immutable(JSON.parse(JSON.stringify(value)));
+}
+
+function selectedFactPlan(project, planDigest) {
+  if (!project?.plan) reject('plan_changed');
+  const selected = planDigest ?? project.plan.planDigest;
+  if (selected === project.plan.planDigest) return { plan: project.plan, tasks: project.tasks, history: false };
+  const previous = (project.legacyHistory ?? []).find(item => item.plan?.planDigest === selected);
+  if (!previous) reject('plan_changed');
+  return { plan: previous.plan, tasks: previous.tasks, history: true };
+}
+function factPage(project, planDigest, kind, rows, cursor, limit = 20) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) reject('invalid_input');
+  const sourceDigest = digestValue({ projectId: project.id, planDigest, kind, rows });
+  let offset = 0;
+  if (cursor !== undefined && cursor !== '') {
+    if (typeof cursor !== 'string' || cursor.length > 4096) reject('stale_cursor');
+    let pinned;
+    try { pinned = JSON.parse(cursor); exactObject(pinned, ['projectId','planDigest','kind','sourceDigest','offset']); }
+    catch { reject('stale_cursor'); }
+    if (pinned.projectId !== project.id || pinned.planDigest !== planDigest || pinned.kind !== kind || pinned.sourceDigest !== sourceDigest || !Number.isSafeInteger(pinned.offset) || pinned.offset < 0 || pinned.offset > rows.length) reject('stale_cursor');
+    offset = pinned.offset;
+  }
+  const next = value => JSON.stringify({ projectId: project.id, planDigest, kind, sourceDigest, offset: value });
+  const items = [];
+  for (const row of rows.slice(offset, offset + limit)) {
+    const candidate = [...items, row];
+    if (Buffer.byteLength(JSON.stringify({items:candidate,nextCursor:next(offset+candidate.length)}),'utf8') > 32768) break;
+    items.push(row);
+  }
+  if (offset < rows.length && !items.length) reject('role_log_budget');
+  let nextCursor = null;
+  if (offset + items.length < rows.length) nextCursor = next(offset + items.length);
+  return immutable({ planDigest, kind, items, nextCursor, sourceDigest, total: rows.length });
+}
+export function projectFactsPage(domain, project, input) {
+  exactObject(input, ['kind','taskId','planDigest','cursor','limit']);
+  if (!['changes','checks','acceptances'].includes(input.kind)) reject('invalid_input');
+  const selected = selectedFactPlan(project,input.planDigest);
+  let rows = [];
+  if (input.kind === 'changes') for (const task of selected.tasks) {
+    if (input.taskId && task.id !== input.taskId) continue;
+    for (let index = 0; index < task.results.length; index += 1) {
+      const result = task.results[index];
+      rows.push({ id: task.id + ':' + index, sourceRef: 'task-result:' + digestValue({planDigest:selected.plan.planDigest,taskId:task.id,runId:task.runId,index,result}), taskId:task.id, roleId:task.roleId, runId:task.runId, resource:result.resource, action:result.action, status:result.status, success:result.success, observedMutation:result.observedMutation, auditFailed:result.auditFailed, reason:result.reason, contentDigest:result.contentDigest, missing:result.missing ?? false, history:selected.history });
+    }
+  }
+  if (input.kind === 'checks') for (const entry of domain.evidence ?? []) {
+    const task = selected.tasks.find(item => item.id === entry.authorization.taskId && item.runId === entry.result.runId);
+    if (!task || entry.authorization.planDigest !== selected.plan.planDigest || input.taskId && input.taskId !== task.id) continue;
+    rows.push({ id:entry.id, sourceRef:'check:'+entry.id, taskId:task.id, roleId:task.roleId, runId:task.runId, checkId:entry.result.checkId, status:entry.result.status, executed:entry.result.executed, testCount:entry.result.testCount, exitCode:entry.result.exitCode, inputDigest:entry.result.inputDigest, stdout:checkLog(entry.result.stdout), stderr:checkLog(entry.result.stderr), logsTruncated:entry.result.logsTruncated, history:selected.history });
+  }
+  if (input.kind === 'acceptances') for (const entry of domain.acceptances ?? []) {
+    if (entry.planDigest !== selected.plan.planDigest || input.taskId && input.taskId !== entry.taskId) continue;
+    rows.push({ id:entry.id, sourceRef:'acceptance:'+entry.id, taskId:entry.taskId, decision:entry.decision, evidenceIds:entry.evidenceIds, issues:publicIssues(entry.issues), history:selected.history });
+  }
+  return factPage(project,selected.plan.planDigest,input.kind,rows,input.cursor,input.limit);
+}
+export function projectOutputsPage(domain, project, input, inventoryByScope = {}) {
+  exactObject(input, ['taskId','planDigest','cursor','limit']);
+  const selected = selectedFactPlan(project,input.planDigest), rows = [];
+  for (const task of selected.tasks) {
+    if (input.taskId && input.taskId !== task.id) continue;
+    for (const output of task.generatedOutputs ?? []) {
+      const expected = inventoryByScope[output.resource + '/'];
+      let status = 'historical';
+      if (!selected.history) { status = 'stale'; if (expected === output.generationDigest) status = 'current'; }
+      rows.push({ id:'generated:'+task.id+':'+output.resource, sourceRef:'task-output:'+digestValue({planDigest:selected.plan.planDigest,taskId:task.id,output}), taskId:task.id, roleId:task.roleId, resource:output.resource, action:'generated', status, generationDigest:output.generationDigest, sha256:null, missing:false, history:selected.history });
+    }
+  }
+  for (const entry of domain.shellWorkflow?.requests ?? []) {
+    if (entry.bindings.planDigest !== selected.plan.planDigest || input.taskId && input.taskId !== entry.origin.taskId) continue;
+    for (const item of entry.result?.publishedResources ?? []) {
+      rows.push({ id:'published:'+entry.id+':'+item.resource, sourceRef:'shell-publication:'+entry.id, taskId:entry.origin.taskId, roleId:entry.origin.roleId, resource:item.resource, action:item.action, status:entry.status, generationDigest:entry.result.generationDigest, sha256:item.sha256, missing:item.missing, history:selected.history });
+    }
+  }
+  return factPage(project,selected.plan.planDigest,'outputs',rows,input.cursor,input.limit);
+}

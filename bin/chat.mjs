@@ -35,12 +35,12 @@ export function deliverySummary(state) {
   if (currentEvidence.length < evidenceIds.size) lines.push('检查详情未展示 / Evidence omitted: ' + (evidenceIds.size - currentEvidence.length));
   for (const evidence of currentEvidence) lines.push(`检查 / Check ${evidence.checkId ?? evidence.result?.checkId}: ${evidence.result?.status ?? evidence.status} · executed ${evidence.result?.executed ?? evidence.executed}`);
   for (const acceptance of (state.acceptances ?? []).filter(item => item.planDigest === state.plan?.planDigest && acceptanceIds.has(item.id))) lines.push(`独立验收 / Acceptance ${acceptance.taskId}: ${acceptance.decision}`);
-  lines.push('Supervisor monitor: ' + (monitor?.status ?? 'not_completed'));
+  lines.push('二哥监控: ' + (monitor?.status ?? 'not_completed'));
   if (monitor?.advice) {
     lines.push('建议 / Recommendation: ' + monitor.advice.recommendation);
     for (const finding of monitor.advice.findings) lines.push(`${finding.severity}: ${finding.reason} · 来源 ${finding.sourceRefs.join(', ')}`);
   }
-  if (state.plan?.status !== 'completed' || monitor?.status !== 'completed') lines.push('剩余风险 / Remaining: 当前交付或监督尚未完整通过，请与 Su 讨论。');
+  if (state.plan?.status !== 'completed' || monitor?.status !== 'completed') lines.push('剩余风险 / Remaining: 当前交付或监督尚未完整通过，请与二哥讨论。');
   else lines.push('剩余风险 / Remaining: 此摘要仅说明本次计划的实际检查与验收结果。');
   return lines.map(clean).join('\n');
 }
@@ -95,7 +95,7 @@ export async function runChat(args, { input = process.stdin, output = process.st
     });
     lines.on('close', () => { eof = true; if (pending) { const done = pending; pending = null; done(null); } });
     process.on('SIGINT', interrupt); process.on('SIGTERM', stop);
-    write('Legion Su · /cancel 取消 · /exit 退出');
+    write('二哥 · /cancel 取消 · /exit 退出');
     let printedTurn = null;
     let delivered = null;
     let inputPrompted = false;
@@ -130,7 +130,7 @@ export async function runChat(args, { input = process.stdin, output = process.st
       if (['running','waiting'].includes(state.turn?.status)) { await delay(100); continue; }
       if (state.turn?.id && printedTurn !== state.turn.id) {
         printedTurn = state.turn.id;
-        write('Su: ' + (state.turn.text ?? state.history?.messages?.findLast(item => item.role === 'assistant')?.text ?? ''));
+        write('二哥: ' + (state.turn.text ?? state.history?.messages?.findLast(item => item.role === 'assistant')?.text ?? ''));
         if (state.turn.status === 'failed' || state.error) write('失败 / Failure: ' + (state.error?.code ?? state.turn.error?.code ?? 'run_failed'));
       }
       if (state.plan && ['completed','failed','invalidated','cancelled'].includes(state.plan.status) && delivered !== state.plan.planDigest + state.plan.status) {
@@ -139,7 +139,7 @@ export async function runChat(args, { input = process.stdin, output = process.st
         if (!queue.length) { write(deliverySummary(state)); delivered = state.plan.planDigest + state.plan.status; }
       }
       if (stopping) break;
-      if (!inputPrompted) { write('Su>'); inputPrompted = true; }
+      if (!inputPrompted) { write('二哥>'); inputPrompted = true; }
       let text;
       if (['confirmed','running'].includes(state.plan?.status)) {
         if (eof && !queue.length) break;
@@ -155,10 +155,10 @@ export async function runChat(args, { input = process.stdin, output = process.st
   } catch (caught) {
     const known = ['invalid_cli_options','missing_model_configuration'];
     let reason = 'cli_request_failed'; if (known.includes(caught.message)) reason = caught.message;
-    error.write('Legion: ' + reason + '\n'); return 1;
+    error.write('二哥: ' + reason + '\n'); return 1;
   } finally {
     process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', stop);
     lines?.close();
-    if (host) { const result = await host.close(); if (!result.ok) error.write('Legion: cleanup_failed\n'); }
+    if (host) { const result = await host.close(); if (!result.ok) error.write('二哥: cleanup_failed\n'); }
   }
 }

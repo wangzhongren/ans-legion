@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { createHash } from 'node:crypto';
 import { createProjectLeaseProvider } from '../../src/providers/public/project_lease.mjs';
 const run = promisify(execFile);
-const fixtureRoot = fileURLToPath(new URL('../../../../.ans/runtime/legion-cli-role-owned-v2/DesktopEngineer/fixtures/', import.meta.url));
+const fixtureRoot = fileURLToPath(new URL('../../../../.ans/runtime/legion-desktop-command-center-v1/DesktopEngineer/fixtures/', import.meta.url));
 async function fixture(t) {
   await mkdir(fixtureRoot, { recursive: true });
   const root = await mkdtemp(join(fixtureRoot, 'lease-'));

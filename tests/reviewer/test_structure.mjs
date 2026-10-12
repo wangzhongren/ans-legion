@@ -26,7 +26,7 @@ import { createFauxCore, fauxAssistantMessage, fauxToolCall } from "@earendil-wo
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const testRole = process.env.LEGION_NODE_TEST_ROLE ?? "Reviewer";
 assert.ok(["ProjectManager", "Reviewer", "Tester"].includes(testRole), "unknown Node test role");
-const temporaryRoot = resolve(project, ".ans/runtime/legion-cli-role-owned-v2", testRole, "tmp");
+const temporaryRoot = resolve(project, ".ans/runtime/legion-desktop-command-center-v1", testRole, "tmp");
 const publicNames = ["createRuntime", "AgentSession", "ActionProposal", "RoleBoundary", "Outcome",
   "AgentScope", "PiConnection", "TaskDispatchContext"].sort();
 const workspaceResources = new Map();
@@ -640,11 +640,11 @@ test("late real SDK creation is disposed after cancellation and never published"
 });
 
 test("stable tarball exact whitelist and product bytes exclude internal development artifacts", async () => {
-  const packaging = join(project, ".ans/runtime/legion-cli-role-owned-v2/ProjectManager/packaging/su-frontdoor-memory-repair-v1");
+  const packaging = join(project, ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-command-center-su-label-repair-v1-9850a3707d523eba");
   const descriptor = JSON.parse(await fs.readFile(join(packaging, "package-smoke.json"), "utf8"));
-  assert.equal(resolve(descriptor.tarball), join(packaging, "legion-runtime-1.1.3.tgz"));
+  assert.equal(resolve(descriptor.tarball), join(packaging, "legion-runtime-1.2.2.tgz"));
   assert.match(descriptor.sha256, /^[a-f0-9]{64}$/);
-  assert.equal(descriptor.sha256, "e0ac5ebaee7caabc52175fe28e229c6fbc195d02890ec5bffe6ba76d80a6f73a");
+  assert.equal(descriptor.sha256, "773da2d1dbb58b7a9ff251e14f1cf80281a8b9286348d7a864589dd92832eef2");
   const tarball = await fs.readFile(descriptor.tarball);
   assert.equal(createHash("sha256").update(tarball).digest("hex"), descriptor.sha256);
   assert.equal(descriptor.integrity, "sha512-" + createHash("sha512").update(tarball).digest("base64"));
@@ -672,7 +672,7 @@ test("stable tarball exact whitelist and product bytes exclude internal developm
     if (Object.hasOwn(descriptor.sourceHashes, path)) assert.equal(createHash("sha256").update(bytes).digest("hex"), descriptor.sourceHashes[path], "pinned current source " + path);
   }
   const metadata = JSON.parse(entries.get("package.json").toString());
-  assert.equal(metadata.version, "1.1.3");
+  assert.equal(metadata.version, "1.2.2");
   assert.deepEqual(metadata.exports, { ".": "./runtime.mjs", "./workbench-models": "./workbench.mjs",
     "./services/policy": "./src/kernel/services/public/policy.mjs", "./services/mutation": "./src/kernel/services/public/mutation.mjs",
     "./services/read": "./src/kernel/services/public/read.mjs",
@@ -681,8 +681,8 @@ test("stable tarball exact whitelist and product bytes exclude internal developm
   assert.ok(Object.values(metadata.dependencies).every((version) => version === "1.0.4"));
   const desktop=JSON.parse(await fs.readFile(join(project,'apps/desktop/package.json'),'utf8'));
   const lock=JSON.parse(await fs.readFile(join(project,'apps/desktop/package-lock.json'),'utf8'));
-  const expectedSpec='file:../../.ans/runtime/legion-cli-role-owned-v2/ProjectManager/packaging/su-frontdoor-memory-repair-v1/legion-runtime-1.1.3.tgz';
-  assert.equal(desktop.dependencies['legion-runtime'],expectedSpec);const installed=lock.packages['node_modules/legion-runtime'];assert.equal(installed.version,'1.1.3');assert.equal(installed.resolved,expectedSpec);assert.equal(installed.integrity,descriptor.integrity);
+  const expectedSpec='file:../../.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-command-center-su-label-repair-v1-9850a3707d523eba/legion-runtime-1.2.2.tgz';
+  assert.equal(desktop.dependencies['legion-runtime'],expectedSpec);const installed=lock.packages['node_modules/legion-runtime'];assert.equal(installed.version,'1.2.2');assert.equal(installed.resolved,expectedSpec);assert.equal(installed.integrity,descriptor.integrity);
   for(const [path,hash] of Object.entries(descriptor.sourceHashes))assert.equal(createHash('sha256').update(await fs.readFile(join(project,'apps/desktop/node_modules/legion-runtime',path))).digest('hex'),hash,'current installed Desktop dependency '+path);
 
 });

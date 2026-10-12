@@ -50,7 +50,7 @@ assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(t
 const projectRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 let roleDirectory = testRole;
 if (testRole !== 'DesktopEngineer') roleDirectory = `${testRole}/desktop`;
-const base = resolve(projectRoot, `.ans/runtime/legion-cli-role-owned-v2/${roleDirectory}`);
+const base = resolve(projectRoot, `.ans/runtime/legion-desktop-command-center-v1/${roleDirectory}`);
 await mkdir(join(base, 'fixtures'), {
   recursive: true
 });
@@ -391,6 +391,8 @@ function encryptionStandIn() {
     projectId,
     ids
   };
+} async function privateOrganization(setup) {
+  return JSON.parse(await readFile(join(setup.data,'workbench-organization',setup.projectId+'.json'),'utf8'));
 } async function until(pipeline, predicate) {
   for (let index = 0; index < 200; index += 1) {
     const state = await pipeline.getState();
@@ -1022,10 +1024,12 @@ test('actual SDK Acceptance failure is read by PM, returns to original owner for
     await setup.pipeline.sendMessage({ projectId: setup.projectId, roleId: 'Supervisor', text: '读取失败证据并在已确认范围内返修' });
     const done = await until(setup.pipeline, (state) => state.plan?.status === 'completed' && state.repairs.length === 1 && state.turn?.status === 'completed');
     assert.equal(done.repairs[0].roleId, 'Worker0'); assert.equal(Object.hasOwn(done.repairs[0],'writeSet'),false); assert.equal(done.acceptances.at(-1).decision, 'pass'); assert.equal(await readFile(join(setup.root, 'file0.txt'), 'utf8'), 'good');
-    assert.equal(done.evidence.filter((entry) => entry.roleId === 'Worker0' && entry.result.status === 'passed').length, 2);
-    assert.equal(done.evidence.filter((entry) => entry.roleId === 'Acceptance').length, 2);
+    const archived = await privateOrganization(setup);
+    assert.equal(archived.evidence.filter((entry) => entry.authorization.roleId === 'Worker0' && entry.result.status === 'passed').length, 2);
+    assert.equal(archived.evidence.filter((entry) => entry.authorization.roleId === 'Acceptance').length, 2);
     assert.deepEqual(done.roleMemory.entries.map((entry) => entry.roleId+'|'+entry.channel).sort(),['Acceptance|member_task','ProjectManager|pm_delegate','RoleArchitect|member_task','Supervisor|su_customer','Supervisor|supervision_monitor','Supervisor|supervision_preflight','Worker0|member_task']);
-    assert.equal(done.memberConversations.events.filter((event) => event.kind === 'host_briefing' && done.memberConversations.runs.find((run) => run.id === event.conversationId)?.roleId === 'Worker0').length, 2);
+    assert.equal(archived.memberConversations.events.filter((event) => event.kind === 'host_briefing' && archived.memberConversations.runs.find((run) => run.id === event.conversationId)?.roleId === 'Worker0').length, 2);
+    assert.equal(done.memberConversations.events.length,0);
     const workerStarts = local.calls.filter((record) => taskMetadata(record.body)?.id === 'task0' && !hasResult(record.body)); assert.equal(workerStarts.length, 2); assert.match(JSON.stringify(workerStarts[1].body), /历史实际宿主任务输入/u); assert.equal(typedResults(workerStarts[1].body).length, 0); assert.equal(JSON.stringify(workerStarts[1].body).includes('已真实独立验收'), false);
 
   } finally { await setup.pipeline.close(); await local.close(); }
@@ -1217,7 +1221,7 @@ test('pending regression: architect receives complete original Human context, re
   }); local.host.manualArchitect = true; const setup = await fixture(local);
   try {
     await setup.pipeline.sendMessage({ projectId: setup.projectId, roleId: 'Supervisor', text: '原始需求：Node与TypeScript，包括前端、后端和存储' }); const done = await until(setup.pipeline, (state) => state.turn?.status === 'completed'); assert.equal(proposed, true); assert.ok(childContext.includes('原始需求：Node与TypeScript，包括前端、后端和存储')); assert.ok(strings(JSON.parse(childContext)).some((text) => text === '原始需求：Node与TypeScript，包括前端、后端和存储')); assert.ok(childPrompt.includes('四系统固定职责约束')); assert.ok(childPrompt.includes('开发成员可按revision+1修订')); assert.equal(childPrompt.includes('通常1至2名'), false); assert.equal(done.proposals.length, 1); assert.equal(done.proposals[0].members.length, 3);
-    const journal = done.memberConversations; const run = journal.runs.find((run) => run.roleId === 'RoleArchitect'); assert.ok(run); assert.equal(run.status, 'completed'); const events = journal.events.filter((event) => event.conversationId === run.id); assert.ok(events.some((event) => event.kind === 'assistant_text' && event.text.includes('开始完整角色设计'))); assert.ok(events.some((event) => event.kind === 'tool_result' && event.tool === 'legion_list_files')); assert.equal(events.filter((event) => event.tool === 'legion_list_files').every((event) => event.resource === null), true); assert.equal(done.timeline.messages.some((message) => message.text.includes('开始完整角色设计')), false);
+    const journal = (await privateOrganization(setup)).memberConversations; const run = journal.runs.find((run) => run.roleId === 'RoleArchitect'); assert.ok(run); assert.equal(run.status, 'completed'); const events = journal.events.filter((event) => event.conversationId === run.id); assert.ok(events.some((event) => event.kind === 'assistant_text' && event.text.includes('开始完整角色设计'))); assert.ok(events.some((event) => event.kind === 'tool_result' && event.tool === 'legion_list_files')); assert.equal(events.filter((event) => event.tool === 'legion_list_files').every((event) => event.resource === null), true); assert.equal(done.timeline.messages.some((message) => message.text.includes('开始完整角色设计')), false); assert.equal(done.memberConversations.events.length,0);
   } finally { await setup.pipeline.close(); await local.close(); }
 });
 
@@ -1227,8 +1231,9 @@ test('pending regression: generation change while architect is working interrupt
     completion(reply, protocol(record), '', { payload: { instruction: '完整角色方案' } }, 'legion_design_roles', 'design-stop');
   }); local.host.manualArchitect = true; const setup = await fixture(local);
   try {
-    await setup.pipeline.sendMessage({ projectId: setup.projectId, roleId: 'Supervisor', text: '需完整角色方案' }); await until(setup.pipeline, (state) => designing && state.memberConversations.runs.some((run) => run.status === 'running'));
-    await setup.pipeline.setDefaultProfile({ profileId: setup.ids[1] }); const stopped = await setup.pipeline.getState(); assert.equal(stopped.value.memberConversations.runs.some((run) => run.status === 'running'), false); assert.ok(stopped.value.memberConversations.runs.some((run) => ['cancelled', 'interrupted'].includes(run.status)));
+    await setup.pipeline.sendMessage({ projectId: setup.projectId, roleId: 'Supervisor', text: '需完整角色方案' }); await until(setup.pipeline, (state) => designing && state.turn?.status === 'running');
+    assert.ok((await privateOrganization(setup)).memberConversations.runs.some((run) => run.status === 'running'));
+    await setup.pipeline.setDefaultProfile({ profileId: setup.ids[1] }); const stopped = await setup.pipeline.getState(); const journal=(await privateOrganization(setup)).memberConversations; assert.equal(journal.runs.some((run) => run.status === 'running'), false); assert.ok(journal.runs.some((run) => ['cancelled', 'interrupted'].includes(run.status)));assert.equal(stopped.value.memberConversations.runs.length,0);
   } finally { await setup.pipeline.close(); await local.close(); }
 });
 
@@ -1301,7 +1306,7 @@ test('actual SDK architect compacts old long own replies but receives active cur
     managerRound += 1; completion(reply, protocol(record), '', { payload: { instruction: '只含PM本次委托简报' + managerRound } }, 'legion_design_roles', 'design-' + managerRound);
   }); local.host.manualArchitect = true; const setup = await fixture(local);
   try { await setup.pipeline.sendMessage({ projectId: setup.projectId, roleId: 'Supervisor', text: '最初架构任务' }); await until(setup.pipeline, (state) => state.turn?.status === 'completed'); await setup.pipeline.sendMessage({ projectId: setup.projectId, roleId: 'Supervisor', text: latest }); const done = await until(setup.pipeline, (state) => state.turn?.status === 'completed');
-    assert.equal(designs, 2); assert.equal(summaries.length, 1); assert.ok(strings(initialBodies[1]).some((text) => text === latest)); assert.match(JSON.stringify(initialBodies[1]), /整理较早架构师任务/u); assert.equal(strings(initialBodies[1]).some((text) => text.includes('旧架构师真实长回复')), false); assert.equal(done.timeline.messages.filter((message) => message.kind === 'human').at(-1).text, latest); assert.ok(done.memberConversations.events.some((event) => event.kind === 'assistant_text' && event.text.length >= 45000)); assert.equal(done.proposals.length, 2);
+    assert.equal(designs, 2); assert.equal(summaries.length, 1); assert.ok(strings(initialBodies[1]).some((text) => text === latest)); assert.match(JSON.stringify(initialBodies[1]), /整理较早架构师任务/u); assert.equal(strings(initialBodies[1]).some((text) => text.includes('旧架构师真实长回复')), false); assert.equal(done.timeline.messages.filter((message) => message.kind === 'human').at(-1).text, latest); assert.ok((await privateOrganization(setup)).memberConversations.events.some((event) => event.kind === 'assistant_text' && event.text.length >= 45000)); assert.equal(done.memberConversations.events.length,0); assert.equal(done.proposals.length, 2);
   } finally { await setup.pipeline.close(); await local.close(); }
 });
 
@@ -1317,7 +1322,7 @@ test('actual SDK worker after completed PM plan keeps new18000-char Human intact
   try {
     await setup.pipeline.sendMessage({ projectId: setup.projectId, roleId: 'Supervisor', text: '前轮需求' }); let draft = await until(setup.pipeline, (state) => state.plan?.status === 'draft' && state.turn?.status === 'completed'); await setup.pipeline.confirmPlan({ projectId: setup.projectId, planDigest: draft.plan.planDigest }); await until(setup.pipeline, (state) => state.plan?.status === 'completed');
     phase = 2; pendingPlan = true; candidate = proposal([setup.ids[0]]); candidate.tasks[0].instruction = '本轮追加精确修改'; await setup.pipeline.sendMessage({ projectId: setup.projectId, roleId: 'Supervisor', text: latest }); draft = await until(setup.pipeline, (state) => state.plan?.status === 'draft' && state.turn?.status === 'completed'); assert.equal(draft.turn.status, 'completed');
-    await setup.pipeline.confirmPlan({ projectId: setup.projectId, planDigest: draft.plan.planDigest }); const done = await until(setup.pipeline, (state) => state.plan?.status === 'completed'); assert.equal(starts.length, 2); assert.equal(summaries.length, 1); assert.ok(strings(starts[1]).some((text) => text === latest)); assert.equal(typedResults(starts[1]).length, 0); assert.equal(strings(starts[1]).some((text) => text.includes('Worker0前轮真实长回复')), false); assert.equal(done.timeline.messages.filter((message) => message.kind === 'human').at(-1).text, latest); assert.ok(done.memberConversations.events.some((event) => event.kind === 'assistant_text' && event.text.includes('Worker0前轮真实长回复') && event.text.length >= 45000)); assert.equal(done.roleMemory.entries.find((entry) => entry.roleId === 'Worker0').hasSummary, true);
+    await setup.pipeline.confirmPlan({ projectId: setup.projectId, planDigest: draft.plan.planDigest }); const done = await until(setup.pipeline, (state) => state.plan?.status === 'completed'); assert.equal(starts.length, 2); assert.equal(summaries.length, 1); assert.ok(strings(starts[1]).some((text) => text === latest)); assert.equal(typedResults(starts[1]).length, 0); assert.equal(strings(starts[1]).some((text) => text.includes('Worker0前轮真实长回复')), false); assert.equal(done.timeline.messages.filter((message) => message.kind === 'human').at(-1).text, latest); assert.ok((await privateOrganization(setup)).memberConversations.events.some((event) => event.kind === 'assistant_text' && event.text.includes('Worker0前轮真实长回复') && event.text.length >= 45000)); assert.equal(done.memberConversations.events.length,0); assert.equal(done.roleMemory.entries.find((entry) => entry.roleId === 'Worker0').hasSummary, true);
   } finally { await setup.pipeline.close(); await local.close(); }
 });
 
@@ -1420,7 +1425,7 @@ test('a later same-role real mutation with identical bytes invalidates earlier c
   const draft=await until(setup.pipeline,state=>state.plan?.status==='draft'&&state.turn?.status==='completed');assert.equal((await setup.pipeline.confirmPlan({projectId:setup.projectId,planDigest:draft.plan.planDigest})).ok,true);
   const done=await until(setup.pipeline,state=>['completed','failed','invalidated'].includes(state.plan?.status));assert.equal(done.plan.status,'failed');
   const first=done.tasks.find(task=>task.id==='task0'),second=done.tasks.find(task=>task.id==='task1');assert.equal(first.error.code,'check_evidence_stale');assert.equal(first.checkStatus,'stale');assert.equal(first.results[0].observedMutation,true);assert.equal(second.results[0].observedMutation,true);assert.equal(await readFile(join(setup.root,'file0.txt'),'utf8'),'identical-current-bytes');
-  const checks=done.evidence.filter(entry=>entry.roleId==='Worker0');assert.equal(checks.length,2);assert.ok(checks.every(entry=>entry.result.status==='passed'));const firstInput=checks[0].result.inputVersions.find(item=>item.resource==='file0.txt'),secondInput=checks[1].result.inputVersions.find(item=>item.resource==='file0.txt');assert.equal(firstInput.sha256,secondInput.sha256);assert.equal(done.acceptances.some(entry=>entry.decision==='pass'),false);
+  const checks=(await privateOrganization(setup)).evidence.filter(entry=>entry.authorization.roleId==='Worker0');assert.equal(checks.length,2);assert.ok(checks.every(entry=>entry.result.status==='passed'));const firstInput=checks[0].result.inputVersions.find(item=>item.resource==='file0.txt'),secondInput=checks[1].result.inputVersions.find(item=>item.resource==='file0.txt');assert.equal(firstInput.sha256,secondInput.sha256);assert.equal(done.evidence.every(entry=>entry.result.inputVersions.length===0),true);assert.equal(done.acceptances.some(entry=>entry.decision==='pass'),false);
  }finally{await setup.pipeline.close();await local.close();}
 });
 
@@ -1435,7 +1440,7 @@ test('real independent Supervisor sees complete owner/plan/check facts and succe
   const supervisorCalls=local.calls.filter(record=>JSON.stringify(record.body.tools).includes('legion_submit_supervision'));assert.ok(supervisorCalls.length>=2);for(const record of supervisorCalls)assert.equal(/legion_write_file|legion_edit_file|legion_run_check|legion_request_shell/u.test(JSON.stringify(record.body.tools)),false);
   await setup.pipeline.confirmPlan({projectId:setup.projectId,planDigest:draft.plan.planDigest});const done=await until(setup.pipeline,state=>state.plan?.status==='completed');
   for(let i=0;i<300&&!local.host.supervisionSnapshots.some(snapshot=>snapshot.phase==='monitor'&&snapshot.execution.every(task=>task.status==='completed'));i++)await delay(5);
-  const monitor=local.host.supervisionSnapshots.find(snapshot=>snapshot.phase==='monitor'&&snapshot.execution.every(task=>task.status==='completed'));assert.ok(monitor);assert.ok(monitor.checks.every(check=>check.status==='passed'&&check.executed));assert.ok(monitor.acceptances.some(item=>item.decision==='pass'));assert.equal(JSON.stringify(done).includes('SUPERVISOR_PRIVATE_RAW_TEXT_CANARY'),false);assert.ok(done.memberConversations.runs.some(run=>run.roleId==='Supervisor'&&run.channel==='su_customer'));assert.ok(done.memberConversations.runs.some(run=>run.roleId==='Supervisor'&&run.channel==='supervision_preflight'));assert.equal(done.memberConversations.events.some(event=>event.kind==='assistant_text'&&done.memberConversations.runs.find(run=>run.id===event.conversationId)?.channel==='supervision_preflight'),false);
+  const monitor=local.host.supervisionSnapshots.find(snapshot=>snapshot.phase==='monitor'&&snapshot.execution.every(task=>task.status==='completed'));assert.ok(monitor);assert.ok(monitor.checks.every(check=>check.status==='passed'&&check.executed));assert.ok(monitor.acceptances.some(item=>item.decision==='pass'));assert.equal(JSON.stringify(done).includes('SUPERVISOR_PRIVATE_RAW_TEXT_CANARY'),false);const journal=(await privateOrganization(setup)).memberConversations;assert.ok(journal.runs.some(run=>run.roleId==='Supervisor'&&run.channel==='su_customer'));assert.ok(journal.runs.some(run=>run.roleId==='Supervisor'&&run.channel==='supervision_preflight'));assert.equal(done.memberConversations.runs.length,0);assert.equal(done.memberConversations.events.length,0);
  }finally{await setup.pipeline.close();await local.close();}
 });
 
@@ -1853,9 +1858,19 @@ test('confirmed and executing Su reads both owners and real activity/log without
   for(const resource of ['file0.txt','file1.txt'])if(!results.some(pair=>pair.result?.resource===resource)){completion(reply,protocol(record),'',{resource,maxBytes:4096},'legion_read_file','live-read-'+resource);return;}
   for(const resource of ['file0.txt','file1.txt'])assert.equal(results.find(pair=>pair.result?.resource===resource).result.status,'read');
   if(!results.some(pair=>pair.result?.tool==='legion_query_role_log')){completion(reply,protocol(record),'',{payload:{roleId:'Worker0',limit:20}},'legion_query_role_log','live-log');return;}
-  const log=results.find(pair=>pair.result?.tool==='legion_query_role_log');assert.equal(log.result.status,'completed');assert.ok(log.result.payload.events.some(event=>event.tool==='legion_write_file'&&event.kind==='tool_result'));completion(reply,protocol(record),'已读取两个owner文件和真实进度日志');
+  const log=results.find(pair=>pair.result?.tool==='legion_query_role_log');assert.equal(log.result.status,'completed');assert.ok(log.result.payload.events.some(event=>event.tool==='legion_write_file'&&event.kind==='tool_result'));
+  if(!results.some(pair=>pair.result?.tool==='legion_remember_fact')){completion(reply,protocol(record),'',{payload:{action:'add',kind:'preference',statement:'不得在执行中改记忆',sourceRefs:['human:invalid'],expectedRevision:0}},'legion_remember_fact','active-memory');return;}
+  const denied=results.find(pair=>pair.result?.tool==='legion_remember_fact');assert.equal(denied.result.status,'denied');assert.equal(denied.result.reason,'execution_busy');completion(reply,protocol(record),'已读取两个owner文件和真实进度日志，执行中记忆修改被拒绝');
  });local.host.supervisionRead=true;const setup=await fixture(local);candidate=proposal([setup.ids[0],setup.ids[0]],true);
  try{await setup.pipeline.sendMessage({projectId:setup.projectId,roleId:'Supervisor',text:'两个owner并行实现'});const draft=await until(setup.pipeline,state=>state.plan?.status==='draft'&&state.turn?.status==='completed');assert.equal((await setup.pipeline.confirmPlan({projectId:setup.projectId,planDigest:draft.plan.planDigest})).ok,true);const running=await until(setup.pipeline,state=>held.size===2&&state.tasks.filter(task=>task.roleId!=='Acceptance').every(task=>task.status==='running'));const runIds=running.tasks.filter(task=>task.roleId!=='Acceptance').map(task=>task.runId);const owners=running.fileOwners.digest;
+  const listed=await setup.pipeline.listProjectFiles({projectId:setup.projectId,resource:''});assert.equal(listed.ok,true,JSON.stringify(listed));assert.ok(listed.value.entries.some(item=>item.name==='file0.txt'));
+  const file=await setup.pipeline.readProjectFile({projectId:setup.projectId,resource:'file0.txt'});assert.equal(file.ok,true,JSON.stringify(file));assert.equal(file.value.text,'owner-task0');
+  const role=await setup.pipeline.queryRoleActivity({projectId:setup.projectId});assert.equal(role.ok,true,JSON.stringify(role));assert.ok(role.value.tasks.some(item=>item.status==='running'));
+  const logPage=await setup.pipeline.queryRoleLog({projectId:setup.projectId,roleId:'Worker0',limit:20});assert.equal(logPage.ok,true,JSON.stringify(logPage));assert.ok(logPage.value.events.some(item=>item.tool==='legion_write_file'));
+  const changes=await setup.pipeline.queryProjectFacts({projectId:setup.projectId,kind:'changes'});assert.equal(changes.ok,true,JSON.stringify(changes));assert.ok(changes.value.items.some(item=>item.observedMutation&&item.sourceRef.startsWith('task-result:')));
+  const outputs=await setup.pipeline.queryProjectOutputs({projectId:setup.projectId});assert.equal(outputs.ok,true,JSON.stringify(outputs));assert.deepEqual(outputs.value.items,[]);
+  const memory=await setup.pipeline.queryProjectMemory({projectId:setup.projectId});assert.equal(memory.ok,true,JSON.stringify(memory));
+  const during=await setup.pipeline.getState();assert.equal(during.value.plan.status,'running');assert.deepEqual(during.value.tasks.filter(task=>task.roleId!=='Acceptance').map(task=>task.runId),runIds);
   assert.equal((await setup.pipeline.sendMessage({projectId:setup.projectId,roleId:'Supervisor',text:'只读当前两个文件、进度和日志'})).ok,true);const answer=await until(setup.pipeline,state=>state.turn?.status==='completed');assert.ok(observedActivity.tasks.filter(task=>task.roleId!=='Acceptance').every(task=>task.status==='running'));assert.equal(answer.plan.status,'running');assert.equal(answer.fileOwners.digest,owners);assert.deepEqual(answer.tasks.filter(task=>task.roleId!=='Acceptance').map(task=>task.runId),runIds);assert.ok(answer.tasks.filter(task=>task.roleId!=='Acceptance').every(task=>task.status==='running'));
   released=true;for(const {record,reply}of held.values())completion(reply,protocol(record),'',{resource:'file0.txt',maxBytes:4096},'legion_read_file','worker-read-after-Su');const done=await until(setup.pipeline,state=>state.plan?.status==='completed');assert.ok(done.tasks.every(task=>task.checkStatus==='passed'));assert.equal(done.acceptances.at(-1).decision,'pass');await until(setup.pipeline,state=>state.supervisions.some(item=>item.phase==='monitor'&&item.status==='completed'));assert.deepEqual([...local.host.supervisionReads].sort(),['monitor','preflight']);
  }finally{released=true;await setup.pipeline.close();await local.close();}

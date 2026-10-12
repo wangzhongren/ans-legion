@@ -28,7 +28,7 @@ import { ContextReadConfirmation, ContextSnapshot, ConfirmedTaskGrant, createWor
 import { exactObject, identifier, immutable } from '../models/desktop.mjs';
 import { WB_LIMITS, WorkbenchValidationError, wbSuccess, wbFailure, wbCaught, wbError,
   assertKnownTextMergeFree, assertKnownKeyFree, workbenchInput, workbenchDTO, projectDocument, projectSummary, boundPlan, extractPlan,
-  contextDigest, topologicalTasks, readyTaskBatch, roleActivityFacts, governedDTO, governedPromptDTO, boundedModelPrompt, modelConversationHistory, projectConversationContext, contentSha256, controlData, prepareRoleContext, roleContextHistory, canonicalRolePins, dependencyOutputMetadata, planArtifactScopes } from '../models/workbench.mjs';
+  contextDigest, topologicalTasks, readyTaskBatch, roleActivityFacts, projectFactsPage, projectOutputsPage, governedDTO, governedPromptDTO, boundedModelPrompt, modelConversationHistory, projectConversationContext, contentSha256, controlData, prepareRoleContext, roleContextHistory, canonicalRolePins, dependencyOutputMetadata, planArtifactScopes } from '../models/workbench.mjs';
 
 const READ_TOOLS = Object.freeze(['legion_list_files', 'legion_read_file']);
 const MEMORY_TOOLS=Object.freeze(['legion_remember_fact','legion_query_memory']);
@@ -175,6 +175,44 @@ export class WorkbenchPipelineImpl {
     return wbSuccess(immutable({ ...base, ...domain, roles, memoryNotices: [...this.#memoryNotices].map(([key, code]) => ({ roleId:key.split('|')[0],channel:key.split('|')[1], code, message: wbError(code).message })) }));
   }
   getState(input = {}) { const checked = workbenchInput('getState', input); if (!checked.ok) return Promise.resolve(checked); return this.#enqueue(() => this.#state(checked.value.force)); }
+  #inspect(operation,input,action) {
+    const checked = workbenchInput(operation,input);
+    if (!checked.ok) return Promise.resolve(checked);
+    return this.#direct(async () => {
+      const project = this.#current(checked.value.projectId);
+      const epoch = this.#authorityEpoch, generation = this.#generation, identity = digestValue(project.workspaceIdentity);
+      const result = await action(project,checked.value);
+      if (this.#closed || this.#project?.id !== project.id || this.#authorityEpoch !== epoch || this.#generation !== generation || digestValue(this.#project.workspaceIdentity) !== identity) throw new WorkbenchValidationError('stale_action');
+      return wbSuccess(this.#safe(result));
+    },checked.value);
+  }
+  listProjectFiles(input) { return this.#inspect('listProjectFiles',input,async (_project,query) => {
+    const request = new ProjectReadRequest({requestId:this.#projects.newId(),runId:this.#projects.newId(),tool:'legion_list_files',resource:query.resource,cursor:query.cursor,limit:query.limit});
+    const result = await this.#read.listFiles(request);
+    if (result.status !== 'listed') throw new WorkbenchValidationError(result.reason);
+    return result;
+  }); }
+  readProjectFile(input) { return this.#inspect('readProjectFile',input,async (_project,query) => {
+    const request = new ProjectReadRequest({requestId:this.#projects.newId(),runId:this.#projects.newId(),tool:'legion_read_file',resource:query.resource,startLine:query.startLine,maxBytes:query.maxBytes});
+    const result = await this.#read.readFile(request);
+    if (result.status !== 'read') throw new WorkbenchValidationError(result.reason);
+    return result;
+  }); }
+  queryRoleActivity(input) { return this.#inspect('queryRoleActivity',input,(project,query) => this.#organizations.inspectRoleActivity(project,{roleId:query.roleId,taskId:query.taskId,planDigest:query.planDigest},[...this.#secrets])); }
+  queryRoleLog(input) { return this.#inspect('queryRoleLog',input,(project,query) => this.#organizations.inspectRoleLog(project,{roleId:query.roleId,taskId:query.taskId,planDigest:query.planDigest,cursor:query.cursor,limit:query.limit},[...this.#secrets])); }
+  queryProjectFacts(input) { return this.#inspect('queryProjectFacts',input,async (project,query) => projectFactsPage(await this.#organization(project),project,{kind:query.kind,taskId:query.taskId,planDigest:query.planDigest,cursor:query.cursor,limit:query.limit})); }
+  queryProjectOutputs(input) { return this.#inspect('queryProjectOutputs',input,async (project,query) => {
+    const scopes = planArtifactScopes(project.plan), digests = {};
+    for (const task of project.tasks) for (const output of task.generatedOutputs ?? []) {
+      const scope = scopes.find(item => item.scope === output.resource + '/');
+      if (scope && digests[scope.scope] === undefined) digests[scope.scope] = (await this.#organizations.inventory(project,scopes,[scope])).generationDigest;
+    }
+    return projectOutputsPage(await this.#organization(project),project,{taskId:query.taskId,planDigest:query.planDigest,cursor:query.cursor,limit:query.limit},digests);
+  }); }
+  queryProjectMemory(input) { return this.#inspect('queryProjectMemory',input,async (project,query) => {
+    const registry = await this.#organizations.memorySources(project);
+    return this.#facts.inspect(project,{kind:query.kind,cursor:query.cursor,limit:query.limit},registry,[...this.#secrets]);
+  }); }
   #save(update, options = {}) {
     const pending = this.#metadataTail.then(async () => {
       const project = typeof update === 'function' ? update(this.#project) : update;
@@ -418,7 +456,7 @@ export class WorkbenchPipelineImpl {
       }
       const ownerSummary = { total: project.fileOwners.owners.length, shown: shownOwners };
       this.#domain = await this.#organization(this.#project);
-      const prompt = ['你是Supervisor，唯一客户对话入口。自主list/read普通项目、query_role_activity/query_role_log查询真实工作；无写/Check/Shell/批准/grant工具。需要计划/角色设计/返修时用legion_delegate_pm；运行中仅只读问答，不能改变计划。PM needs_human时只用questionRef呈现原问题，实际Human答复后用Host humanAnswerRef恢复。开发完成只依据真实Check/Acceptance和当前typed监督事实。',
+      const prompt = ['你是二哥（内部Supervisor），唯一客户对话入口。自主list/read普通项目、query_role_activity/query_role_log查询真实工作；无写/Check/Shell/批准/grant工具。需要计划/角色设计/返修时用legion_delegate_pm；运行中仅只读问答，不能改变计划。PM needs_human时只用questionRef呈现原问题，实际Human答复后用Host humanAnswerRef恢复。开发完成只依据真实Check/Acceptance和当前typed监督事实。',
         `当前持久组织与提案、交互、实际验收/返修（仅事实不授权）：${JSON.stringify(governedPromptDTO(this.#domain,this.#project.plan))}`,
         `当前canonical角色/组织/归属原样引用（不得缩写purpose或重算digest；历史摘要不能覆盖）：${JSON.stringify(canonicalRolePins(this.#domain, 'Supervisor'))}`,
         `可选连接：${JSON.stringify(available)}`,
@@ -489,7 +527,7 @@ export class WorkbenchPipelineImpl {
     this.#pending = { planDigest: plan.planDigest, bindings, nextOwners, recoveryInputs };
     const supervision=await this.#runSupervisor(this.#project,'preflight',this.#manager?.readAbort?.signal);
     let migrationStatement='';if(this.#projects.migrationPending())migrationStatement='\n首次v1迁移：物理workspace '+JSON.stringify(project.workspaceIdentity)+'；旧owner清单 '+JSON.stringify(project.fileOwners.owners)+'。\n我确认已关闭该项目所有旧版 Legion 实例，并选择上述 catalog 为本项目权威 owner 来源；同意当前计划。';
-    await this.#newInteraction({ kind: 'confirmation', purpose: 'execute_plan', title: '确认实施计划', text: `${plan.goal}\n${plan.tasks.map((task) => `${task.title} · ${task.roleId} · ${task.intent} · 检查 ${task.checks.map((check) => check.checkId).join('、')}`).join('\n')}\nSupervisor建议 ${supervision.recommendation}：${supervision.findings.map(item=>item.severity+' '+item.reason+' ['+item.sourceRefs.join(',')+']').join('；')||'无额外建议'}。\n限定返修 ${plan.governance.maxRepairRounds} 次。完整角色归属（${nextOwners.owners.length}文件）：\n${nextOwners.owners.map(item=>item.roleId+' · '+item.resource).join('\n')}\n本次新增/转交：${claims.map(item=>item.resource+' → '+item.roleId).join('、')||'无'}；转交：${transfers.map(item=>item.resource+' '+item.fromRoleId+' → '+item.toRoleId).join('、')||'无'}。\n唯一owner catalog来源：${ownerSource}。${migrationStatement}${recoveryInputs.length ? '\n存在旧Shell部分发布；本次是新的恢复授权，旧命令/许可不重放。当前基线：\n' + recoveryInputs.map((file) => file.resource + ' · ' + file.state + ' · SHA ' + (file.sha256 ?? '缺失') + ' · bytes ' + file.byteLength + ' · 执行位 ' + (file.executable ?? '无')).join('\n') : ''}${retainedPreview.length ? '\n将核验保留以下既有正确输出（不算新的写入；仍需当前检查与独立验收）：\n' + retainedPreview.map((item)=>item.resource+' · 来源 '+item.sourceRequestId+' · SHA '+(item.baseline.sha256??'缺失')).join('\n') : ''}`, options: [], allowSupplement: false },
+    await this.#newInteraction({ kind: 'confirmation', purpose: 'execute_plan', title: '确认实施计划', text: `${plan.goal}\n${plan.tasks.map((task) => `${task.title} · ${task.roleId} · ${task.intent} · 检查 ${task.checks.map((check) => check.checkId).join('、')}`).join('\n')}\n二哥建议 ${supervision.recommendation}：${supervision.findings.map(item=>item.severity+' '+item.reason+' ['+item.sourceRefs.join(',')+']').join('；')||'无额外建议'}。\n限定返修 ${plan.governance.maxRepairRounds} 次。完整角色归属（${nextOwners.owners.length}文件）：\n${nextOwners.owners.map(item=>item.roleId+' · '+item.resource).join('\n')}\n本次新增/转交：${claims.map(item=>item.resource+' → '+item.roleId).join('、')||'无'}；转交：${transfers.map(item=>item.resource+' '+item.fromRoleId+' → '+item.toRoleId).join('、')||'无'}。\n唯一owner catalog来源：${ownerSource}。${migrationStatement}${recoveryInputs.length ? '\n存在旧Shell部分发布；本次是新的恢复授权，旧命令/许可不重放。当前基线：\n' + recoveryInputs.map((file) => file.resource + ' · ' + file.state + ' · SHA ' + (file.sha256 ?? '缺失') + ' · bytes ' + file.byteLength + ' · 执行位 ' + (file.executable ?? '无')).join('\n') : ''}${retainedPreview.length ? '\n将核验保留以下既有正确输出（不算新的写入；仍需当前检查与独立验收）：\n' + retainedPreview.map((item)=>item.resource+' · 来源 '+item.sourceRequestId+' · SHA '+(item.baseline.sha256??'缺失')).join('\n') : ''}`, options: [], allowSupplement: false },
       { roleId: 'ProjectManager', instanceId: this.#project.manager.instanceId, runId: null, toolRequestId: null });
   }
   async #startConversation(manager,runId,prompt) {
@@ -602,7 +640,7 @@ export class WorkbenchPipelineImpl {
       if (!waiter && request.purpose === 'discussion') {
         await this.#endManager();
         const facts = `Human真实答复 ${request.title}：${JSON.stringify(answered.answer.value)}。这是已保存答案事实，继续讨论；不能恢复旧工具请求或执行授权。`;
-        const prompt = boundedModelPrompt(['你是Supervisor。真实Human答复已记录；需要时用legion_delegate_pm resume，不能自造授权。humanAnswerRef='+answered.answer.answerId,facts,`当前canonical角色与owner原样引用：${JSON.stringify(canonicalRolePins(this.#domain,'Supervisor'))}`,`当前组织：${JSON.stringify(governedPromptDTO(this.#domain,this.#project.plan))}`]);
+        const prompt = boundedModelPrompt(['你是二哥（内部Supervisor）。真实Human答复已记录；需要时用legion_delegate_pm resume，不能自造授权。humanAnswerRef='+answered.answer.answerId,facts,`当前canonical角色与owner原样引用：${JSON.stringify(canonicalRolePins(this.#domain,'Supervisor'))}`,`当前组织：${JSON.stringify(governedPromptDTO(this.#domain,this.#project.plan))}`]);
         const manager = await this.#ensureManager(); const runId = this.#projects.newId(); const generation = this.#generation;
         manager.readAbort = new AbortController(); manager.segmentId = null;
         this.#domain = await this.#organizations.beginTurn(this.#project, {turnId:runId,userMessageId:null,continuationAnswerId:answered.answer.answerId,text:'',createdAt:this.#projects.now()});
@@ -674,6 +712,7 @@ export class WorkbenchPipelineImpl {
       let payload;
       if(actor.roleId==='ProjectManager'&&this.#delegation?.actor.instanceId===actor.instanceId)await this.#validateDelegation(this.#delegation);
       if(actor.roleId==='ProjectManager'&&!['legion_review_shell'].includes(request.tool)&&(!this.#delegation||this.#delegation.actor.instanceId!==actor.instanceId||this.#delegation.abort.signal.aborted))throw new WorkbenchValidationError('actor_forbidden');
+      if(this.#active&&actor.roleId==='Supervisor'&&['legion_delegate_pm','legion_remember_fact','legion_request_interaction'].includes(request.tool))throw new WorkbenchValidationError('execution_busy');
       if(QUERY_TOOLS.includes(request.tool)){
         const customer=this.#manager?.instance.instanceId===actor.instanceId&&this.#turn?.id===request.runId;const background=this.#supervisorRuns.get(actor.instanceId);
         if(actor.roleId!=='Supervisor'||!customer&&(!background||background.runId!==request.runId||!background.current()))throw new WorkbenchValidationError('actor_forbidden');
@@ -685,6 +724,7 @@ export class WorkbenchPipelineImpl {
       }else if(MEMORY_TOOLS.includes(request.tool)){
         const registry=await this.#organizations.memorySources(this.#project);const boundActor={...actor,runId:request.runId};
         if(request.tool==='legion_remember_fact')payload=await this.#facts.remember(this.#project,request.parameters.payload,boundActor,registry,[...this.#secrets],signal);
+        else if(this.#active&&actor.roleId==='Supervisor')payload=await this.#facts.inspect(this.#project,request.parameters.payload,registry,[...this.#secrets],signal);
         else payload=await this.#facts.query(this.#project,request.parameters.payload,boundActor,registry,[...this.#secrets],signal);
       }else if(request.tool==='legion_submit_supervision'){
         const binding=this.#supervisorRuns.get(actor.instanceId);if(actor.roleId!=='Supervisor'||!binding||binding.runId!==request.runId||binding.actor.projectId!==actor.projectId||!binding.current())throw new WorkbenchValidationError('actor_forbidden');
@@ -1526,7 +1566,7 @@ export function createWorkbenchPipeline(options) {
   return workbenchFacade(pipeline);
 }
 function workbenchFacade(pipeline) {
-  return Object.freeze(Object.fromEntries(['getState', 'selectProject', 'refreshProject', 'setDefaultProfile', 'saveProfile', 'deleteProfile', 'assignProfile', 'sendMessage', 'selectContext', 'confirmPlan', 'answerInteraction', 'closeInteraction', 'cancelTurn', 'stopExecution', 'testConnection', 'cancelProbe', 'close'].map((name) => [name, pipeline[name].bind(pipeline)])));
+  return Object.freeze(Object.fromEntries(['getState', 'selectProject', 'refreshProject', 'setDefaultProfile', 'saveProfile', 'deleteProfile', 'assignProfile', 'sendMessage', 'selectContext', 'confirmPlan', 'answerInteraction', 'closeInteraction', 'cancelTurn', 'stopExecution', 'testConnection', 'cancelProbe', 'listProjectFiles', 'readProjectFile', 'queryRoleActivity', 'queryRoleLog', 'queryProjectFacts', 'queryProjectOutputs', 'queryProjectMemory', 'close'].map((name) => [name, pipeline[name].bind(pipeline)])));
 }
 
 /** Trusted Node Host entry. leaseRoot is private Host/test injection, never CLI input. */

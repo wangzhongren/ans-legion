@@ -20,3 +20,23 @@ supervisor_frontdoor_design_status: DOCUMENT_PREPARATION_ONLY
 supervisor_frontdoor_design_write_scope: ["docs/roles/ProjectManager/docs/design/2026-10-11_design_supervisor-frontdoor-global-read.md"]
 supervisor_frontdoor_implementation_candidate_status: HUMAN_ACCEPTED_EXACT_CONFIG_C8032728
 supervisor_frontdoor_implementation_candidate_write_scope: ["docs/roles/ProjectManager/docs/change/2026-10-11_change_supervisor-frontdoor-global-read.md"]
+
+desktop_command_center_proposal:
+  state: DOCUMENT_PREPARATION_ONLY
+  date: 2026-10-12
+  write_scope: ["docs/roles/ProjectManager/docs/design/2026-10-12_design_desktop-command-center.md"]
+  application_implementation: awaiting_reviewed_proposal_confirmation
+  permission_source: direct_customer_request_desktop_project_command_center
+
+desktop_command_center_candidate:
+  state: AWAITING_EXACT_CUSTOMER_CONFIG_ACCEPTANCE
+  scope_reference: .ans/decisions/legion-desktop-command-center-v1-project.json
+  authored_files: ["package.json", "package-lock.json", "README.md", "apps/desktop/package.json", "apps/desktop/package-lock.json", "apps/desktop/README.md", "apps/desktop/scripts/verify-dependencies.mjs", "tests/package/test_package.mjs", "tests/cli/test_chat.test.mjs", "apps/desktop/tests/package/desktop-package.test.mjs", "docs/roles/ProjectManager/feature-map.md", "docs/roles/ProjectManager/changelog.md", "docs/roles/ProjectManager/docs/feature/desktop-distribution.md", "docs/roles/ProjectManager/docs/architecture.md", "docs/roles/ProjectManager/docs/design/2026-10-12_design_desktop-command-center.md"]
+  generated_effect_scope: [".ans/runtime/legion-desktop-command-center-v1/ProjectManager/evidence/", ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/fixtures/", ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/user-data/", ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/tmp/", ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/", ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/npm-cache/", ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/electron-cache/", ".ans/runtime/legion-desktop-command-center-v1/ProjectManager/screenshots/"]
+
+desktop_command_center_accepted:
+  state: ACCEPTED
+  config: .ans/decisions/legion-desktop-command-center-v1-check-timeout-project.json
+  config_sha256: 586fa7aa28f8283b90440d512200c04dd7ead8a373ca8ace4d443c568324b5a6
+  design_sha256: e6cf4a935d81b8c5de5037b6d24f033b2fb5cb7935b6a6199edd1ef6f29df8e2
+  permission_source: .ans/decisions/legion-desktop-command-center-v1-authorization.md

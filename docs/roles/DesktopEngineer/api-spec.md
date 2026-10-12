@@ -1,5 +1,9 @@
 # DesktopEngineer 当前公开接线
 
+> 2026-10-12 当前项目指挥台契约以本节和下方“项目指挥台只读查询”为准。较早章节记录历史阶段的 PM 客户入口、task.writeSet 与成员原文页；当前产品由“二哥”唯一对客，内部仍以 `Supervisor` 标识，角色精确 owner 决定写权，原文不公开。
+
+客户聊天标签属于 Interface 投影：Human 为“你”，所有当前客户助手回复为“二哥”，`kind:question` 的实际持久问题显示“二哥 · 转达待答复问题”。这不改 timeline 的 `kind`、`requestId`、答案绑定或原问题文字，也不把后台 PM 变成客户发送入口。默认连接的设置标签是“默认二哥对话连接”；后台 PM 仍用其项目角色映射/已保存连接规则，Shell 审核与返修事实仍明确标 PM。计划协议 fallback 与无计划引导只在客户区使用二哥名称，后台 RoleArchitect/PM 原身份在角色区保持。窗口和 HTML 标题均为“二哥项目指挥台”；CLI 仍以 `roleId:Supervisor` 调用同一 Host。
+
 桌面唯一入口为`apps/desktop/src/interface/main.mjs`，Interface→WorkbenchPipeline→public Services→public Providers，Model共享。生产从安装包`legion-runtime/workbench-models`及`services/{policy,mutation,read,proposal,pi-agent,check}`接线，不引用源码开发树或Kernel Interface。[完整功能](docs/feature/organization-and-acceptance.md)、[canonical设计](../ProjectManager/docs/design/2026-10-08_design_legion-governed-workflow.md)。
 
 ## 启动、IPC与关闭
@@ -21,10 +25,33 @@
 | confirmPlan | {projectId,planDigest,requestId?,version?,requestDigest?}；只接受已由真实Human答复的当前请求，缺nonce不授权 | WorkbenchDTO |
 | cancelTurn / stopExecution | {projectId,turnId} / {projectId} | WorkbenchDTO |
 | testConnection / cancelProbe | {profileId} / {probeId} | ProbeDTO / null |
+| listProjectFiles | {projectId,resource?:相对目录,cursor?,limit?:1..200} | ProjectReadResult 的有限目录页 |
+| readProjectFile | {projectId,resource:普通相对文件,startLine?:正整数,maxBytes?:1..65536} | ProjectReadResult 的文本片段、SHA、nextLine、complete |
+| queryRoleActivity | {projectId,roleId?,taskId?,planDigest?} | 当前角色/任务状态、阻塞与来源摘要 |
+| queryRoleLog | {projectId,roleId,taskId?,planDigest?,cursor?,limit?:1..50} | 仅行动元数据、来源摘要、快照游标 |
+| queryProjectFacts | {projectId,kind:changes\|checks\|acceptances,taskId?,planDigest?,cursor?,limit?:1..50} | 实际修改、当前检查或独立验收的来源绑定页 |
+| queryProjectOutputs | {projectId,taskId?,planDigest?,cursor?,limit?:1..50} | 实际发布与生成产物页；过期状态可见 |
+| queryProjectMemory | {projectId,kind?:pitfall\|decision\|preference,cursor?,limit?:1..50} | 本项目来源验证分类事实页，不修改记忆 |
 
-Result为`{ok:true,value}`或`{ok:false,error:{code,message,field}}`。主进程重建有限投影，隐藏私有root/credentials/SDK原文/授权对象与stack。value除既有profiles、projects、roles、history、turn、plan、tasks、context、observation和probe外包含organization、proposals、interactions、evidence、acceptances、repairs。角色定义独立revision/digest；角色activity是当前宿主实例/任务的有限投影，与长期定义status分开；evidence投影保留状态、测试数、输入SHA及有界日志，完整actualArgv与CheckAuthorization只在私有台账。未知操作/字段、伪来源、任意agent start和非PM直接chat拒绝。
+Result为`{ok:true,value}`或`{ok:false,error:{code,message,field}}`。主进程重建有限投影，隐藏私有root/credentials/SDK原文/授权对象与stack。`getState` 保留二哥客户 timeline、当前计划/任务/角色、有限监督和最近摘要；成员原始 journal 的 runs/events 不传，Check 原始日志与输入版本细目、Shell 命令/审核文字/输出/完整发布列表不传。详细事实只能按上表分页查询。角色定义独立revision/digest，activity是当前Host状态而非长期身份。未知操作/字段、伪来源、任意agent start和非 `Supervisor` 直接chat拒绝。
 
 `createWorkbenchPipeline({userDataDir})`返回上述操作（chooseProject替换为`selectProject(trustedRoot)`）及close。工厂无Services/SDK注入。Impl只用于当前层聚焦测试。Interface调用本Pipeline；唯一Pipeline组合公开Services，不互调peer Services，也不让Provider回调Pipeline。
+
+## 项目指挥台只读查询（当前）
+
+所有新查询由 Workbench Pipeline 的独立有限读通道受理。输入 `projectId` 必须与当前选择一致；Host 在查询前后核当前项目、物理根身份、authority epoch 与运行 generation，失效返回安全错误。它们不调用 `selectContext`、不更新 plan/owner、不开启模型轮或签发工具许可。`listProjectFiles`/`readProjectFile` 使用公开 Kernel Read Service 的 typed request 和原 Storage 路径/预算/no-follow 限制，Host 生成私有 requestId/runId；renderer 不能传绝对路径、模型 actor、授权、用户数据目录。
+
+`queryRoleActivity` 返回当前 planDigest、history 标记、roles 的 `{id,activity,phase,sourceRef}` 与 tasks 的 `{id,roleId,status,phase,checkStatus,acceptanceStatus,blockingTaskIds,observedChanges,checks,acceptances,sourceRef}`。`queryRoleLog` 调用 Organization 独立客户 `inspectRoleLog`，复用纯 `roleLogPage`：最多 50 项/32 KiB、项目/角色/任务/计划筛选、来源摘要固定页游标；仅 `{kind,tool,status,reason,resource,checkId,createdAt,sourceRef,...身份字段}`，没有 `assistant_text`、`host_briefing`、原始工具参数/结果。
+
+`queryProjectFacts` 的 changes 仅取真实任务 `results`，包含成功、拒绝、缺失、审计失败与 SHA；checks 仅取指定计划与实际 task run 对应的当前 CheckResult，有限返回 executed/status/testCount/inputDigest/stdout/stderr；acceptances 仅取真实独立验收、evidenceIds 与 issue。`queryProjectOutputs` 仅取持久 `generatedOutputs` 和已记录 Shell `publishedResources`；当前生成资源比对原 Organization inventory 的生成摘要，不匹配为 stale，旧计划为 historical。所有页最多 50 行/32 KiB，游标绑定项目、计划、kind、来源摘要和 offset，数据改变后返回 `stale_cursor`，不能混合旧页和新页。没有旧正文时不返回伪造 diff；计划里只声明的目录不成为产物。
+
+`queryProjectMemory` 经 Memory Service 的独立 `inspect` 读取。它按当前项目真实 registry 计算来源是否 stale，保留 `pitfall`、`decision`、`preference` 的事实文本、作者、修订、状态和有限来源标签。inspect 不调用原模型 `query` 的 staleView CAS 写，不接受 renderer actor/run；它不创建、修改或撤回事实。执行中二哥的 `delegate_pm`、`remember_fact` 和 `request_interaction` 在 Host control-tool 被拒绝；只读文件、行动与记忆检查保持可用，worker 的当前授权与 runId 不因浏览撤销。
+
+`services/public/organization.mjs` 新增 `inspectRoleActivity/inspectRoleLog`，与仍要求真实 Supervisor actor 的模型工具 `queryRoleActivity/queryRoleLog` 分开；`services/public/memory.mjs` 新增 `inspect`，与角色 `query/remember` 分开。Interface 的 `publicQueryDTO` 对每种响应重新限定根字段与行字段；不直接透传 Service 对象。旧公共成员 journal 被投影为空，原私有 journal 持久存储与工作记忆来源继续由 Host 内部读取；Shell 公共 state 只有最近 32 条无正文状态，Check 公共 state 只有最近 32 条无原始日志摘要。
+
+分页调用约定：`cursor?` 是**字段可省略**，不是空字符串占位。首次请求省略该字段；只有上一页给出非空 `nextCursor`（记忆为 `cursor`）才在追加请求带回原值。角色日志把显式 `cursor:''` 判 `stale_cursor`，分类记忆把它判 `invalid_input`；Renderer 不改这两条验证规则。游标失效时清除该页保存游标并隐藏追加按钮，安全错误保持可见；若追加按钮持有键盘焦点，焦点移至该区“刷新”。文件、修改、产物、检查与验收首页也统一省略 cursor。角色状态 `phase:not_recorded` 仍是 Host 原值，界面仅显示“尚未运行”；`waiting` 与 `waiting_answer` 分别显示“等待任务”和“等待你的答复”。
+
+900px 及更窄的可折叠项目侧栏复用原项目列表、AI 连接和主题按钮，不新增 IPC：顶栏“项目与设置”按钮维护 `aria-expanded`，Escape/背板关闭回按钮，项目目录选择返回后回按钮，转设置或角色区则聚焦目标控件；扩大到宽屏时清除窄窗抽屉状态。无活动计划保存默认连接的提示只说明未来讨论使用新连接，只有 draft/confirmed/running 活动计划才宣称失效。以上均是显示与分页接线修复，不改变计划/权限或执行中的只读查询。
 
 ## 组织Service与Provider
 

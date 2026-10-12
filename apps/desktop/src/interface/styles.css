@@ -34,3 +34,41 @@
 /* Members keep wheel/keyboard scrolling without a visible scrollbar or reserved strip. */
 .member-list { scrollbar-width: none; scrollbar-gutter: auto; }
 .member-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* The customer entry is separate from the read-only role list. */
+.entry-card{display:grid;grid-template-columns:26px minmax(0,1fr) auto;grid-template-areas:"icon copy badge" "icon state state";align-items:center;column-gap:8px;row-gap:5px;min-width:0;padding:11px;border:1px solid var(--line);background:var(--panel)}
+.entry-card.active{border-color:var(--strong-line);background:var(--subtle)}.entry-card:disabled{opacity:.72}
+.entry-icon{grid-area:icon;width:26px;height:26px;display:grid;place-items:center;border-radius:8px;background:var(--subtle);font-size:12px}.entry-copy{grid-area:copy;min-width:0}.entry-copy strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.entry-copy small{display:none}.entry-badge{grid-area:badge;padding:2px 5px;border-radius:6px;background:var(--canvas);color:var(--muted);font-size:9px;white-space:nowrap}.entry-state{grid-area:state;display:flex;align-items:center;gap:5px;min-width:0;color:var(--muted);font-size:10px}.entry-state .activity-dot{flex:0 0 6px}.entry-state>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entry-card[data-activity=working] .activity-dot{background:var(--success);opacity:1}.entry-card[data-activity=waiting_answer] .activity-dot,.entry-card[data-activity=waiting_dependency] .activity-dot{background:var(--warning);opacity:1}.entry-card[data-activity=failed] .activity-dot{background:var(--danger);opacity:1}
+.member-button{grid-template-columns:26px minmax(0,1fr) auto}.member-button strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.member-origin{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.member-status{grid-area:status;display:flex;align-items:center;gap:4px;max-width:56px}.member-status .activity-dot{flex:0 0 6px}.member-status small{font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* The command center keeps each work area independently scrollable. */
+.command-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(350px,1.2fr) minmax(300px,1fr) minmax(260px,.8fr);border-top:1px solid var(--line)}
+.command-grid>.page,.command-grid>.command-zone{min-width:0;min-height:0;border-right:1px solid var(--line)}
+.command-grid>.command-zone:last-child{border-right:0}
+.command-grid .conversation-width{max-width:720px}
+.command-grid .chat-scroll{padding:18px 20px 10px}
+.command-grid .composer{padding:10px 16px 12px}
+.command-grid .member-activity{padding-left:14px;padding-right:14px}
+.command-zone{display:flex;flex-direction:column;background:var(--panel)}
+.zone-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 16px}
+.zone-heading h2{font-size:17px}.zone-heading h3{font-size:13px}.zone-heading .eyebrow{margin:0}
+.zone-tabs{display:flex;gap:3px;padding:0 12px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.zone-tabs button,.workspace-switcher button{border:0;background:transparent;font-size:11px;padding:7px 9px}
+.zone-tabs button[aria-selected=true],.workspace-switcher button[aria-selected=true]{background:var(--subtle);color:var(--text)}
+.zone-scroll{overflow:auto;min-height:0;flex:1;padding:10px 16px 22px;scrollbar-gutter:stable}
+.zone-scroll>section>p,.zone-scroll>p{font-size:11px}
+.zone-scroll h3{font-size:13px;margin:15px 0 8px}
+.zone-toolbar{display:flex;gap:10px;align-items:center;min-width:0}.zone-toolbar span{overflow-wrap:anywhere;font-size:11px}
+.workspace-file{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;border-radius:0;padding:9px 5px;overflow-wrap:anywhere;font-size:12px}
+.workspace-file:hover,.workspace-file:focus-visible{background:var(--subtle)}
+.workspace-fact{padding:11px 2px;border-bottom:1px solid var(--line);overflow-wrap:anywhere;font-size:11px}
+.workspace-fact strong{font-size:12px}.workspace-fact p{font-size:11px;margin:5px 0;white-space:pre-wrap}.workspace-fact pre{max-height:170px}
+#file-preview{margin:16px 0;border-top:1px solid var(--strong-line)}#file-preview .zone-heading{padding-left:0;padding-right:0}#file-preview-text{max-height:42vh;overflow:auto}
+.workspace-switcher{display:none;padding:5px 12px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+#command-status{font-size:10px;margin:2px 0 0}
+@media(max-width:1280px){.command-grid{grid-template-columns:minmax(350px,1fr) minmax(340px,1fr)}.command-grid>#roles-zone{display:none}.command-grid[data-zone=roles]>#project-zone{display:none}.command-grid[data-zone=roles]>#roles-zone{display:flex}.workspace-switcher{display:flex}}
+@media(max-width:900px){.sidebar{display:none}.topbar{padding:12px 16px;height:auto;min-height:70px;flex-basis:auto}.header-actions{flex-wrap:wrap;justify-content:flex-end}.command-grid{grid-template-columns:minmax(0,1fr)}.command-grid>#conversation-page,.command-grid>#project-zone,.command-grid>#roles-zone{display:none;border-right:0}.command-grid[data-zone=conversation]>#conversation-page{display:flex}.command-grid[data-zone=project]>#project-zone{display:flex}.command-grid[data-zone=roles]>#roles-zone{display:flex}.workspace-switcher{justify-content:space-around}.workspace-switcher button{flex:1}.settings-page{padding:16px}.profiles-layout{grid-template-columns:1fr}.details-drawer{top:72px;right:6px;bottom:6px;width:calc(100% - 12px)}.chat-scroll{padding:12px 14px}.composer{padding:8px 12px}}
+#mobile-nav-toggle{display:none}
+@media(max-width:900px){#mobile-nav-toggle{display:inline-flex}#project-sidebar[data-open=true]{display:flex;position:fixed;z-index:16;inset:0 auto 0 0;width:min(290px,calc(100vw - 54px));max-width:100%;box-shadow:var(--shadow);overflow:hidden}#nav-backdrop:not([hidden]){display:block;position:fixed;z-index:15;inset:0;width:100%;height:100%;border:0;border-radius:0;background:#0009;padding:0}}
+@media(min-width:901px){#nav-backdrop{display:none!important}}

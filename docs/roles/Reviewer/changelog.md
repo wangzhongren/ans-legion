@@ -91,3 +91,24 @@ Tester真实GUI另发现absence Wire、activity Esc样式和正确binary无diff�
 
 
 当前1.1.3固定structure收口前69/69实际通过；旧69/68取消失败已由原Host修复并由原真实SDK强回归验证HTTP2/同实例/无partial续轮。真实后台channel、失败后立即新Human/current Host确认、旧PM History原字节及当前Desktop lock/安装99源码身份核对纳入最终门；最终同候选日志/candidate见role-memory-race记录。全部失败日志保留，未新增GUI/可选审计或改其他owner文件。
+
+
+## 2026-10-12 项目指挥台当前结构与私有边界
+
+合法65文件补齐配置派发，只改本角色10文件。迁Node1.2.0/Desktop0.3.0包/manifest与安装闭包；当前Reviewer harness效果迁本阶段fresh，未派Shell-workflow仅保留Governance接受旧fresh例外。真实macOS当前指挥台结构/有限IPC/隐私投影、旧observer实际unavailable与合法隔离拒篡改/任务来源、原owner/lease/CAS/Shell安全门待当前固定structure实际验收，Windows旧用例保留unsupported。未改生产、治理或Tester，不自verify/派发。
+
+
+## 2026-10-12 Su-label 1.2.2当前候选
+
+承接旧UI图77/80 partial，只原R10，当前runtime1.2.2/Desktop0.3.2包、lock、安装99源码迁新smoke。隔离observer两失败根因是Supervisor旧tuple无空行接嵌套metadata，改旧9顶层key截基础tuple保留available/拒伪scope强门；真实旧observerunavailable与旧日志保留。当前七IPC查询/私有边界/在途Su不撤权/真实macOS900可发现导航/包身份固定structure待同候选实际结果，GUI完整验收归Tester，Windowsunsupported。未改D/T或自verify。
+
+
+1.2.2取消fixture两样本证实Host捕获与drain两个合法私有终态竞速；原强断不放宽。经Supervisor授权，真实首su_customer日志已持久化后仅延迟其Service返回至实际cancel signal，以有界屏障确定复现interrupted/run_cancelled；实际SDK/两HTTP/同实例/零partial仍保留。当前最终结构候选定稿冻结，待T固定门释放。
+
+
+## 1.2.2 / 0.3.2 结构门真实闭合
+
+当前f5e18085七入口structure80/80、exit0、candidateUnchanged；两个observer fixture及取消私有终态竞态由本角色精确修fixture，原失败留证。真实有界beginMemberRun持久返回屏障固定Host interrupted/run_cancelled，实际SDK/HTTP2/同实例/零partial不替代；公共private-body隔离与Windowsunsupported保持。两份Reviewer报告关闭本轮结构待验收状态，非TesterGUI全验收；文档冻结后最终同候选structure由当前Su-label task记录，未加可选测试或改产品/他人文件。
+
+
+本轮取消fixture最终采用实际terminal两条源码来源精确双证，移除晚装无效prototype wrapper，不追逐单常量、不mock SDK、不引入新hook。Host captured=interrupted/run_cancelled，drain=cancelled/null，身份/事件时间/空text/零assistant、公共cancelled/HTTP2/sameinstance/续completed/零partial强断保留；旧f5e80/80仅自然Host样本，旧文档后79/80失败保留。最终同候选structure待T安全窗口。

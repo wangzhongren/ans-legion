@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, isAbsolute } from 'node:path';
 import { createWorkbenchPipeline } from '../pipelines/workbench.mjs';
 import { exactObject, identifier, projectIdentifier, displayText, immutable, probeDTO } from '../models/desktop.mjs';
-import { WB_OPERATIONS, WB_LIMITS, workbenchInput, workbenchDTO, planDocument, taskState, contextDescriptor, wbSuccess, wbFailure, wbError, governedWireDTO, roleActivity } from '../models/workbench.mjs';
+import { WB_OPERATIONS, WB_LIMITS, workbenchInput, workbenchDTO, planDocument, taskState, contextDescriptor, publicQueryDTO, wbSuccess, wbFailure, wbError, governedWireDTO, roleActivity } from '../models/workbench.mjs';
 import { ProjectFileOwners } from 'legion-runtime/workbench-models';
 const directory = dirname(fileURLToPath(import.meta.url));
 const channel = (operation) => `legion-desktop:${operation}`;
@@ -62,11 +62,19 @@ export async function _dispatchDesktopIpc(event, window, documentUrl, operation,
       case 'stopExecution': result = await pipeline.stopExecution(checked.value); break;
       case 'testConnection': result = await pipeline.testConnection(checked.value); break;
       case 'cancelProbe': result = await pipeline.cancelProbe(checked.value); break;
+      case 'listProjectFiles': result = await pipeline.listProjectFiles(checked.value); break;
+      case 'readProjectFile': result = await pipeline.readProjectFile(checked.value); break;
+      case 'queryRoleActivity': result = await pipeline.queryRoleActivity(checked.value); break;
+      case 'queryRoleLog': result = await pipeline.queryRoleLog(checked.value); break;
+      case 'queryProjectFacts': result = await pipeline.queryProjectFacts(checked.value); break;
+      case 'queryProjectOutputs': result = await pipeline.queryProjectOutputs(checked.value); break;
+      case 'queryProjectMemory': result = await pipeline.queryProjectMemory(checked.value); break;
       default: return wbFailure('unknown_operation');
     }
     if (!result.ok) return wbFailure(result.error?.code, result.error?.field);
     if (operation === 'cancelProbe') return wbSuccess(null);
     if (operation === 'testConnection') return wbSuccess(probeDTO(result.value));
+    if (['listProjectFiles','readProjectFile','queryRoleActivity','queryRoleLog','queryProjectFacts','queryProjectOutputs','queryProjectMemory'].includes(operation)) return wbSuccess(publicQueryDTO(operation,result.value));
     return wbSuccess(wireState(result.value));
   } catch { return wbFailure('internal_error'); }
 }
@@ -203,7 +211,7 @@ export async function startDesktop(options = {}) {
     active = { close };
     try {
       if (options.initialWorkspace) await pipeline.selectProject(options.initialWorkspace);
-      window = new BrowserWindow({ width: 1260, height: 860, minWidth: 960, minHeight: 640, title: '及时雨 · Handwell', show: false, backgroundColor: '#131312', autoHideMenuBar: true, webPreferences: { preload: join(directory, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webviewTag: false, partition: 'legion-desktop' } });
+      window = new BrowserWindow({ width: 1440, height: 900, minWidth: 860, minHeight: 640, title: '二哥项目指挥台', show: false, backgroundColor: '#131312', autoHideMenuBar: true, webPreferences: { preload: join(directory, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webviewTag: false, partition: 'legion-desktop' } });
       externalLinks = _createExternalLinkHandler({ window, documentUrl, openExternal: (url) => shell.openExternal(url), showFailure: (message) => dialog.showMessageBox(window, { type: 'error', title: '无法打开链接', message }) });
       window.webContents.setWindowOpenHandler(externalLinks.handler);
       window.webContents.on('before-mouse-event', externalLinks.beforeMouse); window.webContents.on('before-input-event', externalLinks.beforeInput);

@@ -223,3 +223,25 @@ Core/Adapter/SDK工具/IPC操作与0.8.2包不变，公共Organization abstract/
 ## 2026-10-11 当前Supervisor typed建议公开投影
 
 getState新增当前plan有限supervisions：每phase最新pending/completed/failed、Host验证安全advice及当前任务/检查/验收来源状态，旧plan/别项目过滤；不暴露raw会话、私有身份/队列/凭据。真实SDK/getState覆盖pending→completed、text-only失败及key不泄漏，wire有限字段重验。当前流程见[CLI Host](docs/feature/cli-project-host.md)。
+
+## 2026-10-12 Legion 项目指挥台实施候选
+
+Su 保持唯一客户对话，桌面从聊天与任务抽屉扩展为宽屏三工作区、1280px双列与900px单页签。新有限只读 IPC 提供普通项目目录/文件分段、真实修改、当前检查与独立验收、产物、角色状态/分页行动、分类事实；Host绑定当前项目和来源快照，读取不选定新的固定上下文或撤销执行权。执行中 Su 的委托、记忆写和新讨论请求由 Host 明确拒绝，已批准并行 worker 仍可推进。
+
+公共 `getState` 不再传成员整本 journal 的原始回复/简报/行动；Shell 命令、私有审核原文与输出正文、Check细目从公共快照移出，细目只经有界事实查询。私有持久 journal 与模型记忆来源未删除。分类事实的客户 inspect 不提交 stale 修订。`main` 对每个新结果重新构造允许字段，preload 不开放文件系统或凭据。当前流程见 [项目指挥台](docs/feature/desktop-console.md)，字段见 [API](api-spec.md)。
+
+本次只在 `legion-desktop-command-center-v1` 的 DesktopEngineer 精确31文件 assignment 内实施。实现期间的模型/组织/记忆与界面单元、真实 localhost Pi 协议和已安装 Electron 原生局部测试是排错证据；最终四固定门、完整GUI与独立Tester/Reviewer 成绩只以本任务最终同候选记录为准，不把旧 Shell GUI 或其他版本包当本次验收。
+
+## 2026-10-12 指挥台真实GUI首屏与900px可达修复候选
+
+Tester当前Electron IPC实证：首页角色日志省略cursor正常，但renderer传空串得到stale_cursor；分类记忆省略正常、传空串得到invalid_input。Renderer现统一首页不发送cursor，追加页只回传Host真实非空游标；失效时清该页游标/追加按钮，保留已读内容与错误说明，键盘焦点回该区刷新。Model和IPC校验未放宽。
+
+900px原sidebar由顶栏“项目与设置”重新可达，复用原项目列表、AI连接入口和主题键，不造第二导航数据源；Escape/背板/目录选择焦点回顶栏，转设置或角色聚焦对应控件，轮询不重建草稿。角色idle相位`not_recorded`仅显示为“尚未运行”，`waiting`与`waiting_answer`区别显示。没有活动计划时更改默认连接不再声称旧计划失效。本阶段只改已派发9文件内界面、相关单测和本角色当前文档；真实Electron与四固定门的最终结果以当前task_ops同候选证据为准，旧失败截图与旧包保持只读。
+
+## 2026-10-12 客户 Su 身份气泡修复候选
+
+当前真实1.2.1 GUI截图发现客户助手气泡仍标 PM/项目管理，而实际唯一发送和持久客户 timeline 均属 Su。只改 Interface：所有客户助手头像/名称改Su，持久 `kind:question` 以“Su · 转达待答复问题”呈现并保留原问题；计划协议fallback与无计划引导也对客写Su。默认连接标“默认 Su 对话连接”，后台 PM 映射和Shell审核/返修仍如实保留PM身份；无活动计划保存连接/映射不声称旧计划失效。新增renderer和已安装Electron真实DOM两级标签断言，旧截图保留。当前节点只在已派发9文件内修客户文案，不修改发送/IPC、客户历史、权限或计划许可；Tester发现的未提交plan尚无产品发送缺陷证据，等待原T的真实DOM ready/键盘诊断。最终同候选四固定门和独立GUI以当前task_ops记录为准。
+
+## 2026-10-12 二哥展示改名候选
+
+当前桌面窗口、HTML品牌、客户气泡/转达问题、对话页签、输入与连接提示、角色展示别名均显示“二哥”；首轮与真实Human答复后的客户模型提示也自称二哥。`manager_only`、`preflight_incomplete`、`conversation_busy`、`invalid_plan` 只改客户提示文字，错误码和权限判断不变。Human执行确认把监督建议显示为“二哥建议”。内部 `Supervisor` roleId、AgentInstance.name、组织定义/digest、记忆channel、后台PM与独立监督、既有历史原文不改；`sendMessage` 仍只接受 `roleId:Supervisor`。本角色三项单测及实际 Electron 聚焦结果以本次 `er-ge-display-name-v1` 固定候选证据为准，最终安装包和独立GUI由下游验证。

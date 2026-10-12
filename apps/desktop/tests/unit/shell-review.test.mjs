@@ -49,7 +49,7 @@ assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(t
 const projectRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 let roleDirectory = testRole;
 if (testRole !== 'DesktopEngineer') roleDirectory = `${testRole}/desktop`;
-const base = resolve(projectRoot, `.ans/runtime/legion-cli-role-owned-v2/${roleDirectory}`);
+const base = resolve(projectRoot, `.ans/runtime/legion-desktop-command-center-v1/${roleDirectory}`);
 await mkdir(join(base, 'fixtures'), {
   recursive: true
 });

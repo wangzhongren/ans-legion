@@ -1,0 +1,9 @@
+# Su 客户入口身份同范围修复
+
+当前真实1.2.1 GUI截图证明助手气泡仍显示PM/项目管理，renderer第431行硬码，连Su完成回复也误标PM；第5行计划fallback与第465行空任务引导仍指向直接PM。与已接受v0.3客户只与Su连续对话的具体要求不符。由原Desktop在既有interface范围修复实际客户身份；运行区后台PM职责/连接保持真实语义，不用全局文字替换假装统一。
+
+沿Human已经接受的66文件配置85c6197ccad1a0b67454a42966b3fce53d701170c41092a9fdc4b355a5b37366与冻结设计e6cf4a935d81b8c5de5037b6d24f033b2fb5cb7935b6a6199edd1ef6f29df8e2，不加角色、文件、检查、权限或功能。Desktop只在实际task_ops窄assignment中写已授renderer/既有测试/行为文档；T已实证GUI流程发送与焦点问题若为产品问题，同轮归原Desktop合并必要修复；纯fixture归原T10，不修改未派文件。
+
+固定Supervisor唯一新条件记录：docs/scheduling/legion-desktop-command-center-v1-su-label-repair-integration.md。旧T/R检查在安全边界收束后正式stop，保留1.2.1 tar/截图/失败证据；新图D→PM当前fresh1.2.2/Desktop对应patch→T/R真实同候选→PM四文档readonly关闭，不用旧candidate通过替代。首先基于真实日志确定必要修复范围，避免同一已知UI误接线分多轮新包；达到已批准闭环即可停止额外诊断。
+
+新真实GUI明确每条客户助手回复显示Su，PM问题由Su转达；900入口、首屏日志/记忆、计划确认、执行中查询、取消续轮等已批准强场景仍验，后台私有不出IPC。继有固定随机fixture兼容例外仅原五入口且不覆写旧证据，未知marker保留。当前授权完整覆盖此必要修复，故不重复Human同版批准。

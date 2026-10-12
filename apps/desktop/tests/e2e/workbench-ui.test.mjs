@@ -24,7 +24,7 @@ async function files(directory, prefix = '') {
 async function state(page) { const result = await page.evaluate(() => window.legionDesktop.getState()); assert.equal(result.ok, true, result.error?.code); return result.value; }
 async function theme(page, name) {
   const current = await page.locator('html').getAttribute('data-theme');
-  if (current !== name) { await page.locator('#theme-toggle').click(); if (await page.locator('html').getAttribute('data-theme') !== name) await page.locator('#theme-toggle').click(); }
+  if (current !== name) { const mobile=await page.locator('#mobile-nav-toggle').isVisible();if(mobile)await page.locator('#mobile-nav-toggle').click();await page.locator('#theme-toggle').click(); if (await page.locator('html').getAttribute('data-theme') !== name) await page.locator('#theme-toggle').click();if(mobile){await page.locator('#theme-toggle').press('Escape');assert.equal(await page.locator('#mobile-nav-toggle').getAttribute('aria-expanded'),'false');assert.equal(await page.locator('#mobile-nav-toggle').evaluate(node=>node===document.activeElement),true);}}
   assert.equal(await page.locator('html').getAttribute('data-theme'), name);
 }
 
@@ -168,132 +168,16 @@ test('Windows ZIP native chooser, focused UI, confirmed write and DPAPI process 
   }
 });
 
-test('installed macOS Electron UI gives PM and confirmed worker controlled project reads', {
-  timeout: 90000, skip: process.platform !== 'darwin' ? 'macOS Electron check requires macOS' : false,
-}, async () => {
-  await fs.mkdir(handwellEvidence,{recursive:true});
-  const location = await ownedDirectory('fixtures', 'handwell-mac-read-ui-');
-  const userData = await ownedDirectory('user-data', 'mac-read-ui-');
-  await guard(join(generated, 'tmp'), true);
-  const workspace = join(location, 'customer-project');
-  await fs.mkdir(join(workspace, 'nested/.ssh'), { recursive: true });
-  await fs.writeFile(join(workspace, 'ordinary.txt'), 'mac-ui-ordinary-marker\n');
-  await fs.writeFile(join(workspace, 'nested/.ssh/id_rsa'), 'mac-ui-credential-marker');
-  let electron; let server; let phase = 'initial'; let transferPlan;
-  try {
-    const runtimePackage = JSON.parse(await fs.readFile(join(projectRoot, 'apps/desktop/node_modules/legion-runtime/package.json'), 'utf8'));
-    const electronPackage = JSON.parse(await fs.readFile(join(projectRoot, 'apps/desktop/node_modules/electron/package.json'), 'utf8'));
-    assert.equal(runtimePackage.version, '0.8.2'); assert.equal(electronPackage.version, '44.6.0');
-    const planned = plan('placeholder-profile', ['approved.txt']);
-    server = await localServer(async (call, reply) => {
-      const names = (call.body.tools ?? []).map(item => item.function.name).sort();
-      const previous = call.body.messages.filter(item => item.role === 'tool');
-      if(names.includes('legion_submit_acceptance')){if(!previous.length){replyText(reply,'',{checkId:'acceptance'},'legion_run_check');return;}if(previous.length===1){const checked=JSON.parse(previous[0].content).result;assert.equal(checked.status,'passed');replyText(reply,'',{payload:{taskId:'zzindependent',evidenceIds:[checked.requestId],decision:'pass',issues:[]}},'legion_submit_acceptance');return;}assert.equal(JSON.parse(previous.at(-1).content).result.status,'completed');replyText(reply,'Actual independent acceptance complete');return;}
-      if (!names.includes('legion_write_file')) {
-        assert.ok(names.includes('legion_list_files')&&names.includes('legion_read_file'));assert.ok(names.includes('legion_design_roles'));
-        const candidate=phase==='transfer'?transferPlan:planned;assert.ok(candidate.governance,'fixture roles approved before SDK turn');
-        if (phase === 'transfer') { replyText(reply, planText(transferPlan)); return; }
-        if (previous.length === 0) { replyText(reply, '', { resource: '' }, 'legion_list_files'); return; }
-        if (previous.length === 1) { replyText(reply, '', { resource: 'ordinary.txt' }, 'legion_read_file'); return; }
-        if (previous.length === 2) { replyText(reply, '', { resource: 'nested/.ssh/id_rsa' }, 'legion_read_file'); return; }
-        const responses = JSON.stringify(previous);
-        assert.ok(responses.includes('mac-ui-ordinary-marker'));
-        assert.ok(!responses.includes('mac-ui-credential-marker'));
-        replyText(reply, planText(planned)); return;
-      }
-      assert.deepEqual(names, ['legion_edit_file', 'legion_list_files', 'legion_read_file', 'legion_request_shell', 'legion_run_check', 'legion_write_file']);
-      if (phase === 'transfer') {
-        if (previous.length === 0) { replyText(reply, '', { resource: 'approved.txt' }, 'legion_read_file'); return; }
-        if (previous.length === 1) {
-          const read = JSON.parse(previous[0].content).result;
-          assert.equal(read.status, 'read'); assert.equal(read.text, 'mac-ui-approved-write');
-          assert.equal(read.sha256, sha(Buffer.from(read.text)));
-          replyText(reply, '', { resource: 'approved.txt', expectedSha256: read.sha256,
-            replacements: [{ oldText: 'approved', newText: 'edited' }] }, 'legion_edit_file'); return;
-        }
-        if(previous.length===2){assert.equal(JSON.parse(previous.at(-1).content).result.status,'written');replyText(reply,'',{checkId:'selftest-task0'},'legion_run_check');return;}assert.equal(JSON.parse(previous.at(-1).content).result.status,'passed');
-        replyText(reply, 'Transferred Agent edit completed'); return;
-      }
-      if (previous.length === 0) { replyText(reply, '', { resource: 'ordinary.txt' }, 'legion_read_file'); return; }
-      if (previous.length === 1) { replyText(reply, '', { resource: 'nested/.ssh/id_rsa' }, 'legion_read_file'); return; }
-      if (previous.length === 2) {
-        const responses = JSON.stringify(previous);
-        assert.ok(responses.includes('mac-ui-ordinary-marker'));
-        assert.ok(!responses.includes('mac-ui-credential-marker'));
-        replyText(reply, '', { resource: 'approved.txt', content: 'mac-ui-approved-write' }); return;
-      }
-      if(previous.length===3){assert.equal(JSON.parse(previous.at(-1).content).result.status,'written');replyText(reply,'',{checkId:'selftest-task0'},'legion_run_check');return;}assert.equal(JSON.parse(previous.at(-1).content).result.status,'passed');replyText(reply, 'Worker completed');
-    });
-    const executablePath = join(projectRoot, 'apps/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron');
-    electron = await _electron.launch({ executablePath, args: [join(projectRoot, 'apps/desktop')],
-      cwd: join(projectRoot, 'apps/desktop'),
-      env: environment({ LEGION_DESKTOP_USER_DATA_DIR: userData, LEGION_DESKTOP_INITIAL_WORKSPACE: workspace,
-        LEGION_DESKTOP_SHOW: 'false' }), timeout: 35000 });
-    const page = await electron.firstWindow({ timeout: 20000 });
-    await page.waitForSelector('#conversation-page:not([hidden])');
-    const initial = await waitFor(() => state(page), value => value.currentProject?.name === 'customer-project', 'macOS project selected');
-    assert.deepEqual(initial.context.files, []);
-    await page.locator('.sidebar-bottom [data-page="settings"]').click();
-    await page.locator('#new-profile').click(); await page.locator('#profile-name').fill('mac read tester');
-    await page.locator('#protocol').selectOption('openai-completions');
-    await page.locator('#provider').fill('tester'); await page.locator('#model-id').fill('tester-local');
-    await page.locator('#base-url').fill(server.baseUrl); await page.locator('#api-key').fill('mac-ui-key');
-    await page.locator('#save-profile').click();
-    const saved = await waitFor(() => state(page), value => value.profiles.some(item => item.name === 'mac read tester'), 'macOS profile saved');
-    const profileId = saved.profiles.find(item => item.name === 'mac read tester').id;
-    planned.roles[0].profileId = profileId; planned.tasks[0].profileId = profileId;
-    await page.locator('#default-profile').selectOption(profileId);
-    await page.locator('[data-page="conversation"]').click();
-    await prepareCandidate(planned,workspace,userData,'mac-ui-approved-write');
-    await page.locator('#message-input').fill('Inspect this project and propose one exact output');
-    await page.locator('#send-message').click();
-    const discussed = await waitFor(() => state(page), value => value.plan?.status === 'draft' && value.turn?.status === 'completed', 'macOS PM draft', 20000);
-    assert.deepEqual(discussed.context.files, []);
-    assert.equal(await fs.readFile(join(workspace, 'ordinary.txt'), 'utf8'), 'mac-ui-ordinary-marker\n');
-    await assert.rejects(fs.stat(join(workspace, 'approved.txt')), { code: 'ENOENT' });
-    assert.ok(!JSON.stringify(discussed).includes('mac-ui-ordinary-marker'));
-    assert.ok(!JSON.stringify(discussed).includes('mac-ui-credential-marker'));
-    await page.locator('#details-toggle').click();await page.waitForSelector('#plan-panel:not([hidden])');
-    await page.screenshot({ path: join(handwellEvidence, 'tester-mac-read-draft.png') });
-    await page.locator('#tab-task').click();await page.waitForSelector('#detail-task:not([hidden])');await page.locator('#confirm-plan').click();await page.waitForSelector('#interaction-modal[open]');await page.locator('#interaction-submit').click();
-    const completed = await waitFor(() => state(page), value => value.plan?.status === 'completed', 'macOS confirmed worker', 20000);
-    assert.equal(await fs.readFile(join(workspace, 'approved.txt'), 'utf8'), 'mac-ui-approved-write');
-    assert.equal(completed.tasks[0].checkStatus, 'passed');assert.equal(completed.tasks[0].acceptanceStatus,'pass');
-    const audit = await fs.readFile(join(workspace, '.ans/events/index.jsonl'), 'utf8');
-    assert.ok(audit.includes('mutation_success'));
-    assert.ok(!audit.includes('mac-ui-ordinary-marker') && !audit.includes('mac-ui-credential-marker'));
-    assert.ok(!JSON.stringify(completed).includes('mac-ui-credential-marker'));
-    assert.equal(completed.fileOwners.owners.find(item => item.resource === 'approved.txt').roleId, 'Writer');
-    assert.equal(server.calls.length, 12);
-    await page.locator('#details-close').click();
-    transferPlan = plan(profileId, ['approved.txt']);
-    transferPlan.roles[0] = { id: 'Editor', name: 'Editor', purpose: 'Confirmed file transfer', profileId };
-    transferPlan.tasks[0].roleId = 'Editor';
-    transferPlan.transfers = [{ resource: 'approved.txt', fromRoleId: 'Writer', toRoleId: 'Editor' }];
-    await prepareCandidate(transferPlan,workspace,userData,'mac-ui-edited-write');
-    phase = 'transfer';
-    await page.locator('#message-input').fill('Transfer approved.txt from Writer to Editor for a small edit');
-    await page.locator('#send-message').click();
-    const transferDraft = await waitFor(() => state(page), value => value.plan?.status === 'draft' &&
-      value.plan?.fileOwnership?.transfers.length === 1, 'macOS transfer draft', 20000);
-    assert.equal(transferDraft.fileOwners.owners.find(item => item.resource === 'approved.txt').roleId, 'Writer');
-    assert.equal(await fs.readFile(join(workspace, 'approved.txt'), 'utf8'), 'mac-ui-approved-write');
-    if(!(await page.locator('#details-drawer').isVisible()))await page.locator('#details-toggle').click();await page.locator('#tab-files').click();await page.waitForSelector('#detail-files:not([hidden])');
-    await page.locator('#plan-ownership').getByText('approved.txt：Writer → Editor').waitFor();
-    await page.screenshot({ path: join(handwellEvidence, 'tester-mac-transfer-draft.png') });
-    await page.locator('#tab-task').click();await page.waitForSelector('#detail-task:not([hidden])');await page.locator('#confirm-plan').click();await page.waitForSelector('#interaction-modal[open]');await page.locator('#interaction-submit').click();
-    const transferred = await waitFor(() => state(page), value => value.plan?.status === 'completed' &&
-      value.fileOwners.owners.some(item => item.resource === 'approved.txt' && item.roleId === 'Editor'), 'macOS transferred Agent edit', 20000);
-    assert.equal(await fs.readFile(join(workspace, 'approved.txt'), 'utf8'), 'mac-ui-edited-write');
-    assert.equal(transferred.tasks[0].results[0].action, 'edit_file');
-    assert.equal(transferred.tasks[0].results[0].contentDigest, sha(Buffer.from('mac-ui-edited-write')));
-    assert.equal((await page.evaluate(value => window.legionDesktop.confirmPlan(value),
-      { projectId: initial.currentProject.id, planDigest: discussed.plan.planDigest })).ok, false);
-    assert.equal(server.calls.length, 20);
-  } catch(error) {const directory=join(userData,'workbench-organization');for(const name of await fs.readdir(directory).catch(()=>[])){if(name.endsWith('.json'))await fs.copyFile(join(directory,name),join(handwellEvidence,'mac-read-failed-organization.json'));}throw error;} finally {
-    if (electron) await electron.close();
-    if (server) await server.close();
-    await removeOwned(location, join(generated, 'fixtures'));
-    await removeOwned(userData, join(generated, 'user-data'));
+
+import {withCommandGui,guiState,guiZone,configureGui} from './governed-workflow-ui.test.mjs';
+test('macOS actual command-center six viewports/themes preserve keyboard focus drafts and read-only files',{timeout:90000},async()=>{
+ assert.equal(process.platform,'darwin','new macOS GUI scenario must run');
+ await withCommandGui(async({electron,page,root,controller,capture})=>{
+  const initial=await guiState(page);assert.equal(initial.profiles.length,0);assert.equal(controller.server.calls.length,0);assert.equal(await page.locator('#send-message').isDisabled(),true);await capture('no-connection-current-project');await configureGui(page,controller);
+  for(const size of [{width:1440,height:900},{width:1280,height:800},{width:900,height:700}]){await electron.evaluate(({BrowserWindow},size)=>BrowserWindow.getAllWindows()[0].setContentSize(size.width,size.height),size);await waitFor(()=>page.evaluate(()=>({width:innerWidth,height:innerHeight})),value=>value.width===size.width&&value.height===size.height,'actual native content size');
+   for(const mode of ['dark','light']){await theme(page,mode);await guiZone(page,'conversation');const draft='完整未提交 Human 草稿 '+size.width+' '+mode;const input=page.locator('#message-input');await input.fill(draft);await input.focus();await input.press('Home');await input.press('Shift+End');const selection=await input.evaluate(node=>({start:node.selectionStart,end:node.selectionEnd}));assert.ok(selection.end>selection.start);const node=await input.elementHandle();await page.waitForTimeout(1100);assert.equal(await node.evaluate(node=>node===document.activeElement&&node.isConnected),true,'focus and node survive one real 1s polling cycle');assert.equal(await input.inputValue(),draft);assert.deepEqual(await input.evaluate(node=>({start:node.selectionStart,end:node.selectionEnd})),selection);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);const box=await input.boundingBox();assert.ok(box&&box.x>=0&&box.x+box.width<=size.width+1&&box.y+box.height<=size.height+1);await capture('layout-'+size.width+'-'+mode);if(size.width===900){await page.locator('#mobile-nav-toggle').click();await page.locator('[data-page="settings"]').click();assert.equal(await page.locator('#settings-page').isVisible(),true);assert.equal(await page.locator('#new-profile').isVisible(),true);await capture('900-direct-ai-settings-'+mode);await page.locator('#mobile-nav-toggle').click();await page.locator('#conversation-nav').click();assert.equal(await page.locator('#message-input').inputValue(),draft);}
+    await guiZone(page,'project');await page.locator('#project-refresh').click();const file=page.locator('#project-file-list button').filter({hasText:'ordinary.txt'});await file.waitFor();await file.focus();await file.press('Enter');await waitFor(()=>page.locator('#file-preview-text').innerText(),text=>text.includes('READ_ONLY_PROJECT_FILE'),'keyboard current file');assert.equal(await fs.readFile(join(root,'ordinary.txt'),'utf8'),'READ_ONLY_PROJECT_FILE\n');assert.deepEqual((await guiState(page)).context.files,[],'browsing never selects context');await page.locator('#file-preview-close').focus();await page.locator('#file-preview-close').press('Enter');await guiZone(page,'conversation');assert.equal(await input.inputValue(),draft,'draft survives workspace navigation');await page.locator('#details-toggle').click();await page.locator('#details-close').press('Escape');await waitFor(()=>page.locator('#details-drawer').isVisible(),value=>!value,'Escape closes actual details');assert.equal(await page.locator('#details-toggle').evaluate(node=>node===document.activeElement),true,'Escape restores trigger focus');
+   }
   }
+ });
 });

@@ -16,7 +16,7 @@ import { CheckSpec, CheckRequest, CheckAuthorization, CheckDecision, ProjectFile
   PiToolRequest, digestValue } from 'legion-runtime/workbench-models';
 import { createCheckService } from 'legion-runtime/services/check';
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const generated = join(projectRoot, '.ans/runtime/legion-cli-role-owned-v2/Reviewer');
+const generated = join(projectRoot, '.ans/runtime/legion-desktop-command-center-v1/Reviewer');
 const projectId = 'a'.repeat(64);
 const actor = (roleId, id = roleId) => ({ projectId, roleId, instanceId: id });
 function definition(id, boundary, revision = 1) {

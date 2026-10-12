@@ -99,3 +99,53 @@ Su CLI 当前确认选择修复依据 `.ans/decisions/legion-supervisor-frontdoo
 | 类型 | 项目相对路径 | 用途 |
 | --- | --- | --- |
 | 条件文件 | `docs/scheduling/legion-cli-role-owned-v2.md` | 固定 Supervisor 经 task_ops 维护本阶段记录；旧 v1 记录不续派 |
+
+
+| 文件 | `docs/scheduling/legion-desktop-command-center-v1.md` | 项目指挥台精确配置接受后由固定Supervisor通过task_ops维护的本阶段唯一调度记录；当前待Human确认，Governance不写记录 |
+
+Human已接受项目指挥台v0.3和精确超时修正版586fa7aa…：允许固定Supervisor经task_ops维护 `docs/scheduling/legion-desktop-command-center-v1.md` 并自动派发四既有角色。可信操作者私有计划/令牌仅写 `.ans/runtime/legion-desktop-command-center-v1/Supervisor/operator/` 新run，token不进文档或worker正文；协调锁/日志按task_ops工具既定生成路径，不授应用源码。
+
+
+| 条件文件 | `docs/scheduling/legion-desktop-command-center-v1-shell-caller-integration.md` | Human已接受65文件补齐配置86dccc57…；固定Supervisor仅经task_ops维护当前T/R/PM文档集成，绑定原D/PM已verified来源，旧图与证据保留 |
+
+
+| 条件文件 | `docs/scheduling/legion-desktop-command-center-v1-ui-repair-integration.md` | Human已接受66文件配置85c6197c…；固定Supervisor仅经task_ops维护既有Desktop UI必要修复、PM新候选包与独立T/R/PM关闭，原失败图/证据保留 |
+
+
+| 条件文件 | `docs/scheduling/legion-desktop-command-center-v1-su-label-repair-integration.md` | 同Human已接受66配置85c6197c…内Su客户身份误标与实际GUI流程接线必要修复，固定Supervisor仅经task_ops维护，旧1.2.1与失败保留 |
+
+
+**二哥展示改名 v1：已由真人接受的条件记录**
+
+| 类型 | 项目相对路径 | 用途 |
+| --- | --- | --- |
+| 条件文件 | `docs/scheduling/er-ge-display-name-v1.md` | 固定 Supervisor 经已接受的本次独立改名方案及29文件配置，通过 task_ops 初始化、自动派发并维护 |
+
+配置 `.ans/decisions/er-ge-display-name-v1-project.json`，SHA-256 `f27e36af6aca342b6644d305a8c56ca4590076812b9ab740ff10f54f680b6b5a`。生成证据及私有operator仅使用既有获准 `.ans/runtime/legion-desktop-command-center-v1/` 各owner根下全新 er-ge stage/run；旧1.2.2包与历史只读。无新增应用归属或权限。
+
+2026-10-12 真人已接受上述二哥改名方案及29文件配置（call_c8153a14b05949d78b19b2c9774d1548，答复“确认并实施”），条件记录现可按精确配置执行。配置/方案保持确认时字节，既有执行owner边界未扩展。
+
+
+**二哥依赖检查单文件补齐：真人已接受**
+
+| 类型 | 项目相对路径 | 用途 |
+| --- | --- | --- |
+| 条件文件 | `docs/scheduling/er-ge-display-name-v1-dependency-integration.md` | 真人已接受30文件补齐配置，由固定Supervisor经task_ops初始化接续原D候选与PM/T/交付；旧图保留 |
+
+配置SHA-256 `68d86b8f279e23f52a335f3d704492ebe85b0632047d1f9707a0fc458e6a318f`，原二哥方案不变。精确原因见 `.ans/decisions/er-ge-display-name-v1-dependency-scope.md`。2026-10-12 真人已通过 call_17adcf87fd8a48b2beb90eac65cbc2a7 批准，可按30文件精确配置派发。
+
+
+| 条件文件 | `docs/scheduling/er-ge-display-name-v1-final-package-integration.md` | 同真人已接受30配置68d86b8f…内README当前称呼与事实修正后的fresh final-v2包接续PM/T/文档；固定Supervisor仅经task_ops维护，首诊断包和记录保留 |
+
+此接续不新增源码路径、角色权限或设计变更，不重复同版真人确认。先结束旧在途固定门并保留证据，按原30配置派发原owner；新图readSet必须绑定真实final-v2 tar/package-smoke及已verified D来源，不在同图偷换旧tar路径。生成仍用既有获准根，旧包不覆盖。
+
+
+**二哥侧栏主入口分组：真人已接受的条件记录**
+
+| 类型 | 项目相对路径 | 用途 |
+| --- | --- | --- |
+| 条件文件 | `docs/scheduling/er-ge-sidebar-entry-v1.md` | 真人已接受7文件配置，固定Supervisor经task_ops初始化、自动派发D6/T1并维护 |
+
+候选配置 `.ans/decisions/er-ge-sidebar-entry-v1-project.json` SHA-256 `afbcb443c97778f501467e93d1bd3792860e31f6c76e6e9ee17a3a5d844adb7f`，方案 `.ans/decisions/er-ge-sidebar-entry-v1-scope.md`。仅侧栏Interface与原owner测试/功能说明，生成沿既有获准根的fresh sidebar-entry stage；不新增Host或私有消息权限，不改版本、README或已冻结tar。
+
+2026-10-12 真人已通过call_Pi1zzPGohNCbOcjDzhWFtbQs答复“按图实施”，上述侧栏7文件配置与方案生效。

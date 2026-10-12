@@ -4,36 +4,47 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'">
-  <title>及时雨 · Handwell</title>
+  <title>二哥项目指挥台</title>
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="../../node_modules/marked/lib/marked.umd.js"></script>
   <script type="module" src="renderer.mjs"></script>
 </head>
 <body>
-  <aside class="sidebar" aria-label="项目导航">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">H</span><strong>及时雨<small>Handwell</small></strong></div>
+  <aside id="project-sidebar" class="sidebar" aria-label="项目导航">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">二</span><strong>二哥<small>项目指挥台</small></strong></div>
     <div class="sidebar-heading"><span>项目</span><button id="choose-project" class="icon-button" title="选择项目文件夹" aria-label="选择项目文件夹">＋</button></div>
     <div id="project-list" class="project-list"></div>
-    <button id="conversation-nav" class="nav-item active" data-page="conversation" aria-current="page">对话</button>
-    <div class="sidebar-heading"><span>项目成员</span><span id="role-count" class="muted">0</span></div>
-    <div id="member-list" class="member-list" aria-label="持续项目成员"></div>
+    <div class="sidebar-heading"><span>主入口</span></div>
+    <button id="conversation-nav" class="nav-item entry-card active" data-page="conversation" aria-current="page" aria-label="二哥主入口，先选择项目" disabled><span class="entry-icon" aria-hidden="true">二</span><span class="entry-copy"><strong>二哥</strong><small>当前项目对话</small></span><span id="entry-badge" class="entry-badge" hidden>内置</span><span class="entry-state"><span class="activity-dot" aria-hidden="true"></span><span id="entry-status">先选择项目</span></span></button>
+    <div class="sidebar-heading"><span>其他角色（查看/调试）</span><span id="role-count" class="muted">0</span></div>
+    <div id="member-list" class="member-list" aria-label="其他角色，仅查看与调试"></div>
     <div class="sidebar-bottom"><button class="nav-item" data-page="settings" aria-current="false">AI 连接</button><button id="theme-toggle" class="secondary compact">切换浅色 / 深色</button><p>一起想清楚，稳妥地做好。</p></div>
   </aside>
+  <button id="nav-backdrop" type="button" aria-label="关闭项目导航" hidden></button>
   <main id="workspace">
-    <header class="topbar"><div><h1 id="project-name">及时雨 · Handwell</h1><p id="manager-connection">从一个想法开始</p></div><div class="header-actions"><button id="refresh-project" class="secondary compact">刷新</button><button id="details-toggle" class="secondary compact" aria-expanded="false" aria-controls="details-drawer">当前任务</button></div></header>
+    <header class="topbar"><div><h1 id="project-name">二哥项目指挥台</h1><p id="manager-connection">和二哥从一个想法开始</p><p id="command-status" class="muted" aria-live="polite">等待项目</p></div><div class="header-actions"><button id="mobile-nav-toggle" class="secondary compact" aria-expanded="false" aria-controls="project-sidebar">项目与设置</button><button id="top-choose-project" class="secondary compact">选择项目</button><button id="refresh-project" class="secondary compact">刷新</button><button id="details-toggle" class="secondary compact" aria-expanded="false" aria-controls="details-drawer">当前任务</button></div></header>
     <div id="notice" class="notice" role="status" hidden></div>
-    <section id="conversation-page" class="page conversation-page welcome-mode" aria-label="项目管理对话">
+    <div id="workspace-switcher" class="workspace-switcher" role="tablist" aria-label="工作区"><button id="zone-conversation" role="tab" data-zone="conversation" aria-selected="true">二哥对话</button><button id="zone-project" role="tab" data-zone="project" aria-selected="false">项目</button><button id="zone-roles" role="tab" data-zone="roles" aria-selected="false">角色</button></div>
+    <div id="command-grid" class="command-grid" data-zone="conversation">
+    <section id="conversation-page" class="page conversation-page welcome-mode" aria-label="二哥客户对话">
       <div id="member-activity" class="member-activity conversation-width" aria-label="正在工作的成员" hidden></div>
       <div id="chat-scroll" class="chat-scroll"><div class="conversation-width"><div id="messages" class="messages" aria-live="polite" aria-label="完整项目会话"></div></div></div>
       <div class="conversation-entry">
-        <div id="welcome" class="welcome"><span class="eyebrow">及时雨 / Handwell</span><h2>有什么想一起完成？</h2><p id="welcome-description">选择一个项目，带着你的想法开始。</p><div class="welcome-actions"><button id="welcome-choose" class="secondary">选择项目文件夹</button><button id="welcome-settings" class="secondary" hidden>配置 AI 连接</button></div></div>
-        <div class="composer"><form id="message-form" class="conversation-width"><button id="pending-interaction" type="button" class="pending-interaction" hidden>查看待答复请求</button><div class="composer-box"><textarea id="message-input" rows="3" maxlength="65536" placeholder="描述你的想法，和项目管理一起想清楚…" aria-label="给项目管理的消息"></textarea><div class="composer-actions"><span id="conversation-status" class="muted">选择项目后开始对话</span><div><button id="cancel-turn" type="button" class="secondary" hidden>停止回复</button><button id="send-message" type="submit" class="primary" aria-label="发送">↑</button></div></div></div><p id="composer-hint" class="muted">Ctrl / ⌘ + Enter 发送 · 确认具体范围后执行</p></form></div>
+        <div id="welcome" class="welcome"><span class="eyebrow">二哥 / 项目指挥台</span><h2>有什么想一起完成？</h2><p id="welcome-description">选择一个项目，和二哥从你的想法开始。</p><div class="welcome-actions"><button id="welcome-choose" class="secondary">选择项目文件夹</button><button id="welcome-settings" class="secondary" hidden>配置 AI 连接</button></div></div>
+        <div class="composer"><form id="message-form" class="conversation-width"><button id="pending-interaction" type="button" class="pending-interaction" hidden>查看待答复请求</button><div class="composer-box"><textarea id="message-input" rows="3" maxlength="65536" placeholder="描述你的想法，和二哥一起想清楚…" aria-label="给二哥的消息"></textarea><div class="composer-actions"><span id="conversation-status" class="muted">选择项目后开始对话</span><div><button id="cancel-turn" type="button" class="secondary" hidden>停止回复</button><button id="send-message" type="submit" class="primary" aria-label="发送">↑</button></div></div></div><p id="composer-hint" class="muted">Ctrl / ⌘ + Enter 发送 · 确认具体范围后执行</p></form></div>
         <div id="suggestions" class="suggestions"><button class="secondary" data-suggestion="先帮我梳理这个项目的目标和实施方案。">梳理一个想法</button><button class="secondary" data-suggestion="我需要修改现有项目，请先与我澄清需求和需要参考的文件。">修改现有项目</button></div>
       </div>
     </section>
+    <section id="project-zone" class="command-zone" aria-label="项目文件和结果">
+      <header class="zone-heading"><div><span class="eyebrow">项目工作区</span><h2>文件与结果</h2></div><button id="project-refresh" class="secondary compact">刷新事实</button></header>
+      <div class="zone-tabs" role="tablist" aria-label="项目资料"><button data-project-tab="files" role="tab" aria-selected="true">文件</button><button data-project-tab="changes" role="tab" aria-selected="false">变更</button><button data-project-tab="outputs" role="tab" aria-selected="false">产物</button><button data-project-tab="checks" role="tab" aria-selected="false">检查 / 验收</button></div>
+      <div id="project-scroll" class="zone-scroll"><section id="project-files-panel"><div class="zone-toolbar"><button id="file-parent" class="secondary compact">上级</button><span id="file-path" class="muted">项目根目录</span></div><p id="file-status" class="muted">选择项目后读取普通文件。</p><div id="project-file-list"></div><button id="file-more" class="secondary compact" hidden>下一页</button><section id="file-preview" hidden><div class="zone-heading"><h3 id="file-preview-title"></h3><button id="file-preview-close" class="secondary compact">关闭</button></div><p id="file-preview-status" class="muted"></p><pre id="file-preview-text"></pre><button id="file-preview-more" class="secondary compact" hidden>继续读取</button></section></section><section id="project-changes-panel" hidden><p id="changes-status" class="muted">当前计划的真实修改。</p><div id="project-changes-list"></div><button id="changes-more" class="secondary compact" hidden>下一页</button></section><section id="project-outputs-panel" hidden><p id="outputs-status" class="muted">真实发布与生成产物。</p><div id="project-outputs-list"></div><button id="outputs-more" class="secondary compact" hidden>下一页</button></section><section id="project-checks-panel" hidden><p id="checks-status" class="muted">软件检查与独立验收。</p><div id="project-checks-list"></div><button id="checks-more" class="secondary compact" hidden>更多检查</button><button id="acceptances-more" class="secondary compact" hidden>更多验收</button></section></div>
+    </section>
+    <section id="roles-zone" class="command-zone" aria-label="角色运行与记忆"><header class="zone-heading"><div><span class="eyebrow">角色运行区</span><h2>工作与依赖</h2></div><button id="roles-refresh" class="secondary compact">刷新</button></header><div class="zone-scroll"><label>当前角色<select id="role-selector" aria-label="选择角色"></select></label><p id="role-status" class="muted">选择项目后查看角色。</p><div id="role-activity-list"></div><h3>任务与阻塞</h3><div id="role-task-list"></div><div class="zone-heading"><h3>行动日志</h3><button id="role-log-refresh" class="secondary compact">重新读取</button></div><p id="role-log-status" class="muted">只显示经宿主校验的行动事实。</p><div id="role-log-list"></div><button id="role-log-more" class="secondary compact" hidden>下一页</button><div class="zone-heading"><h3>分类记忆</h3><button id="memory-refresh" class="secondary compact">刷新</button></div><label>类别<select id="memory-kind"><option value="">全部</option><option value="pitfall">踩坑</option><option value="decision">重要决定</option><option value="preference">本项目偏好</option></select></label><p id="memory-status" class="muted">只显示有来源的项目事实。</p><div id="memory-list"></div><button id="memory-more" class="secondary compact" hidden>下一页</button></div></section>
+    </div>
     <section id="settings-page" class="page settings-page" aria-label="AI 连接设置" hidden>
       <div class="settings-content"><div class="section-heading"><div><span class="eyebrow">连接与协作</span><h2>AI 连接</h2><p class="muted">使用你自己的模型连接，密钥在本机加密保存。</p></div><button id="new-profile" class="secondary">新增连接</button></div>
-      <label class="default-profile">默认项目管理连接<select id="default-profile" aria-label="默认项目管理连接"></select></label><p id="default-profile-hint" class="muted">更改默认连接会使旧计划失效并停止其执行。</p>
+      <label class="default-profile">默认二哥对话连接<select id="default-profile" aria-label="默认二哥对话连接"></select></label><p id="default-profile-hint" class="muted">二哥使用此连接；后台 PM 的专属映射仍在下方设置。活动计划会因连接变化失效。</p>
       <div class="profiles-layout"><div id="profile-list" class="profile-list" aria-label="已保存的连接"></div>
         <form id="profile-form" class="profile-editor"><h3 id="form-title">新增连接</h3><input id="profile-id" type="hidden">
           <label>连接名称<input id="profile-name" required maxlength="100" placeholder="例如：工作连接"></label>
@@ -43,10 +54,10 @@
           <div class="key-heading"><span>API Key</span><span id="saved-key" class="badge">尚未保存密钥</span></div>
           <label>密钥编辑动作<select id="key-action"><option value="replace">替换：保存新密钥</option><option value="keep">保留：使用已保存密钥</option><option value="clear">清除：移除已保存密钥</option></select></label>
           <label>新密钥<input id="api-key" type="password" maxlength="8192" autocomplete="off" placeholder="保存后不会读回"></label><p id="key-hint" class="muted"></p>
-          <p id="profile-error" class="inline-error" role="alert" hidden></p><button id="save-profile" type="submit" class="primary">保存连接</button><p class="muted">保存、删除或更改映射会使旧计划失效并停止执行。</p>
+          <p id="profile-error" class="inline-error" role="alert" hidden></p><button id="save-profile" type="submit" class="primary">保存连接</button><p class="muted">连接变化会使活动计划失效；没有活动计划时仅影响后续使用。</p>
         </form>
       </div><div class="probe-card"><div><h3>连接测试</h3><p id="probe-state" class="muted">尚未测试 · 只测试已保存连接</p></div><button id="cancel-probe" class="secondary" disabled>取消测试</button></div>
-      <section class="mapping-section"><h3>当前项目的连接映射</h3><p class="muted">为实际成员选择已保存的连接。保存映射后需要重新讨论确认计划。</p><div id="mapping-list"></div></section>
+      <section class="mapping-section"><h3>当前项目的连接映射</h3><p class="muted">为实际成员选择已保存的连接；后台 PM 可以单独映射。活动计划变更后须重新确认。</p><div id="mapping-list"></div></section>
       </div>
     </section>
     <aside id="details-drawer" class="details-drawer" aria-label="当前任务详情" hidden>

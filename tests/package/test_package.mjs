@@ -9,10 +9,10 @@ import { fileURLToPath } from "node:url";
 const project = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const role = process.env.LEGION_NODE_TEST_ROLE ?? "ProjectManager";
 assert.ok(["ProjectManager", "Reviewer", "Tester"].includes(role), "unknown_node_test_role");
-const generated = join(project, ".ans/runtime/legion-cli-role-owned-v2", role);
-const packaging = join(generated, "packaging", "su-frontdoor-memory-repair-v1");
-const cache = join(generated, "npm-cache", "su-frontdoor-memory-repair-v1");
-const temporary = join(generated, "tmp", "su-frontdoor-memory-repair-v1");
+const generated = join(project, ".ans/runtime/legion-desktop-command-center-v1", role);
+const packaging = join(generated, "packaging", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26");
+const cache = join(generated, "npm-cache", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26");
+const temporary = join(generated, "tmp", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26");
 const historicalSeed = join(project, ".ans/runtime/legion-pi-node-v3/npm-cache/_cacache");
 const localSeed = "/private/tmp/legion-npm-cache/_cacache";
 const previousGovernedTarball = join(project, ".ans/runtime/legion-governed-workflow-v1/ProjectManager/packaging/legion-runtime-0.7.0.tgz");
@@ -302,9 +302,9 @@ async function installedShellSmoke(base) {
   await fs.writeFile(path.join(workspaceRoot, 'owned.txt'), 'original\n');
   await fs.writeFile(path.join(workspaceRoot, 'removed.txt'), 'remove with exact baseline\n');
   await fs.writeFile(path.join(workspaceRoot, 'asset.png'), Buffer.from([137, 80, 0]));
-  await fs.writeFile(path.join(workspaceRoot, 'package.json'), JSON.stringify({ name: 'installed-shell-fixture', version: '1.1.3',
+  await fs.writeFile(path.join(workspaceRoot, 'package.json'), JSON.stringify({ name: 'installed-shell-fixture', version: '1.2.3',
     scripts: { build: 'node -e "require(\'node:fs\').mkdirSync(\'dist\',{recursive:true});require(\'node:fs\').writeFileSync(\'dist/result.txt\',\'built\')"' } }));
-  await fs.writeFile(path.join(workspaceRoot, 'local/package.json'), JSON.stringify({ name: 'installed-shell-local', version: '1.1.3', bin: { 'installed-bin': 'bin.js' } }));
+  await fs.writeFile(path.join(workspaceRoot, 'local/package.json'), JSON.stringify({ name: 'installed-shell-local', version: '1.2.3', bin: { 'installed-bin': 'bin.js' } }));
   await fs.writeFile(path.join(workspaceRoot, 'local/bin.js'), '#!/usr/bin/env node\nconsole.log("local installed dependency");\n');
   const stat = await fs.lstat(workspaceRoot, { bigint: true });
   const workspaceIdentity = { canonicalPath: workspaceRoot, deviceId: String(stat.dev), fileId: String(stat.ino) };
@@ -861,7 +861,7 @@ export async function buildPackageEvidence() {
     const packed = JSON.parse(npm(["pack", "--json", "--pack-destination", runDirectory]))[0];
     assert.deepEqual(packed.files.map((file) => file.path).sort(), expected);
     assert.equal(packed.name, "legion-runtime");
-    assert.equal(packed.version, "1.1.3");
+    assert.equal(packed.version, "1.2.3");
     const tarball = join(packaging, packed.filename);
     const bytes = await fs.readFile(join(runDirectory, packed.filename));
     try { await fs.writeFile(tarball, bytes, { flag: "wx" }); }
@@ -880,16 +880,16 @@ export async function buildPackageEvidence() {
       private: true, type: "module", dependencies: { "legion-runtime": tarballDependency } }));
     const sourceLock = JSON.parse(await fs.readFile(join(project, "package-lock.json"), "utf8"));
     sourceLock.name = "legion-isolated-consumer";
-    sourceLock.version = "1.1.3";
-    sourceLock.packages[""] = { name: "legion-isolated-consumer", version: "1.1.3",
+    sourceLock.version = "1.2.3";
+    sourceLock.packages[""] = { name: "legion-isolated-consumer", version: "1.2.3",
       dependencies: { "legion-runtime": tarballDependency } };
-    sourceLock.packages["node_modules/legion-runtime"] = { version: "1.1.3", resolved: tarballDependency,
+    sourceLock.packages["node_modules/legion-runtime"] = { version: "1.2.3", resolved: tarballDependency,
       integrity, dependencies: { "@earendil-works/pi-ai": "1.0.4", "@earendil-works/pi-coding-agent": "1.0.4" },
       bin: { legion: "bin/legion.mjs" }, engines: { node: ">=22.19.0" } };
     await fs.writeFile(join(consumer, "package-lock.json"), JSON.stringify(sourceLock, null, 2) + "\n");
     npm(["ci", "--offline", "--cache", cache], consumer);
     const tree = JSON.parse(npm(["ls", "--all", "--json"], consumer));
-    assert.equal(tree.dependencies["legion-runtime"].version, "1.1.3");
+    assert.equal(tree.dependencies["legion-runtime"].version, "1.2.3");
     await fs.writeFile(join(consumer, "smoke.mjs"), "const installedLease = " + installedLease.toString() + ";\nconst installedFreshSingleRunSmoke = " + installedFreshSingleRunSmoke.toString() + ";\nawait (" + installedSmoke.toString() + ")(" + JSON.stringify(modelNames) + "," + JSON.stringify(serviceNames) + ");\n");
     const smokeOutput = execute(["smoke.mjs"], consumer);
     const smoke = JSON.parse(smokeOutput.trim());
@@ -899,7 +899,7 @@ export async function buildPackageEvidence() {
     assert.equal(smoke.projectRead, true);
     assert.equal(smoke.fileOwnership, true);
     assert.equal(smoke.controlledEdit, true);
-    await fs.writeFile(join(consumer, "shell-smoke.mjs"), "const installedLease = " + installedLease.toString() + ";\nconst value = await (" + installedShellSmoke.toString() + ")(" + JSON.stringify(join(generated, "fixtures")) + "); console.log(JSON.stringify(value));\n");
+    await fs.writeFile(join(consumer, "shell-smoke.mjs"), "const installedLease = " + installedLease.toString() + ";\nconst value = await (" + installedShellSmoke.toString() + ")(" + JSON.stringify(join(generated, "fixtures", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26")) + "); console.log(JSON.stringify(value));\n");
     const shell = JSON.parse(execute(["shell-smoke.mjs"], consumer).trim());
     assert.equal(shell.realOfflineNpmInstall, true);
     assert.equal(shell.publicWorkbenchPublication, true);
@@ -928,7 +928,7 @@ export async function buildPackageEvidence() {
     assert.match(exampleOutput, /Su discussion complete/);
     const readmeExample = true;
     const suWorkflow = 'final fixed cli requires installed-cli-flow.json';
-    await fs.writeFile(join(consumer, "su-control-smoke.mjs"), "const value = await (" + installedSuControlSmoke.toString() + ")(" + JSON.stringify(join(generated, "fixtures")) + "); console.log(JSON.stringify(value));\n");
+    await fs.writeFile(join(consumer, "su-control-smoke.mjs"), "const value = await (" + installedSuControlSmoke.toString() + ")(" + JSON.stringify(join(generated, "fixtures", "er-ge-display-name-v1-final-v2-a689a7d63d7dfc26")) + "); console.log(JSON.stringify(value));\n");
     const suControls = JSON.parse(execute(["su-control-smoke.mjs"], consumer).trim());
     assert.equal(suControls.results.length, 9);
     assert.equal(suControls.totalActualLocalRequests, 18);

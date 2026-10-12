@@ -13,3 +13,16 @@ project_shell_candidate_version: handwell-pm-approved-project-shell-v1
 project_shell_candidate_status: AWAITING_EXACT_CUSTOMER_CONFIG_ACCEPTANCE
 project_shell_candidate_write_scope: ["tests/reviewer/test_shell_boundaries.mjs", "apps/desktop/tests/reviewer/shell-workflow-boundaries.test.mjs", "docs/roles/Reviewer/docs/review-project-shell-v1.md", "docs/roles/Reviewer/docs/feature/project-shell.md", "docs/roles/Reviewer/docs/design/2026-10-10_design_project-shell.md", "docs/roles/Reviewer/docs/change/2026-10-10_change_project-shell.md"]
 project_shell_candidate_generated_effect_scope: [".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/fixtures/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/user-data/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/tmp/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/evidence/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/packaging/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/npm-cache/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/electron-cache/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/shell-mirrors/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/shell-home/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/shell-logs/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/publication-staging/", ".ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/recovery/"]
+
+desktop_command_center_candidate:
+  state: AWAITING_EXACT_CUSTOMER_CONFIG_ACCEPTANCE
+  scope_reference: .ans/decisions/legion-desktop-command-center-v1-project.json
+  authored_files: ["tests/reviewer/test_cli_boundaries.mjs", "tests/reviewer/test_structure.mjs", "apps/desktop/tests/reviewer/desktop-boundaries.test.mjs", "apps/desktop/tests/reviewer/workbench-boundaries.test.mjs", "apps/desktop/tests/reviewer/governed-workflow-boundaries.test.mjs", "docs/roles/Reviewer/feature-map.md", "docs/roles/Reviewer/changelog.md", "docs/roles/Reviewer/docs/review-desktop-workbench-v2.md", "docs/roles/Reviewer/docs/review-governed-workflow-v1.md"]
+  generated_effect_scope: [".ans/runtime/legion-desktop-command-center-v1/Reviewer/evidence/", ".ans/runtime/legion-desktop-command-center-v1/Reviewer/fixtures/", ".ans/runtime/legion-desktop-command-center-v1/Reviewer/user-data/", ".ans/runtime/legion-desktop-command-center-v1/Reviewer/tmp/", ".ans/runtime/legion-desktop-command-center-v1/Reviewer/packaging/", ".ans/runtime/legion-desktop-command-center-v1/Reviewer/npm-cache/", ".ans/runtime/legion-desktop-command-center-v1/Reviewer/electron-cache/", ".ans/runtime/legion-desktop-command-center-v1/Reviewer/screenshots/"]
+
+desktop_command_center_accepted:
+  state: ACCEPTED
+  config: .ans/decisions/legion-desktop-command-center-v1-check-timeout-project.json
+  config_sha256: 586fa7aa28f8283b90440d512200c04dd7ead8a373ca8ace4d443c568324b5a6
+  design_sha256: e6cf4a935d81b8c5de5037b6d24f033b2fb5cb7935b6a6199edd1ef6f29df8e2
+  permission_source: .ans/decisions/legion-desktop-command-center-v1-authorization.md

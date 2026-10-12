@@ -12,6 +12,7 @@ import {
   projectDocument,
   workbenchDTO,
   workbenchInput,
+  wbError,
   historyDocument
 } from '../../src/models/workbench.mjs';
 const identity = {
@@ -21,6 +22,14 @@ const identity = {
 };
 const projectId = identityKey(identity);
 const sha = 'a'.repeat(64);
+test('customer error copy uses 二哥 while the accepted send role remains Supervisor', () => {
+  for (const code of ['manager_only','preflight_incomplete','conversation_busy','invalid_plan']) {
+    assert.match(wbError(code).message, /二哥/u);
+    assert.equal(/Su|Supervisor|项目管理/u.test(wbError(code).message), false);
+  }
+  assert.equal(workbenchInput('sendMessage', { projectId, roleId: 'Supervisor', text: '当前需求' }).value.roleId, 'Supervisor');
+  assert.equal(workbenchInput('sendMessage', { projectId, roleId: 'ProjectManager', text: '当前需求' }).error.code, 'manager_only');
+});
 const candidate = {schemaVersion:2,
   goal: '修改项目',
   roles: [{
@@ -378,4 +387,22 @@ test('supervision wire accepts finite current-plan typed fields and rejects auth
 test('member source content digest stays stable when Su completes while required Human coverage remains enforced',()=>{
  const domain=memoryDomain([]),at='2026-10-11T00:00:00.000Z';domain.timeline=beginConversationTurn(domain.timeline,{turnId:'live-Su',userMessageId:'real-Human',continuationAnswerId:null,text:'完整真实Human不能因轮次结束失去覆盖',createdAt:at});domain.customerTimeline=customerTimeline({...domain.timeline,schemaVersion:2,actor:'Supervisor',digest:undefined});const before=roleContextSources(domain,'RoleArchitect');
  domain.timeline=finishConversationTurn(domain.timeline,{turnId:'live-Su',status:'completed',assistantText:'Su解释原文',messageId:'Su-completed',createdAt:at});domain.customerTimeline=customerTimeline({...domain.timeline,schemaVersion:2,actor:'Supervisor',digest:undefined});const after=roleContextSources(domain,'RoleArchitect');assert.equal(after.sourceDigest,before.sourceDigest);assert.deepEqual(after.sources,before.sources);const prepared=prepareRoleContext(domain,'RoleArchitect','当前canonical完整输入');assert.ok(prepared.retained.some(source=>source.text==='完整真实Human不能因轮次结束失去覆盖'));assert.throws(()=>prepareRoleContext(domain,'RoleArchitect','x'.repeat(65535)),{code:'prompt_budget'});
+});
+test('customer projection hides the entire private member journal while paged action facts retain provenance',async()=>{
+ const {publicMemberJournal,roleLogPage,projectFactsPage,projectOutputsPage}=await import('../../src/models/workbench.mjs');
+ const at='2026-10-12T00:00:00.000Z',runId='private-run',planDigest='b'.repeat(64);
+ let journal=beginMemberConversation(createMemberConversations(projectId),{id:runId,roleId:'Builder',taskId:'build',instanceId:'builder-instance',runId,planDigest,startedAt:at});
+ for(const event of [
+  {id:'brief',kind:'host_briefing',text:'private-host-briefing',tool:null,requestId:null,resource:null,checkId:null,status:null,reason:null,digest:null},
+  {id:'action',kind:'tool_request',text:'',tool:'legion_read_file',requestId:'request-one',resource:'src/a.mjs',checkId:null,status:null,reason:null,digest:null},
+  {id:'answer',kind:'assistant_text',text:'private-member-answer',tool:null,requestId:null,resource:null,checkId:null,status:null,reason:null,digest:null}
+ ]) journal=appendMemberConversation(journal,{...event,conversationId:runId,createdAt:at});
+ const publicJournal=publicMemberJournal(journal);assert.equal(publicJournal.events.length,0);assert.equal(publicJournal.runs.length,0);assert.equal(JSON.stringify(publicJournal).includes('private-'),false);
+ const project={id:projectId,plan:{planDigest},tasks:[{id:'build',roleId:'Builder',runId,results:[{resource:'src/a.mjs',status:'written',action:'write_file',success:true,observedMutation:true,auditFailed:false,reason:'written',contentDigest:sha},{resource:'src/b.mjs',status:'denied',action:'write_file',success:false,observedMutation:false,auditFailed:false,reason:'unowned_file',contentDigest:null}],generatedOutputs:[{resource:'dist',generationDigest:'c'.repeat(64)}]}]};
+ const domain={memberConversations:journal,evidence:[],acceptances:[],shellWorkflow:{requests:[]}};
+ const log=roleLogPage(domain,project,{roleId:'Builder',limit:1});assert.equal(log.events.length,1);assert.equal(log.events[0].tool,'legion_read_file');assert.equal(JSON.stringify(log).includes('private-'),false);
+ const first=projectFactsPage(domain,project,{kind:'changes',limit:1});assert.equal(first.items.length,1);assert.ok(first.nextCursor);assert.equal(first.items[0].sourceRef.startsWith('task-result:'),true);
+ const second=projectFactsPage(domain,project,{kind:'changes',limit:1,cursor:first.nextCursor});assert.equal(second.items[0].status,'denied');
+ assert.throws(()=>projectFactsPage(domain,{...project,tasks:[{...project.tasks[0],results:[]}]},{kind:'changes',cursor:first.nextCursor}),{code:'stale_cursor'});
+ const output=projectOutputsPage(domain,project,{}, {'dist/':'c'.repeat(64)});assert.equal(output.items[0].status,'current');
 });

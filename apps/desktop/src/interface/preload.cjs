@@ -16,5 +16,12 @@ contextBridge.exposeInMainWorld('legionDesktop', Object.freeze({
   cancelTurn: (input) => ipcRenderer.invoke('legion-desktop:cancelTurn', input),
   stopExecution: (input) => ipcRenderer.invoke('legion-desktop:stopExecution', input),
   testConnection: (input) => ipcRenderer.invoke('legion-desktop:testConnection', input),
-  cancelProbe: (input) => ipcRenderer.invoke('legion-desktop:cancelProbe', input)
+  cancelProbe: (input) => ipcRenderer.invoke('legion-desktop:cancelProbe', input),
+  listProjectFiles: (input) => ipcRenderer.invoke('legion-desktop:listProjectFiles', input),
+  readProjectFile: (input) => ipcRenderer.invoke('legion-desktop:readProjectFile', input),
+  queryRoleActivity: (input) => ipcRenderer.invoke('legion-desktop:queryRoleActivity', input),
+  queryRoleLog: (input) => ipcRenderer.invoke('legion-desktop:queryRoleLog', input),
+  queryProjectFacts: (input) => ipcRenderer.invoke('legion-desktop:queryProjectFacts', input),
+  queryProjectOutputs: (input) => ipcRenderer.invoke('legion-desktop:queryProjectOutputs', input),
+  queryProjectMemory: (input) => ipcRenderer.invoke('legion-desktop:queryProjectMemory', input)
 }));

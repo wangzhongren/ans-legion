@@ -32,5 +32,17 @@ export class MemoryServiceImpl{
   const available=currentFacts(next).filter(item=>item.status==='active'&&(input.kind===null||item.kind===input.kind)).sort((a,b)=>a.factId.localeCompare(b.factId));if(offset>available.length)fail('stale_memory_cursor');
   const facts=available.slice(offset,offset+input.limit).map(item=>({factId:item.factId,ownerRoleId:item.ownerRoleId,kind:item.kind,statement:item.statement,revision:item.revision,sources:item.sourceRefs.map(ref=>{const source=registry.sources.find(item=>item.id===ref);let label='Historical registered source';if(source)label=source.label;return {id:ref,label};})}));let cursor=null;if(offset+facts.length<available.length)cursor=next.digest+':'+(offset+facts.length);return {document:next,value:{facts,cursor,total:available.length}};
  },signal,secrets);}
+ async inspect(project,raw,registry,secrets=[],signal=null){
+  assertKnownKeyFree(raw,secrets);const input=memoryQuery(raw);
+  if(registry.projectId!==project.id)fail('memory_project_mismatch');
+  await this.#tail;if(this.#closed)fail('closed');if(signal?.aborted)fail('stale_action');
+  const stored=await this.#provider.read(project,secrets),view=staleView(assertKnownKeyFree(stored??emptyMemory(project.id),secrets),registry,secrets);
+  let offset=0;if(input.cursor!==null){const [digest,index]=input.cursor.split(':');if(digest!==view.digest||!/^(?:0|[1-9][0-9]*)$/u.test(index))fail('stale_memory_cursor');offset=Number(index);}
+  const available=currentFacts(view).filter(item=>item.status!=='retracted'&&(input.kind===null||item.kind===input.kind)).sort((a,b)=>a.factId.localeCompare(b.factId));
+  if(offset>available.length||signal?.aborted)fail('stale_memory_cursor');
+  const facts=available.slice(offset,offset+input.limit).map(item=>({factId:item.factId,ownerRoleId:item.ownerRoleId,kind:item.kind,statement:item.statement,revision:item.revision,status:item.status,sources:item.sourceRefs.map(ref=>{const source=registry.sources.find(candidate=>candidate.id===ref);return {id:ref,label:source?.label??'历史来源'};})}));
+  let cursor=null;if(offset+facts.length<available.length)cursor=view.digest+':'+(offset+facts.length);
+  return assertKnownKeyFree({facts,cursor,total:available.length,sourceDigest:view.digest},secrets);
+ }
  async close(){this.#closed=true;await this.#tail;this.#provider.close();}
 }

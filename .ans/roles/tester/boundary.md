@@ -102,3 +102,12 @@ Tester UI/e2e 默认 hidden 不抢用户焦点；真实 live GUI 展示单独由
 | 条件生成目录 | `.ans/runtime/legion-cli-role-owned-v2/Tester/evidence/` | 仅本角色本阶段隔离运行产物；新 run 不覆盖历史证据 |
 | 条件生成目录 | `.ans/runtime/legion-cli-role-owned-v2/Tester/packaging/` | 仅本角色本阶段隔离运行产物；新 run 不覆盖历史证据 |
 | 条件生成目录 | `.ans/runtime/legion-cli-role-owned-v2/Tester/npm-cache/` | 仅本角色本阶段隔离运行产物；新 run 不覆盖历史证据 |
+
+
+项目指挥台 v1 候选实施范围（设计 v0.3；精确配置待 Human 确认，当前不得实施）：
+
+以下既有角色独占文件由新配置缩小派发；本次只新增设计文档，不转交文件归属。
+
+本阶段生成效果仅 `.ans/runtime/legion-desktop-command-center-v1/Tester/` 下 evidence, fixtures, user-data, tmp, packaging, npm-cache, electron-cache, screenshots 明确子目录；每次新 run，不覆盖1.1.3旧包或旧证据。可启动受控localhost与本次跟踪Electron/Node进程；仅清理已核本次身份的资源。PM原已接受的 node_modules/真实安装权限保持，不手改安装源码。
+
+项目指挥台64文件范围和300秒GUI门修正版已获Human接受；配置 `.ans/decisions/legion-desktop-command-center-v1-check-timeout-project.json` SHA `586fa7aa28f8283b90440d512200c04dd7ead8a373ca8ace4d443c568324b5a6`。同v0.3设计，实际写入仍须固定Supervisor task_ops精确派发。

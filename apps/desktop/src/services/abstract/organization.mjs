@@ -15,7 +15,9 @@ export function organizationServiceOptions(value) { exactObject(value, ['userDat
  * load first validates old three-role schema/digest, then CAS migrates the fourth fixed Supervisor and invalidates pending execution. */
 
 /** Su frontdoor: migrate(project,knownSecrets,signal) validates original v1 digest then CAS commits v2.
- * queryRoleActivity/queryRoleLog(project,input,actor) return pure safe action facts; cursor pins filtered records up to a stable boundary, not Org revision.
+ * queryRoleActivity/queryRoleLog(project,input,actor) are model-only facts with a trusted Supervisor actor.
+ * inspectRoleActivity/inspectRoleLog are separate customer reads bound by the Host to its selected project; neither returns member text.
+ * Log cursors pin filtered records up to a stable boundary, not Org revision.
  * saveDelegation(project,entry,customerActor,signal) stores only trusted bounded binding/protocol state; no grant/credential or duplicated progress store.
  * saveRoleMemory includes a trusted channel. History is readonly; all current customer messages belong to customerTimeline.
  */

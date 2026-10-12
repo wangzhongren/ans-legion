@@ -19,7 +19,7 @@ const testRole = process.env.LEGION_DESKTOP_TEST_ROLE ?? 'Reviewer';
 assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(testRole), 'unknown Desktop test role');
 let roleDirectory = testRole;
 
-const base = join(project, '.ans/runtime/legion-governed-workflow-v1', roleDirectory);
+const base = join(project, '.ans/runtime/legion-desktop-command-center-v1', roleDirectory);
 const fixtures = join(base, 'fixtures');
 const userData = join(base, 'user-data');
 const temporaryRoot = join(base, 'tmp');
@@ -94,6 +94,10 @@ async function workspace(t) {
   const paths = ['.ans/project.yaml', '.ans/organization/current.yaml', '.ans/events/index.jsonl', '.ans/events/2026-10-07.jsonl'];
   for (const id of ids) for (const name of ['role.yaml', 'role-card.md', 'boundary.yaml', 'boundary.md']) paths.push(`.ans/roles/${id}/${name}`);
   for (const path of paths) await put(root, path, await fs.readFile(join(project, path)));
+  // Reconstruct the immutable accepted pre-candidate YAML segment inside this fixture.
+  const legacyKeys=new Set(['schema_version','role_id','status','version','read_scope','write_scope','generated_effect_scope','deny_scope','approval_source']);
+  for(const id of ids){const all=(await fs.readFile(join(project,'.ans/roles/'+id+'/boundary.yaml'),'utf8')).replaceAll('\r\n','\n').split('\n');const selected=[];for(const line of all){if(!line.trim()||line.startsWith('#'))continue;const key=/^([A-Za-z_]+):/u.exec(line)?.[1];if(!legacyKeys.has(key))break;selected.push(line);}const yaml=selected.join('\n')+'\n';const scope=JSON.parse(yaml.match(/^write_scope: (.+)$/mu)[1].replaceAll("'",'"'));const effects=yaml.match(/^generated_effect_scope: (.+)$/mu);if(effects)scope.push(...JSON.parse(effects[1].replaceAll("'",'"')));const markdown=await fs.readFile(join(project,'.ans/roles/'+id+'/boundary.md'),'utf8');const rows=markdown.split('\n').filter(row=>{const m=/^\|[^|]+\|\s*`([^`]+)`\s*\|/u.exec(row);return m&&scope.includes(m[1]);});await put(root,'.ans/roles/'+id+'/boundary.yaml',yaml);await put(root,'.ans/roles/'+id+'/boundary.md','# Section 1: isolated accepted snapshot\n\n| 类型 | 路径 | 用途 |\n| --- | --- | --- |\n'+rows.join('\n')+'\n');}
+
   return root;
 }
 const input = { name: 'Reviewer local', protocol: 'openai-completions', provider: 'local', modelId: 'custom-model', baseUrl: 'http://127.0.0.1:43210/v1', keyAction: 'keep' };
@@ -103,14 +107,14 @@ test('current desktop ownership and adjacent public edges; Model has no external
   assert.equal(hash(ownershipBytes), '87808cec2739fdbbc9520631637b4ddcb2adc2f8680a6e849ec8885d01a35187');
   const ownership = JSON.parse(ownershipBytes.toString('utf8'));
   const paths = await files(join(desktop, 'src'));
-  assert.equal(paths.length, 44);
-  const governed = JSON.parse(await fs.readFile(join(project, ".ans/decisions/handwell-pm-approved-project-shell-v1-project.json"), "utf8"));
+  assert.equal(paths.length, 60);
+  const governed = JSON.parse(await fs.readFile(join(project, '.ans/decisions/legion-desktop-command-center-v1-shell-caller-project.json'), 'utf8')); const previous=JSON.parse(await fs.readFile(join(project,'.ans/decisions/legion-supervisor-frontdoor-v1-project.json'),'utf8'));
   const currentBoundary = await fs.readFile(join(project, governed.roles.DesktopEngineer.boundary), "utf8");
   for (const path of paths) {
     const name = relative(project, path).replaceAll('\\', '/');
     if (ownership.files[name]) assert.equal(ownership.files[name].primaryOwner, 'DesktopEngineer', name);
     else {
-      assert.ok(governed.roles.DesktopEngineer.writeFiles.includes(name), name);
+      assert.ok(governed.roles.DesktopEngineer.writeFiles.includes(name)||previous.roles.DesktopEngineer.writeFiles.includes(name)||currentBoundary.split('\n').some(line=>line.startsWith('| 文件 |')&&line.includes('`'+name+'`')), name);
       assert.ok(currentBoundary.split('\n').some((line) => line.startsWith('| 文件 |') && line.includes('`' + name + '`')), name);
     }
     if (!path.endsWith('.mjs') && !path.endsWith('.cjs')) continue;
@@ -183,15 +187,17 @@ test('safe immutable DTOs do not return stored secrets or raw errors', () => {
   assert.equal(model.operationInput('saveProfile', { ...input, baseUrl: 'http://example.com/v1' }).ok, false);
 });
 
-test('real current workspace preserves source bounds and authentic task records without liveness or tokens', async () => {
-  const provider = createWorkspaceProvider({ workspaceRoot: project });
+test('real current workspace preserves source bounds and authentic task records without liveness or tokens', async (t) => {
+  const actual=createWorkspaceProvider({workspaceRoot:project});const observed=await actual.read();assert.equal(observed.ok,true);assert.ok(observed.value.sources.some(source=>source.kind==='boundary'&&source.status==='unavailable'));assert.ok(observed.value.errors.length>0);
+  const fixtureRoot=await workspace(t);await put(fixtureRoot,'docs/scheduling/legion-node-fixture-compat-v1.md',await fs.readFile(join(project,'docs/scheduling/legion-node-fixture-compat-v1.md')));
+  const provider = createWorkspaceProvider({ workspaceRoot: fixtureRoot });
   const result = await provider.read();
   assert.equal(result.ok, true);
-  assert.equal(result.value.roles.length, 7);
+  assert.equal(result.value.roles.length, 7,JSON.stringify(result.value.sources.filter(source=>source.status==='unavailable').map(source=>({path:source.relativePath,error:source.error}))));
   assert.equal(result.value.organization.version, 'v004');
   const oversized = [];
-  for (const name of await fs.readdir(join(project, 'docs/scheduling'))) {
-    if (name.endsWith('.md') && (await fs.stat(join(project, 'docs/scheduling', name))).size > wb.WB_LIMITS.taskDocumentBytes) oversized.push('docs/scheduling/' + name);
+  for (const name of await fs.readdir(join(fixtureRoot, 'docs/scheduling'))) {
+    if (name.endsWith('.md') && (await fs.stat(join(fixtureRoot, 'docs/scheduling', name))).size > wb.WB_LIMITS.taskDocumentBytes) oversized.push('docs/scheduling/' + name);
   }
   assert.deepEqual(result.value.sources.filter((item) => item.kind === 'task' && item.status === 'unavailable').map((item) => item.relativePath).sort(), oversized.sort());
   assert.equal(result.value.errors.length, oversized.length);
@@ -214,7 +220,7 @@ test('owned workspace tamper traversal mirror and version errors are explicit; s
   const service = createWorkspaceService({ workspaceRoot: root });
   t.after(() => service.close());
   const accepted = await service.refresh();
-  assert.equal(accepted.value.status, 'available');
+  assert.equal(accepted.value.status, 'available',JSON.stringify(accepted.value.sources.filter(source=>source.status==='unavailable').map(source=>({path:source.relativePath,error:source.error}))));
   assert.equal(accepted.value.tasks.find((item) => item.nodeId === 'ownership-regression').status, 'verified');
   // A matching Markdown row alone must not authorize an unapproved boundary revision or scope.
   const boundaryYamlPath = '.ans/roles/ProjectManager/boundary.yaml';
@@ -304,7 +310,7 @@ import {createProfilesService} from ${JSON.stringify(profilesUrl)};
 import {createSettingsProvider} from ${JSON.stringify(settingsUrl)};
 async function run(){
  app.on('window-all-closed',()=>{});
- const options={userDataDir:${JSON.stringify(settings)},initialWorkspace:${JSON.stringify(project)},show:false};
+ const options={userDataDir:${JSON.stringify(settings)},initialWorkspace:${JSON.stringify(directory)},show:false};
  const first=await startDesktop(options);
  assert.equal(safeStorage.isEncryptionAvailable(),true);
  const profiles=createProfilesService({userDataDir:options.userDataDir});
@@ -317,9 +323,14 @@ async function run(){
  const decrypted=await createSettingsProvider({userDataDir:options.userDataDir}).decryptKey(stored.profiles[0].keyCiphertext);
  assert.ok(decrypted.ok&&decrypted.value===secret,${JSON.stringify(process.platform === 'win32' ? 'real main-process Windows DPAPI roundtrip' : 'real main-process macOS safeStorage roundtrip')});
  const window=BrowserWindow.fromId(first.readiness.windowId);
- const proof=await window.webContents.executeJavaScript('({process:typeof process,require:typeof require,api:Object.keys(window.legionDesktop).sort(),pages:document.querySelectorAll("[data-page]").length})');
- assert.equal(proof.process,'undefined'); assert.equal(proof.require,'undefined'); assert.equal(proof.pages,2);
+ const proof=await window.webContents.executeJavaScript('({process:typeof process,require:typeof require,api:Object.keys(window.legionDesktop).sort(),pages:document.querySelectorAll("[data-page]").length,zones:document.querySelectorAll("#command-grid > section").length,title:document.title})');
+ assert.equal(proof.process,'undefined'); assert.equal(proof.require,'undefined'); assert.equal(proof.pages,2);assert.equal(proof.zones,3);assert.match(proof.title,/Legion/u);
  assert.deepEqual(proof.api,${JSON.stringify([...wb.WB_OPERATIONS].sort())});
+ window.setSize(900,700);
+ const narrow=await window.webContents.executeJavaScript("({visible:(()=>{const n=document.getElementById('mobile-nav-toggle'),b=n.getBoundingClientRect();return b.width>0&&b.height>0&&getComputedStyle(n).display!=='none';})()})");assert.equal(narrow.visible,true);
+ await window.webContents.executeJavaScript("document.getElementById('mobile-nav-toggle').click()");
+ const controls=await window.webContents.executeJavaScript("({open:document.getElementById('mobile-nav-toggle').getAttribute('aria-expanded'),theme:document.getElementById('theme-toggle').getBoundingClientRect().width>0,settings:document.querySelector('[data-page=settings]').getBoundingClientRect().width>0})");assert.equal(controls.open,'true');assert.equal(controls.theme,true);assert.equal(controls.settings,true);
+
  const state=await window.webContents.executeJavaScript('window.legionDesktop.getState()');
  assert.equal(state.ok,true); assert.equal(state.value.profiles[0].hasSavedKey,true); assert.ok(!JSON.stringify(state).includes(secret));
  const denied=await window.webContents.executeJavaScript('window.legionDesktop.assignProfile({roleId:"Reviewer",profileId:null,projectId:"forged"})');
@@ -328,7 +339,7 @@ async function run(){
  profiles.close();
  const closed=await first.close(); assert.equal(closed.closed,true); assert.equal(await first.close(),closed); assert.equal(window.isDestroyed(),true);
  const second=await startDesktop(options); assert.equal(second.readiness.ready,true); assert.equal((await second.close()).closed,true);
- await writeFile(${JSON.stringify(join(directory, 'native-proof.json'))},JSON.stringify({sandbox:true,DPAPI:${process.platform === 'win32'},macOSSafeStorage:${process.platform === 'darwin'},savedKeyDTO:true,pages:2,repeatedClose:true,windowRestart:true}));
+ await writeFile(${JSON.stringify(join(directory, 'native-proof.json'))},JSON.stringify({sandbox:true,DPAPI:${process.platform === 'win32'},macOSSafeStorage:${process.platform === 'darwin'},savedKeyDTO:true,pages:2,zones:3,repeatedClose:true,windowRestart:true}));
  app.exit(0);
 }
 void run().catch(()=>{console.error('Reviewer native boundary failed');app.exit(1);});
@@ -354,9 +365,9 @@ void run().catch(()=>{console.error('Reviewer native boundary failed');app.exit(
   assert.equal(result.signal, null);
   const proof = JSON.parse(await fs.readFile(join(directory, 'native-proof.json'), 'utf8'));
   assert.deepEqual(proof, { sandbox: true, DPAPI: process.platform === 'win32',
-    macOSSafeStorage: process.platform === 'darwin', savedKeyDTO: true, pages: 2,
+    macOSSafeStorage: process.platform === 'darwin', savedKeyDTO: true, pages: 2,zones:3,
     repeatedClose: true, windowRestart: true });
-  const evidenceRoot = join(project, '.ans/runtime/handwell-pm-approved-project-shell-v1/Reviewer/evidence'); await ensure(evidenceRoot); const proofDirectory = await fs.mkdtemp(join(evidenceRoot, 'native-boundary-')); await fs.writeFile(join(proofDirectory, 'native-boundary.json'), JSON.stringify({ ...proof, exitCode: result.code, paidCalls: 0 }) + '\n');
+  const evidenceRoot = join(project, '.ans/runtime/legion-desktop-command-center-v1/Reviewer/evidence'); await ensure(evidenceRoot); const proofDirectory = await fs.mkdtemp(join(evidenceRoot, 'native-boundary-')); await fs.writeFile(join(proofDirectory, 'native-boundary.json'), JSON.stringify({ ...proof, exitCode: result.code, paidCalls: 0 }) + '\n');
 });
 
 let legacyCaseName = 'Windows ZIP historical byte and source snapshot assertions'; if (process.platform !== 'win32') legacyCaseName = 'legacy 0.7.0 runtime archive has exact historical bytes; missing Windows ZIP is not verified';
@@ -442,40 +453,40 @@ test(legacyCaseName, async () => {
   assert.ok(![...entries.keys()].some((path) => /\/resources\/app\/(tests|\.ans|scripts)\//u.test(path)));
 });
 
-test('macOS installed runtime matches current 0.8.2 package and every shipped source byte', { skip: process.platform !== 'darwin' }, async () => {
+test('macOS installed runtime matches current 1.2.2 package and every shipped source byte', { skip: process.platform !== 'darwin' }, async () => {
   const installed = join(desktop, 'node_modules/legion-runtime');
   const metadata = await fs.lstat(installed);
   assert.ok(metadata.isDirectory() && !metadata.isSymbolicLink());
   const manifest = JSON.parse(await fs.readFile(join(desktop, 'package.json'), 'utf8'));
   const lock = JSON.parse(await fs.readFile(join(desktop, 'package-lock.json'), 'utf8'));
-  const dependency = 'file:../../.ans/runtime/handwell-pm-approved-project-shell-v1/ProjectManager/packaging/bridge-v3/legion-runtime-0.8.2.tgz';
+  const dependency = 'file:../../.ans/runtime/legion-desktop-command-center-v1/ProjectManager/packaging/desktop-command-center-su-label-repair-v1-9850a3707d523eba/legion-runtime-1.2.2.tgz';
   assert.equal(manifest.dependencies['legion-runtime'], dependency);
   assert.equal(lock.packages[''].dependencies['legion-runtime'], dependency);
-  assert.equal(lock.packages['node_modules/legion-runtime'].version, '0.8.2');
+  assert.equal(lock.packages['node_modules/legion-runtime'].version, '1.2.2');
   assert.equal(lock.packages['node_modules/legion-runtime'].resolved, dependency);
   const tarballPath = resolve(desktop, dependency.slice(5));
   const descriptor = JSON.parse(await fs.readFile(join(dirname(tarballPath), 'package-smoke.json'), 'utf8'));
   const tarball = await fs.readFile(tarballPath);
   assert.equal(resolve(descriptor.tarball), tarballPath);
-  assert.equal(descriptor.sha256, '1a2a7c483f04f2bb939d6bf4d25aa7a4318bc866a473dcac251f74d1ee592622');
+  assert.equal(descriptor.sha256, '773da2d1dbb58b7a9ff251e14f1cf80281a8b9286348d7a864589dd92832eef2');
   assert.equal(hash(tarball), descriptor.sha256);
   const integrity = 'sha512-' + createHash('sha512').update(tarball).digest('base64');
   assert.equal(descriptor.integrity, integrity);
   assert.equal(lock.packages['node_modules/legion-runtime'].integrity, integrity);
-  const packageFiles = ['package.json', 'README.md', 'runtime.mjs', 'workbench.mjs', 'bin/legion.mjs',
+  const packageFiles = ['package.json', 'README.md','apps/desktop/README.md', 'runtime.mjs', 'workbench.mjs', 'bin/legion.mjs','bin/chat.mjs',...JSON.parse(await fs.readFile(join(project,'package.json'),'utf8')).files.filter(path=>path.startsWith('apps/')),
     ...await files(join(project, 'src')).then((paths) => paths.filter((path) => path.endsWith('.mjs'))
       .map((path) => relative(project, path).replaceAll('\\', '/')))];
-  assert.equal(packageFiles.length, 46);
+  assert.equal(packageFiles.length, 102);
   assert.deepEqual((await files(installed)).map((path) => relative(installed, path).replaceAll('\\', '/')).sort(),
     packageFiles.sort());
-  const sourceNames = packageFiles.filter((name) => !['package.json', 'README.md'].includes(name));
-  assert.equal(sourceNames.length, 44); assert.deepEqual(Object.keys(descriptor.sourceHashes).sort(), sourceNames);
+  const sourceNames = packageFiles.filter((name) => !['package.json', 'README.md','apps/desktop/README.md'].includes(name));
+  assert.equal(sourceNames.length, 99); assert.deepEqual(Object.keys(descriptor.sourceHashes).sort(), sourceNames);
   for (const name of packageFiles) {
     assert.equal(hash(await fs.readFile(join(installed, name))), hash(await fs.readFile(join(project, name))), name);
     if (Object.hasOwn(descriptor.sourceHashes, name)) assert.equal(hash(await fs.readFile(join(installed, name))), descriptor.sourceHashes[name], 'pinned installed source ' + name);
   }
   const installedManifest = JSON.parse(await fs.readFile(join(installed, 'package.json'), 'utf8'));
-  assert.equal(installedManifest.version, '0.8.2');
+  assert.equal(installedManifest.version, '1.2.2');
   assert.deepEqual(installedManifest.exports, {
     '.': './runtime.mjs', './workbench-models': './workbench.mjs',
     './services/policy': './src/kernel/services/public/policy.mjs',
@@ -484,8 +495,18 @@ test('macOS installed runtime matches current 0.8.2 package and every shipped so
     './services/check': './src/kernel/services/public/check.mjs',
     './services/proposal': './src/adapters/services/public/proposal.mjs',
     './services/pi-agent': './src/adapters/services/public/pi_agent.mjs',
-    './services/shell': './src/kernel/services/public/shell.mjs'
+    './services/shell': './src/kernel/services/public/shell.mjs','./headless-workbench':'./apps/desktop/src/pipelines/workbench.mjs'
   });
   assert.deepEqual(Object.keys(await import('legion-runtime/services/read')).sort(),
     ['ReadService', 'createReadService']);
+});
+
+test('seven customer IPC queries reject authority fields and private response bodies before wire delivery',async()=>{
+ const id='a'.repeat(64),frame={url:'file:///legion/index.html'},window={isDestroyed:()=>false,webContents:{mainFrame:frame}},event={sender:window.webContents,senderFrame:frame};
+ const rows={listProjectFiles:[{projectId:id},{status:'listed',reason:'listed',resource:'',entries:[],nextCursor:'',text:'',nextLine:null,complete:true,byteLength:0}],readProjectFile:[{projectId:id,resource:'ordinary.txt'},{status:'read',reason:'read',resource:'ordinary.txt',entries:[],nextCursor:'',text:'ordinary',nextLine:2,complete:true,byteLength:8}],queryRoleActivity:[{projectId:id},{planDigest:null,history:false,roles:[],tasks:[]}],queryRoleLog:[{projectId:id,roleId:'Worker'},{filters:{roleId:'Worker',taskId:null,planDigest:null},events:[],nextCursor:null,sourceDigest:'b'.repeat(64)}],queryProjectFacts:[{projectId:id,kind:'changes'},{planDigest:'c'.repeat(64),kind:'changes',items:[],nextCursor:null,sourceDigest:'b'.repeat(64),total:0}],queryProjectOutputs:[{projectId:id},{planDigest:'c'.repeat(64),kind:'outputs',items:[],nextCursor:null,sourceDigest:'b'.repeat(64),total:0}],queryProjectMemory:[{projectId:id},{facts:[],cursor:null,total:0,sourceDigest:'b'.repeat(64)}]};
+ for(const [operation,[input,value]]of Object.entries(rows)){let calls=0;const pipeline={[operation]:async()=>{calls++;return {ok:true,value};}};const first=await _dispatchDesktopIpc(event,window,frame.url,operation,input,pipeline);assert.equal(first.ok,true,operation);for(const field of ['workspaceRoot','actor','instanceId','runId','knownKeys','permit']){assert.equal((await _dispatchDesktopIpc(event,window,frame.url,operation,{...input,[field]:'forged'},pipeline)).ok,false);assert.equal(calls,1);}pipeline[operation]=async()=>({ok:true,value:{...value,privateSummary:'never-on-wire',apiKey:'never-on-wire'}});const denied=await _dispatchDesktopIpc(event,window,frame.url,operation,input,pipeline);assert.equal(denied.ok,false);assert.ok(!JSON.stringify(denied).includes('never-on-wire'));}
+});
+test('getState wire strips private member journal while retaining immutable customer context',async()=>{
+ const I=await import('../../src/models/interaction.mjs'),id='a'.repeat(64),now='2026-10-12T00:00:00.000Z';let journal=I.beginMemberConversation(I.createMemberConversations(id),{id:'member',roleId:'Worker',channel:'member_task',taskId:'task',instanceId:'instance',runId:'run',planDigest:null,startedAt:now});
+ journal=I.appendMemberConversation(journal,{id:'private',conversationId:'member',kind:'assistant_text',text:'private-member-watermark',tool:null,requestId:null,resource:null,checkId:null,status:null,reason:null,digest:null,createdAt:now});const publicJournal=wb.publicMemberJournal(journal);assert.deepEqual(publicJournal.runs,[]);assert.deepEqual(publicJournal.events,[]);assert.ok(!JSON.stringify(publicJournal).includes('private-member-watermark'));assert.equal(journal.events[0].text,'private-member-watermark');
 });

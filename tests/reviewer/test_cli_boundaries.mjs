@@ -10,11 +10,11 @@ import {createProjectLeaseProvider} from '../../apps/desktop/src/providers/publi
 import {assertKnownKeyFree,workbenchInput} from '../../apps/desktop/src/models/workbench.mjs';
 import {AgentScope,TaskDispatchContext,ProjectFileOwners} from '../../workbench.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
-const stage=join(root,'.ans/runtime/legion-cli-role-owned-v2/Reviewer');
+const stage=join(root,'.ans/runtime/legion-desktop-command-center-v1/Reviewer');
 async function fixture(t){await fs.mkdir(join(stage,'fixtures'),{recursive:true});const base=await fs.mkdtemp(join(stage,'fixtures','cli-review-'));t.after(async()=>{assert.equal((await fs.lstat(base)).isSymbolicLink(),false);await fs.rm(base,{recursive:true});});return base;}
 test('production Node closure is complete, uses one Pipeline and excludes Electron',async()=>{
  const metadata=JSON.parse(await fs.readFile(join(root,'package.json'),'utf8'));
- assert.equal(metadata.version,'1.1.3');assert.equal(metadata.exports['./headless-workbench'],'./apps/desktop/src/pipelines/workbench.mjs');
+ assert.equal(metadata.version,'1.2.2');assert.equal(metadata.exports['./headless-workbench'],'./apps/desktop/src/pipelines/workbench.mjs');
  const visited=new Set();async function visit(path){if(visited.has(path))return;visited.add(path);const source=await fs.readFile(path,'utf8');for(const match of source.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)['"]([^'"]+)['"]/gu)){const spec=match[1];if(spec==='electron'){assert.equal(path,join(root,'apps/desktop/src/providers/impl/settings.mjs'));assert.match(source,/async function electronEncryption/u);continue;}if(spec.startsWith('.')){const target=resolve(dirname(path),spec);const from=path.slice(root.length+1),to=target.slice(root.length+1);
  if(from.includes('/pipelines/')&&!to.includes('/models/'))assert.ok(to.includes('/services/public/'),from+' -> '+to);
  if(from.includes('/services/')&&to.includes('/providers/'))assert.ok(to.includes('/providers/public/'),from+' -> '+to);

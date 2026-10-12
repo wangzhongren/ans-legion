@@ -9,7 +9,7 @@ import { createProjectService as realCreateProjectService } from '../../src/serv
 import { createOrganizationService } from '../../src/services/public/organization.mjs';
 import { FIXED_ROLE_DUTIES } from '../../src/models/organization.mjs';
 import { digestValue } from 'legion-runtime/workbench-models';
-const generated = fileURLToPath(new URL('../../../../.ans/runtime/legion-cli-role-owned-v2/DesktopEngineer/', import.meta.url));
+const generated = fileURLToPath(new URL('../../../../.ans/runtime/legion-desktop-command-center-v1/DesktopEngineer/', import.meta.url));
 await mkdir(join(generated, 'fixtures'), { recursive: true }); await mkdir(join(generated, 'user-data'), { recursive: true });
 async function fixture() {
  const directory = await mkdtemp(join(generated, 'fixtures', 'organization-')); const root = join(directory, 'customer'); await mkdir(root);
@@ -202,6 +202,10 @@ test('public action log cursor pins filtered snapshot, survives unrelated append
   await f.service.beginMemberRun(f.project,{id:'su-log',roleId:'Supervisor',channel:'su_customer',taskId:'customer',instanceId:su.instanceId,runId:'su-log',planDigest:null,startedAt:at},su);
   stage='append';for(let i=0;i<4;i++)await f.service.appendMemberEvent(f.project,{id:'action-'+i,conversationId:'su-log',kind:'tool_result',text:'',tool:'legion_list_files',requestId:'request-'+i,resource:null,checkId:null,status:'listed',reason:'listed',digest:null,createdAt:at},su);
   stage='first';const first=await f.service.queryRoleLog(f.project,{roleId:'Supervisor',limit:2},su);assert.equal(first.events.length,2);assert.ok(first.nextCursor);
+  const beforeInspect=await readFile(join(f.data,'workbench-organization',f.project.id+'.json'),'utf8');
+  const inspected=await f.service.inspectRoleLog(f.project,{roleId:'Supervisor',limit:2});assert.deepEqual(inspected,first);
+  const activity=await f.service.inspectRoleActivity(f.project,{roleId:'Supervisor'});assert.equal(activity.roles[0].id,'Supervisor');
+  assert.equal(await readFile(join(f.data,'workbench-organization',f.project.id+'.json'),'utf8'),beforeInspect);
   await f.service.appendMemberEvent(f.project,{id:'self-query',conversationId:'su-log',kind:'tool_result',text:'',tool:'legion_query_role_log',requestId:'query-request',resource:null,checkId:null,status:'completed',reason:'completed',digest:null,createdAt:at},su);
   stage='second';const second=await f.service.queryRoleLog(f.project,{roleId:'Supervisor',limit:2,cursor:first.nextCursor},su);assert.deepEqual(second.events.map(event=>event.id),['action-2','action-3']);assert.equal(second.sourceDigest,first.sourceDigest);assert.equal(second.nextCursor,null);
   await assert.rejects(f.service.queryRoleLog(f.project,{roleId:'Supervisor',taskId:'other',cursor:first.nextCursor},su),{code:'stale_cursor'});

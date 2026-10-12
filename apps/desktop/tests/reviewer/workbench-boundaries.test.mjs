@@ -24,7 +24,7 @@ const role = process.env.LEGION_DESKTOP_TEST_ROLE ?? 'Reviewer';
 assert.ok(['DesktopEngineer', 'ProjectManager', 'Reviewer', 'Tester'].includes(role));
 let roleDirectory = role;
 
-const base = join(project, '.ans/runtime/legion-cli-role-owned-v2', roleDirectory);
+const base = join(project, '.ans/runtime/legion-desktop-command-center-v1', roleDirectory);
 delete process.env.NODE_OPTIONS;
 delete process.env.NODE_COMPILE_CACHE;
 process.env.NODE_DISABLE_COMPILE_CACHE = '1';
@@ -141,7 +141,14 @@ async function fixture(t, handler, directCustomer = false, legacyHistory = null)
       if((call.body.tools??[]).some(item=>item.function.name==='legion_delegate_pm')&&!directCustomer){
         const names=call.body.tools.map(item=>item.function.name).sort();assert.deepEqual(names,['legion_delegate_pm','legion_list_files','legion_query_memory','legion_query_role_activity','legion_query_role_log','legion_read_file','legion_remember_fact','legion_request_interaction']);
         const results=call.body.messages.filter(item=>item.role==='tool').map(item=>JSON.parse(item.content));
-        if(results.some(item=>item.result?.payload?.delegationId))complete(reply,'Su reports actual PM result');
+        const currentText=call.body.messages.flatMap(item=>typeof item.content==='string'?[item.content]:Array.isArray(item.content)?item.content.map(part=>part.text??''):[]).join('\n');
+        if(currentText.includes('review-query-while-running')){
+          if(results.length===0)complete(reply,'',{payload:{}},'legion_query_role_activity','during-activity');
+          else if(results.length===1){assert.ok(results[0].result.payload.tasks.some(task=>task.status==='running'));complete(reply,'',{payload:{action:'add',kind:'preference',statement:'Do not change current plan',sourceRefs:['human:unused'],expectedRevision:0}},'legion_remember_fact','during-remember');}
+          else if(results.length===2){assert.equal(results.at(-1).result.reason,'execution_busy');complete(reply,'',{payload:{kind:'question',purpose:'discussion',title:'must not be created',text:'business-changing request',options:[],allowSupplement:false}},'legion_request_interaction','during-question');}
+          else if(results.length===3){assert.equal(results.at(-1).result.reason,'execution_busy');complete(reply,'',{payload:{action:'start',purpose:'plan',instruction:'must not change plan',sourceRefs:['human:unused']}},'legion_delegate_pm','during-delegate');}
+          else{assert.equal(results.at(-1).result.reason,'execution_busy');complete(reply,'Verified read-only progress');}
+        } else if(results.some(item=>item.result?.payload?.delegationId))complete(reply,'Su reports actual PM result');
         else{const strings=call.body.messages.flatMap(item=>typeof item.content==='string'?[item.content]:Array.isArray(item.content)?item.content.map(part=>part.text??''):[]).join('\n');const ref=[...strings.matchAll(/human:[A-Za-z0-9_.-]+/gu)].at(-1)?.[0];assert.ok(ref);complete(reply,'',{payload:{action:'start',purpose:'plan',instruction:'Prepare exact requested plan',sourceRefs:[ref]}},'legion_delegate_pm','su-delegate');}
       } else if ((call.body.tools ?? []).some(item=>item.function.name==='legion_submit_supervision')) {
         const names=call.body.tools.map(item=>item.function.name).sort();assert.deepEqual(names,['legion_list_files','legion_query_memory','legion_query_role_activity','legion_query_role_log','legion_read_file','legion_remember_fact','legion_submit_supervision']);
@@ -215,6 +222,7 @@ async function until(pipeline, predicate) {
   }
   const final=await pipeline.getState(); assert.fail('bounded workbench condition not reached '+JSON.stringify(final));
 }
+async function untilPrivateDomain(f,predicate){for(let i=0;i<220;i++){const domain=JSON.parse(await fs.readFile(join(f.data,'workbench-organization',f.id+'.json'),'utf8'));if(predicate(domain))return domain;await delay(10);}assert.fail('bounded private fixture condition not reached');}
 async function draft(f, expectPlan = true) {
   assert.equal((await f.pipeline.sendMessage({ projectId: f.id, roleId: 'Supervisor', text: 'Prepare exact plan' })).ok, true);
   return until(f.pipeline, (state) => state.turn?.status === 'completed' && (!expectPlan || state.plan?.status === 'draft'));
@@ -343,6 +351,13 @@ test('Su delegates exact PM plan; legacy PM History bytes remain read-only acros
   assert.equal(done.tasks[0].checkStatus, 'passed'); assert.equal(done.tasks[0].results[0].observedMutation, true);
   assert.equal(done.tasks.find((task) => task.id === 'acceptance').acceptanceStatus, 'pass');
   assert.equal(await fs.readFile(join(f.root, 'a.txt'), 'utf8'), 'actual controlled write');
+  const { _dispatchDesktopIpc }=await import('../../src/interface/main.mjs'),frame={url:'file:///reviewer/index.html'},window={isDestroyed:()=>false,webContents:{mainFrame:frame}},event={sender:window.webContents,senderFrame:frame};
+  const queries={listProjectFiles:{projectId:f.id},readProjectFile:{projectId:f.id,resource:'a.txt'},queryRoleActivity:{projectId:f.id},queryRoleLog:{projectId:f.id,roleId:'Worker',limit:1},queryProjectFacts:{projectId:f.id,kind:'changes'},queryProjectOutputs:{projectId:f.id},queryProjectMemory:{projectId:f.id}};
+  const inspected={};for(const [operation,input]of Object.entries(queries)){const result=await _dispatchDesktopIpc(event,window,frame.url,operation,input,f.pipeline);assert.equal(result.ok,true,operation+' '+JSON.stringify(result));inspected[operation]=result.value;}
+  const checks=await _dispatchDesktopIpc(event,window,frame.url,'queryProjectFacts',{projectId:f.id,kind:'checks'},f.pipeline);assert.equal(checks.ok,true);assert.ok(checks.value.items.some(item=>item.executed&&item.status==='passed'&&item.sourceRef.startsWith('check:')));
+  const accepts=await _dispatchDesktopIpc(event,window,frame.url,'queryProjectFacts',{projectId:f.id,kind:'acceptances'},f.pipeline);assert.equal(accepts.ok,true);assert.ok(accepts.value.items.some(item=>item.decision==='pass'&&item.sourceRef.startsWith('acceptance:')));
+  assert.equal(inspected.readProjectFile.text,'actual controlled write');assert.ok(inspected.queryProjectFacts.items.some(item=>item.observedMutation&&item.sourceRef.startsWith('task-result:')));assert.ok(inspected.queryRoleActivity.tasks.some(task=>task.id==='a'&&task.status==='completed'));assert.ok(inspected.queryRoleLog.events.every(item=>!['assistant_text','host_briefing'].includes(item.kind)));assert.equal(done.memberConversations.runs.length,0);assert.equal(done.memberConversations.events.length,0);
+
   const events = (await fs.readFile(join(f.root, '.ans/events/index.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse);
   assert.ok(events.some((event) => event.kind === 'mutation_success'));
   assert.ok(events.every((event) => event.recordedAt.endsWith('+08:00')));
@@ -388,6 +403,12 @@ test('stop synchronously revokes before queued state read; late SDK write cannot
   assert.equal((await confirm(f, staged)).ok, true);
   for (let i = 0; i < 250 && !held; i += 1) await delay(10);
   assert.ok(held);
+  const before=(await f.pipeline.getState()).value;
+  const read=await f.pipeline.readProjectFile({projectId:f.id,resource:'package.json'});assert.equal(read.ok,true);
+  const memory=await f.pipeline.queryProjectMemory({projectId:f.id});assert.equal(memory.ok,true);
+  assert.equal((await f.pipeline.sendMessage({projectId:f.id,roleId:'Supervisor',text:'review-query-while-running'})).ok,true);
+  const after=await until(f.pipeline,state=>state.turn?.status==='completed'&&state.turn.text==='Verified read-only progress');assert.equal(after.plan.status,'running');assert.equal(after.plan.planDigest,before.plan.planDigest);assert.equal(after.fileOwners.version,before.fileOwners.version);assert.deepEqual(after.tasks.map(task=>task.runId),before.tasks.map(task=>task.runId));assert.ok(!after.interactions.some(request=>request.title==='must not be created'));
+  assert.deepEqual((await f.pipeline.queryProjectMemory({projectId:f.id})).value,memory.value);
   assert.equal((await f.pipeline.stopExecution({ projectId: '0'.repeat(64) })).error.code, 'project_missing');
   const original = f.profiles.list.bind(f.profiles); let entered; let unblock;
   const pending = new Promise((done) => { entered = done; });
@@ -441,7 +462,8 @@ test('cancel_turn leaves the same Su instance usable without restoring failed te
   },true);
   const started = await f.pipeline.sendMessage({ projectId: f.id, roleId: 'Supervisor', text: human });
   assert.equal(started.ok, true);
-  const active = await until(f.pipeline, (state) => state.turn?.status === 'running' && f.calls.length>0 && state.memberConversations.runs.some(run=>run.id===started.value.turn.id&&run.status==='running'));
+  const active = await until(f.pipeline, (state) => state.turn?.status === 'running' && f.calls.length>0);
+  await untilPrivateDomain(f,domain=>domain.memberConversations.runs.some(run=>run.id===started.value.turn.id&&run.status==='running'));
   assert.equal(active.turn.id, started.value.turn.id);
   const cancelled = await f.pipeline.cancelTurn({ projectId: f.id, turnId: started.value.turn.id });
   assert.equal(cancelled.ok, true); assert.equal(cancelled.value.turn.status, 'cancelled');
@@ -453,8 +475,12 @@ test('cancel_turn leaves the same Su instance usable without restoring failed te
   const done = await until(f.pipeline, (state) => ['completed','failed'].includes(state.turn?.status));
   assert.equal(done.turn.status,'completed',JSON.stringify({error:done.turn.error,calls:f.calls.length,fixtureErrors:f.errors.map(e=>e.stack)}));
   assert.equal(f.calls.length,2,'same process sends a real second HTTP request');
-  await until(f.pipeline,state=>state.memberConversations.runs.filter(run=>run.roleId==='Supervisor'&&run.channel==='su_customer'&&run.status!=='running').length===2);
-  const raw=JSON.parse(await fs.readFile(join(f.data,'workbench-organization',f.id+'.json'),'utf8')),runs=raw.memberConversations.runs.filter(run=>run.roleId==='Supervisor'&&run.channel==='su_customer');assert.equal(runs.length,2);assert.equal(runs[0].instanceId,runs[1].instanceId);assert.deepEqual(runs.map(run=>run.status),['cancelled','completed']);assert.ok(!JSON.stringify(raw.roleMemories.entries.filter(entry=>entry.channel==='su_customer')).includes(partial));
+  await untilPrivateDomain(f,domain=>domain.memberConversations.runs.filter(run=>run.roleId==='Supervisor'&&run.channel==='su_customer'&&run.status!=='running').length===2);
+  const raw=JSON.parse(await fs.readFile(join(f.data,'workbench-organization',f.id+'.json'),'utf8')),runs=raw.memberConversations.runs.filter(run=>run.roleId==='Supervisor'&&run.channel==='su_customer');assert.equal(runs.length,2);assert.equal(runs[0].instanceId,runs[1].instanceId);assert.equal(runs[0].runId,started.value.turn.id);assert.equal(runs[1].status,'completed');const firstTerminal=raw.memberConversations.events.find(event=>event.conversationId===runs[0].id&&event.kind==='terminal');assert.ok(firstTerminal);assert.equal(firstTerminal.text,'');assert.equal(firstTerminal.createdAt,runs[0].finishedAt);assert.equal(firstTerminal.status,runs[0].status);
+  // Exact provenance pairs from the two current Host paths; no arbitrary terminal allowance.
+  if(firstTerminal.reason==='run_cancelled'){assert.equal(firstTerminal.status,'interrupted');}
+  else {assert.equal(firstTerminal.reason,null);assert.equal(firstTerminal.status,'cancelled');}
+  assert.equal(raw.customerTimeline.turns.find(turn=>turn.id===started.value.turn.id).status,'cancelled');assert.equal(raw.memberConversations.events.filter(event=>event.conversationId===runs[0].id&&event.kind==='assistant_text').map(event=>event.text).join(''),'');assert.ok(!JSON.stringify(raw.roleMemories.entries.filter(entry=>entry.channel==='su_customer')).includes(partial));
   assert.deepEqual(done.history.messages.map((item) => item.text), [human, 'Continue', 'Continue safely']);
   assert.equal(done.history.messages.filter((message) => message.role === 'user' && message.text === human).length, 1);
   assert.equal(done.history.messages.some((message) => message.text.includes(partial)), false);
